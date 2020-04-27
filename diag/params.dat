@@ -1,0 +1,67 @@
+[System]
+# System size in natural units
+size = 2000.
+# Spatial discretization
+delta_x = 0.25
+# either periodic or open
+boundary_condition = open
+
+[Disorder]
+#  Various disorder types can be used
+# type = 'anderson_gaussian'
+# type = 'regensburg'
+# type = 'konstanz'
+# type = 'singapore'
+# type = 'speckle'
+type = speckle
+# Correlation length of disorder
+sigma = 1.0
+# Disorder strength
+V0 = 0.1
+
+[Nonlinearity]
+# g is the nonlinear interaction
+g = 0.0
+
+[Wavefunction]
+# Either plane_wave or gaussian_wave_packet
+initial_state = plane_wave
+# make sure that k_0_over_2_pi*my_system_size is an integer
+k_0_over_2_pi = 0.16
+#0.16
+# Size of Gaussian wavepacket
+sigma_0 = 10.0
+
+[Propagation]
+# Propagation method can be either 'ode' or 'che' (for Chebyshev)
+method = che
+data_layout = real
+# Total duration of the propagation
+t_max = 2000.
+# Elementary time step
+delta_t = 2.
+
+[Spectral]
+range = 20.0
+resolution = 0.02
+
+[Averaging]
+n_config = 10000
+
+[Measurement]
+delta_t_measurement = 2.
+#first_measurement = 0
+density = True
+density_momentum = True
+dispersion = True
+dispersion_momentum = True
+wavefunction_final = True
+autocorrelation = True
+extended = True
+
+[Diagonalization]
+method = sparse
+targeted_energy = 0.6
+IPR_min = 0.0
+IPR_max = 0.01
+number_of_bins = 50
