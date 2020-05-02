@@ -43,7 +43,7 @@ t_max = 2000.
 delta_t = 2.
 
 [Averaging]
-n_config = 10
+n_config = 1
 
 [Measurement]
 delta_t_measurement = 2.

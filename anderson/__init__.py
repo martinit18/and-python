@@ -29,8 +29,28 @@ class Timing:
     self.DUMMY_TIME=0.0
     self.LYAPOUNOV_TIME=0.0
     self.LYAPOUNOV_NOPS=0
-    return 
-    
+    self.MAX_NONLINEAR_PHASE=0.0
+    return
+
+  def mpi_merge(self,comm):
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      print("mpi4py is not found!")
+      return
+    self.GPE_TIME       = comm.reduce(self.GPE_TIME)
+    self.CHE_TIME       = comm.reduce(self.CHE_TIME)
+    self.EXPECT_TIME    = comm.reduce(self.EXPECT_TIME)
+    self.ODE_TIME       = comm.reduce(self.ODE_TIME)
+    self.TOTAL_TIME     = comm.reduce(self.TOTAL_TIME)
+    self.NUMBER_OF_OPS  = comm.reduce(self.NUMBER_OF_OPS)
+    self.N_SOLOUT       = comm.reduce(self.N_SOLOUT)
+    self.MAX_CHE_ORDER  = comm.reduce(self.MAX_CHE_ORDER,op=MPI.MAX)
+    self.DUMMY_TIME     = comm.reduce(self.DUMMY_TIME)
+    self.LYAPOUNOV_TIME = comm.reduce(self.LYAPOUNOV_TIME)
+    self.LYAPOUNOV_NOPS = comm.reduce(self.LYAPOUNOV_NOPS)
+    self.MAX_NONLINEAR_PHASE = comm.reduce(self.MAX_NONLINEAR_PHASE,op=MPI.MAX)
+
 """
 The class Potential is basically a 1D disordered potential, characterized by its length and the disorder strength
 """
@@ -45,7 +65,7 @@ The class Hamiltonian contains all properties that define a disordered Hamiltoni
 interaction if g for Gross-Pitaeskii
 script_tunneling and script_disorder are just rescaled variables used when the temporal propagation if performed using Chebyshev polynomials
 They are used in the rescaling of the Hamiltonian to bring its spectrum between -1 and +1
-"""  
+"""
 class Hamiltonian(Potential):
   def __init__(self, dim_x, delta_x, boundary_condition='periodic', disorder_type='anderson gaussian', correlation_length=0.0, disorder_strength=0.0, interaction=0.0):
     super().__init__(dim_x)
@@ -106,7 +126,7 @@ class Hamiltonian(Potential):
       return
 #      print(dim_x,mask_size)
 #      print(self.mask)
-#      self.mask[0]=dim_x        
+#      self.mask[0]=dim_x
     if disorder_type=='konstanz':
       self.generate = 'field mask'
       self.mask = np.zeros(dim_x)
@@ -124,10 +144,10 @@ class Hamiltonian(Potential):
 
   """
   Generate a specific disorder configuration
-  """    
+  """
   def generate_disorder(self,seed):
 # Here, the MKL Random Number Generator is used
-# Use instead the following two lines if you prefer Numpy RNG     
+# Use instead the following two lines if you prefer Numpy RNG
 # np.random.seed(i)
 # disorder = np.random.normal(scale=self.disorder_strength/np.sqrt(self.delta_x), size=self.dim_x)+2.0*self.tunneling
     mkl_random.RandomState(77777, brng='SFMT19937')
@@ -141,7 +161,7 @@ class Hamiltonian(Potential):
       return
 # When a field_mask is used, the initial data is a complex uncorrelated set of Gaussian distributed random numbers in configuration space
 # The Fourier transform in momentum space is also a complex uncorrelated set of Gaussian distributed random numbers
-# Thus the first FT is useless and can be short circuited      
+# Thus the first FT is useless and can be short circuited
     if self.generate=='field mask':
       self.disorder =  2.0*self.tunneling +0.5*self.disorder_strength*self.dim_x*np.abs(np.fft.ifft(self.mask*mkl_random.standard_normal(2*self.dim_x).view(np.complex128)))**2
 # Alternatively (slower)
@@ -154,63 +174,63 @@ class Hamiltonian(Potential):
   def print_potential(self):
     np.savetxt('potential.dat',self.disorder-2.0*self.tunneling)
     return
-  
+
   """
   Converts Hamiltonian to a full matrix for Lapack diagonalization
   """
-  
+
   def generate_full_matrix(self):
     n = self.dim_x
     matrix = np.diag(self.disorder)
     for i in range(n-1):
       matrix[i,i+1] = -self.tunneling
       matrix[i+1,i] = -self.tunneling
-    if self.boundary_condition=='periodic': 
+    if self.boundary_condition=='periodic':
       matrix[0,n-1] = -self.tunneling
       matrix[n-1,0] = -self.tunneling
 #    print(matrix)
     return matrix
-  
+
   """
   Converts Hamiltonian to a sparse matrix for sparse diagonalization
   """
   def generate_sparse_matrix(self):
     n = self.dim_x
-    if self.boundary_condition=='periodic':    
+    if self.boundary_condition=='periodic':
       diagonals=[self.disorder,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling),[-self.tunneling],[-self.tunneling]]
       matrix = ssparse.diags(diagonals,[0,-1,1,1-n,n-1],format='csr')
-    else:  
+    else:
       diagonals=[self.disorder,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling)]
-      matrix = ssparse.diags(diagonals,[0,-1,1],format='csr')  
+      matrix = ssparse.diags(diagonals,[0,-1,1],format='csr')
 #    print(matrix)
     return matrix
-  
+
   """
   Apply Hamiltonian on a wavefunction
   """
   def apply_h(self, wfc):
     dim_x = self.dim_x
     rhs = np.empty(dim_x,dtype=np.complex128)
-    if self.boundary_condition=='periodic': 
+    if self.boundary_condition=='periodic':
       rhs[0]       = -self.tunneling * (wfc[dim_x-1] + wfc[1]) + self.disorder[0] * wfc[0]
       rhs[dim_x-1] = -self.tunneling * (wfc[dim_x-2] + wfc[0]) + self.disorder[dim_x-1] * wfc[dim_x-1]
-    else:    
+    else:
       rhs[0]       = -self.tunneling * wfc[1]       + self.disorder[0]       * wfc[0]
       rhs[dim_x-1] = -self.tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
     rhs[1:dim_x-1] = -self.tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
-    return rhs  
+    return rhs
 
   """
   Try to estimate bounds of the spectrum of The Hamiltonian
   This is needed for the temporal propagation using the Chebyshev method
   """
   def energy_range(self, accurate=False):
-# The accurate determination should be used for starong disorder    
+# The accurate determination should be used for starong disorder
     if (accurate):
   # rough estimate of the maximum energy (no disorder taken into account)
       e_max_0 = 2.0/(self.delta_x**2)
       n_iterations_hamiltonian_bounds=min(10,int(50./np.log10(e_max_0)))
-  # rough estimate of the minimum energy (no disorder taken into account) 
+  # rough estimate of the minimum energy (no disorder taken into account)
       e_min_0 = 0.0
   # First determine the lower bound
   # Start with plane wave k=0 (minimum energy state)
@@ -257,7 +277,7 @@ class Hamiltonian(Potential):
         estimated_bound=new_estimated_bound
       e_min = e_max_0 - 1.01 * estimated_bound
     else:
-# Very basic bounds using the min/max of the potential       
+# Very basic bounds using the min/max of the potential
       e_min=np.amin(self.disorder)-1.0/(self.delta_x**2)
       e_max=np.amax(self.disorder)+1.0/(self.delta_x**2)
 #    print(e_min,e_max)
@@ -265,14 +285,14 @@ class Hamiltonian(Potential):
 
   """
   Computes the rescaling of Hamiltonian for the Chebyshev method
-  """  
+  """
   def script_h(self,e_min,e_max):
     one_over_delta_e = 1.0/(e_max-e_min)
     script_tunneling = 2.0*self.tunneling*one_over_delta_e
     script_disorder = (2.0*self.disorder-(e_min+e_max))*one_over_delta_e
 #  print(script_tunneling,script_disorder[0:10])
     return script_tunneling, script_disorder
-  
+
 class Wavefunction:
   def __init__(self, dim_x, delta_x):
     self.dim_x = dim_x
@@ -280,61 +300,64 @@ class Wavefunction:
     self.wfc = np.zeros(dim_x,dtype=np.complex128)
     self.position = 0.5*delta_x*np.arange(1-dim_x,dim_x+1,2)
     return
-    
+
   def gaussian(self,sigma_0,k_0):
     psi=np.exp(1j*k_0*self.position-0.5*(self.position/sigma_0)**2)
-#    self.type = 'Gaussian wavepacket'
+# The next two lines are to avoid too small values of abs(psi[i])
+# which slow down the calculation
+    threshold = 1.e-30
+    psi=np.where(abs(psi)<threshold,threshold,psi)
     self.k_0 = k_0
     self.sigma_0 = sigma_0
     self.wfc = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_x))
     return
-  
+
   def plane_wave(self,k_0):
 #    self.type = 'Plane wave'
     self.k_0 = k_0
     self.sigma_0 = 0.0
-    self.wfc = np.exp(1j*k_0*self.position)/np.sqrt(self.dim_x*self.delta_x) 
+    self.wfc = np.exp(1j*k_0*self.position)/np.sqrt(self.dim_x*self.delta_x)
     return
 
   def overlap(self, other_wavefunction):
 #    return np.sum(self.wfc*np.conj(other_wavefunction.wfc))*self.delta_x
 # The following line is 5 times faster!
-    return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_x 
+    return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_x
 
   def expectation_value_local_operator(self, local_operator):
     density = np.abs(self.wfc)**2
     norm = np.sum(density)
     x = np.sum(density*local_operator)
-    return x/norm  
+    return x/norm
 
   def convert_to_momentum_space(self):
 #    psic_momentum = self.delta_x*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
  #   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
     return np.fft.fftshift(self.delta_x*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
-  
+
   def expectation_value_local_momentum_operator(self, local_operator):
     density = np.abs(self.wfc_momentum)**2
     norm = np.sum(density)
     x = np.sum(density*local_operator)
-    return x/norm    
+    return x/norm
 
   def energy(self, H):
 #    rhs = H.apply_h(self.wfc)
     non_linear_energy = 0.5*H.interaction*np.sum(np.abs(self.wfc)**4)*self.delta_x
-    energy = np.sum(np.real(self.wfc*np.conjugate(H.apply_h(self.wfc))))*self.delta_x + non_linear_energy  
+    energy = np.sum(np.real(self.wfc*np.conjugate(H.apply_h(self.wfc))))*self.delta_x + non_linear_energy
     norm = np.linalg.norm(self.wfc)**2*self.delta_x
 #  print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm
-  
+
 #def expectation_value_local_operator(wfc, local_operator):
 #  density = np.abs(wfc)**2
 #  norm = np.sum(density)
 #  x = np.sum(density*local_operator)
-#  return x/norm    
-    
+#  return x/norm
+
 def compute_correlation(x,y):
-  return np.fft.ifft(np.fft.fft(x)*np.conj(np.fft.fft(y)))/x.size 
-  
+  return np.fft.ifft(np.fft.fft(x)*np.conj(np.fft.fft(y)))/x.size
+
 def determine_unique_postfix(fn):
   if not os.path.exists(fn):
     return ''
@@ -343,7 +366,7 @@ def determine_unique_postfix(fn):
   make_fn = lambda i: os.path.join(path, '%s_%d%s' % (name, i, ext))
   i = 0
   while True:
-    i = i+1  
+    i = i+1
     uni_fn = make_fn(i)
     if not os.path.exists(uni_fn):
       return '_'+str(i)

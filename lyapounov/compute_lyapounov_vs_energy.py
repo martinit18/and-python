@@ -1,5 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+__author__ = "Dominique Delande"
+__copyright__ = "Copyright (C) 2020 Dominique Delande"
+__license__ = "GPL version 2 or later"
+__version__ = "1.0"
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>.
+# ____________________________________________________________________
+#
+# compute_spectral_function.py
+# Author: Dominique Delande
+# Release date: April, 27, 2020
+# License: GPL2 or later
 """
 Created on Fri Aug 16 17:05:10 2019
 
@@ -13,7 +36,7 @@ import numpy as np
 import getpass
 import sys
 import configparser
-sys.path.append('../')
+sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
 import anderson.lyapounov
 import anderson.io
@@ -25,40 +48,84 @@ if __name__ == "__main__":
   environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
              +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Started on: {}'.format(time.asctime())+'\n'
-  mpi_version = False
-  nprocs = 1
-  rank = 0
-  environment_string += 'Single processor version\n\n'
+  try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    nprocs = comm.Get_size()
+    mpi_version = True
+    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
+  except ImportError:
+    mpi_version = False
+    nprocs = 1
+    rank = 0
+    environment_string += 'Single processor version\n\n'
 
-  config = configparser.ConfigParser()
-  config.read('params.dat')
+  if rank==0:
+    initial_time=time.asctime()
+    hostname = os.uname()[1].split('.')[0]
+    print("Python script started on: {}".format(initial_time))
+    print("{:>24}: {}".format('from',hostname))
+    print("Name of python script: {}".format(os.path.abspath( __file__ )))
 
-  Averaging = config['Averaging']
-  n_config = Averaging.getint('n_config',1)
+    config = configparser.ConfigParser()
+    config.read('params.dat')
 
-  System = config['System']
-  system_size = System.getfloat('size')
-  delta_x = System.getfloat('delta_x')
-  boundary_condition = System.get('boundary_condition','periodic')
+    Averaging = config['Averaging']
+    n_config = Averaging.getint('n_config',1)
+    n_config = (n_config+nprocs-1)//nprocs
+    print("Total number of disorder realizations: {}".format(n_config*nprocs))
+    print("Number of processes: {}".format(nprocs))
 
-  Disorder = config['Disorder']
-  disorder_type = Disorder.get('type','anderson gaussian')
-  correlation_length = Disorder.getfloat('sigma',0.0)
-  V0 = Disorder.getfloat('V0',0.0)
-  disorder_strength = V0
+    System = config['System']
+    system_size = System.getfloat('size')
+    delta_x = System.getfloat('delta_x')
+    boundary_condition = System.get('boundary_condition','periodic')
 
-  #Nonlinearity = config['Nonlinearity']
-  #interaction_strength = Nonlinearity.getfloat('g',0.0)
+    Disorder = config['Disorder']
+    disorder_type = Disorder.get('type','anderson gaussian')
+    correlation_length = Disorder.getfloat('sigma',0.0)
+    V0 = Disorder.getfloat('V0',0.0)
+    disorder_strength = V0
 
-  Lyapounov = config['Lyapounov']
-  e_min = Lyapounov.getfloat('e_min',0.0)
-  e_max = Lyapounov.getfloat('e_max',0.0)
-  number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
-  e_histogram = Lyapounov.getfloat('e_histogram',0.0)
-  lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
-  lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
-  number_of_bins = Lyapounov.getint('number_of_bins',0)
+    #Nonlinearity = config['Nonlinearity']
+    #interaction_strength = Nonlinearity.getfloat('g',0.0)
 
+    Lyapounov = config['Lyapounov']
+    e_min = Lyapounov.getfloat('e_min',0.0)
+    e_max = Lyapounov.getfloat('e_max',0.0)
+    number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
+    e_histogram = Lyapounov.getfloat('e_histogram',0.0)
+    lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
+    lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
+    number_of_bins = Lyapounov.getint('number_of_bins',0)
+
+  else:
+    n_config = None
+    system_size = None
+    delta_x = None
+    boundary_condition = None
+    disorder_type = None
+    correlation_length = None
+    disorder_strength = None
+    e_min = None
+    e_max = None
+    number_of_e_steps = None
+    e_histogram = None
+    lyapounov_min = None
+    lyapounov_max = None
+    number_of_bins = None
+
+  if mpi_version:
+    n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
+    disorder_type, correlation_length, disorder_strength = comm.bcast((disorder_type, correlation_length, disorder_strength))
+    e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins))
+
+  t1=time.perf_counter()
+  timing=anderson.Timing()
+
+  mkl.set_num_threads(1)
+  os.environ["MKL_NUM_THREADS"] = "1"
 
   # Number of sites
   dim_x = int(system_size/delta_x+0.5)
@@ -68,20 +135,6 @@ if __name__ == "__main__":
   assert boundary_condition in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
   # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength)
-
-  initial_time=time.asctime()
-  hostname = os.uname()[1].split('.')[0]
-
-  print("Python script started on: {}".format(initial_time))
-  print("{:>24}: {}".format('from',hostname))
-  print("Name of python script: {}".format(os.path.abspath( __file__ )))
-  print("Total number of disorder realizations: {}".format(n_config*nprocs))
-  print("Number of processes: {}".format(nprocs))
-
-  timing=anderson.Timing()
-  t1=time.perf_counter()
-  mkl.set_num_threads(1)
-  os.environ["MKL_NUM_THREADS"] = "1"
 
 #  print(e_min,e_max,number_of_e_steps)
 
@@ -111,11 +164,18 @@ if __name__ == "__main__":
 # No parallelization, a simple loop makes debugging MUCH MUCH easier
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-    tab_lyapounov, used_time, number_of_ops = lyapounov.compute_lyapounov(i, H)
+    tab_lyapounov, used_time, number_of_ops = lyapounov.compute_lyapounov(i+rank*n_config, H)
     tab_global_lyapounov[0] += tab_lyapounov
     tab_global_lyapounov[1] += tab_lyapounov**2
     timing.LYAPOUNOV_TIME+=used_time
     timing.LYAPOUNOV_NOPS+=number_of_ops
+  t2 = time.perf_counter()
+  timing.TOTAL_TIME = t2-t1
+  if mpi_version:
+    timing.mpi_merge(comm)
+    tab_global_lyapounov_glob = np.empty_like(tab_global_lyapounov)
+    comm.Reduce(tab_global_lyapounov,tab_global_lyapounov_glob)
+    tab_global_lyapounov = np.copy(tab_global_lyapounov_glob)
 #  else:
 # The parallel case
 #    pool = multiprocessing.Pool(number_of_cores)
@@ -129,15 +189,15 @@ if __name__ == "__main__":
 #    timing.LYAPOUNOV_NOPS=np.sum(tab_nops)
 #
 # Compute mean value and standard deviation
-  tab_global_lyapounov /= n_config
-  if n_config>1:
-    tab_global_lyapounov[1] = np.sqrt(np.abs(tab_global_lyapounov[1]-tab_global_lyapounov[0]**2)/(n_config-1))
-  else:
-   tab_global_lyapounov[1] = 0.0
+  if rank==0:
+    tab_global_lyapounov /= n_config*nprocs
+    if n_config*nprocs>1:
+      tab_global_lyapounov[1] = np.sqrt(np.abs(tab_global_lyapounov[1]-tab_global_lyapounov[0]**2)/(n_config*nprocs-1))
+    else:
+      tab_global_lyapounov[1] = 0.0
+    anderson.io.output_density('lyapounov_vs_energy.dat',lyapounov.tab_energy,tab_global_lyapounov,header_string,print_type='lyapounov')
 
-  anderson.io.output_density('lyapounov_vs_energy.dat',lyapounov.tab_energy,tab_global_lyapounov,header_string,print_type='lyapounov')
-
-  """
+    """
 
 # Other code to compute an histogram of the lyapounov exponent at a given energy
   lyapounov = anderson.lyapounov.Lyapounov(e_histogram,e_histogram,0)
@@ -149,14 +209,13 @@ if __name__ == "__main__":
     timing.LYAPOUNOV_NOPS+=number_of_ops
   tab_histogram, bin_edges = np.histogram(tab_lyapounov, bins=number_of_bins, range=(lyapounov_min,lyapounov_max), density=True)
   anderson.io.output_density('histogram_lyapounov.dat',bin_edges[1:],tab_histogram,header_string,print_type='histogram_lyapounov')
-  """
+    """
 
-  t2=time.perf_counter()
 
-  final_time = time.asctime()
-  print("Python script ended on: {}".format(final_time))
-  print("Total execution time {0:.3f} seconds".format(t2-t1))
-  print()
-  print("Lyapounov time       = {0:.3f}".format(timing.LYAPOUNOV_TIME))
-  print("Number of ops        = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
-  print("Total_time           = {0:.3f}".format(t2-t1))
+    final_time = time.asctime()
+    print("Python script ended on: {}".format(final_time))
+    print("Total execution time {0:.3f} seconds".format(t2-t1))
+    print()
+    print("Lyapounov time       = {0:.3f}".format(timing.LYAPOUNOV_TIME))
+    print("Number of ops        = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
+    print("Total_time           = {0:.3f}".format(timing.TOTAL_TIME))

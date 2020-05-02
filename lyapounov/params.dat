@@ -1,6 +1,6 @@
 [System]
 # System size in natural units
-size = 1.e4
+size = 1.e7
 # Spatial discretization
 delta_x = 0.25
 # either periodic or open
@@ -8,16 +8,15 @@ boundary_condition = open
 
 [Disorder]
 #  Various disorder types can be used
-# type = 'anderson_gaussian'
-# type = 'regensburg'
-# type = 'konstanz'
-# type = 'singapore'
-# type = 'speckle'
-type = speckle
+type = anderson_gaussian
+# type = regensburg
+# type = konstanz
+# type = singapore
+# type = speckle
 # Correlation length of disorder
 sigma = 1.591549431
 # Disorder strength
-V0 = 0.05
+V0 = 0.01
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -46,7 +45,7 @@ range = 20.0
 resolution = 0.02
 
 [Averaging]
-n_config = 100
+n_config = 80
 
 [Measurement]
 delta_t_measurement = 2.
