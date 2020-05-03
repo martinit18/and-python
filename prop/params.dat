@@ -48,11 +48,12 @@ n_config = 1
 [Measurement]
 delta_t_measurement = 2.
 #first_measurement = 0
-density = True
+#density = True
 density_momentum = True
-dispersion = True
+#dispersion_position = True
 dispersion_momentum = True
+#dispersion_energy = True
 wavefunction_final = True
-autocorrelation = True
-extended = True
+#autocorrelation = True
+#dispersion_variance = True
 

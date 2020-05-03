@@ -37,10 +37,9 @@ import numpy as np
 import getpass
 import configparser
 import sys
+sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
-import anderson.diag
-import anderson.io
 import mkl
 
 

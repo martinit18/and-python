@@ -30,6 +30,7 @@ def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
   gamma+=math.log(abs(psi_cur))
   return gamma
 
+"""
 def compute_lyapounov(i, H, tab_energy):
   try:
     from anderson._lyapounov import ffi,lib
@@ -44,7 +45,6 @@ def compute_lyapounov(i, H, tab_energy):
   inv_tunneling = 1.0/H.tunneling
 
   start_lyapounov_time = timeit.default_timer()
-  """
   What follows is a poor man's version of the recursion for transfer matrix
   for a single energy
   The routine core_lyapounov (Python version) or core_lyapounov_cffi (C version) are equivalelent, but much faster
@@ -56,7 +56,6 @@ def compute_lyapounov(i, H, tab_energy):
     r = inv_tunneling*(H.disorder[i]-energy)-1.0/r
     gamma += math.log(abs(r))
     if r<0.0: h+=1.0
-  """
   loop_step=64
   number_of_energies = tab_energy.size
   tab_gamma = np.zeros(number_of_energies)
@@ -67,7 +66,6 @@ def compute_lyapounov(i, H, tab_energy):
     else:
       tab_gamma[i_energy]=core_lyapounov(dim_x, loop_step, H.disorder, tab_energy[i_energy], inv_tunneling)
 
-  """
   loop_step=64
   psi_cur=1.0
   psi_old=0.0
@@ -81,8 +79,6 @@ def compute_lyapounov(i, H, tab_energy):
     psi_old/=psi_cur
     psi_cur=1.0
   gamma+=math.log(abs(psi_cur))
-  """
-  """
   loop_step=64
   psi_cur=1.0;
   psi_old=0.0;
@@ -95,7 +91,6 @@ def compute_lyapounov(i, H, tab_energy):
       psi_old/=psi_cur
       psi_cur=1.0
   gamma+=math.log(abs(psi_cur))
-  """
   used_time = timeit.default_timer() - start_lyapounov_time
   number_of_ops = 5*dim_x*number_of_energies
 #  lyapounov = gamma/(dim_x*H.delta_x)
@@ -103,6 +98,7 @@ def compute_lyapounov(i, H, tab_energy):
 #  return (lyapounov,integrated_dos)
 # The Lyapounov is here computed for the wavefunction (double for intensity)
   return tab_gamma/(dim_x*H.delta_x),used_time,number_of_ops
+"""
 
 class Lyapounov:
   def __init__(self, e_min, e_max, number_of_e_steps):

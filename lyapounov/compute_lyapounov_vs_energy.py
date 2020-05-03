@@ -36,10 +36,9 @@ import numpy as np
 import getpass
 import sys
 import configparser
-sys.path.append('/users/champ/delande/git/and-python/')
+sys.path.append('../')
+#sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
-import anderson.lyapounov
-import anderson.io
 import mkl
 
 #import matplotlib.pyplot as plt

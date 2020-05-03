@@ -383,9 +383,11 @@ class Measurement:
       comm.Reduce(self.tab_position2,toto)
       self.tab_position2 =  np.copy(toto)
     if self.measure_dispersion_momentum:
+      toto = np.empty_like(self.tab_momentum)
       comm.Reduce(self.tab_momentum,toto)
       self.tab_momentum = np.copy(toto)
     if self.measure_dispersion_energy:
+      toto = np.empty_like(self.tab_energy)
       comm.Reduce(self.tab_energy,toto)
       self.tab_energy =  np.copy(toto)
       comm.Reduce(self.tab_nonlinear_energy,toto)
@@ -466,6 +468,8 @@ class Measurement:
       self.wfc /= n_config
     if self.measure_wavefunction_momentum_final:
       self.wfc_momentum /= n_config
+  #  print(tab_strings)
+  #  print(list_of_columns)
     return tab_strings, np.column_stack(list_of_columns)
 
   """

@@ -46,7 +46,7 @@ range = 10.0
 resolution = 0.01
 
 [Averaging]
-n_config = 800
+n_config = 8
 
 [Measurement]
 delta_t_measurement = 2.

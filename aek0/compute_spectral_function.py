@@ -44,7 +44,6 @@ Various disorder types can be used, defined by the disorder_type variable:
   speckle: Rayleigh on-site distribution (average V_0, variance V_0^2) with spatial correlation function <V(r)V(r+delta)>=V_0^2 (1+sinc^2(delta/sigma))
 
 There is addiitonally the possibility of adding a nonlinear term proportional to g in the GPE
-Not tested, should not be used |-(.
 
   Internally, the wavefunction can be stored using two different layouts.
   This does NOT affect the storage of the wavefunctions used for measurements, which is always 'complex'
@@ -69,10 +68,12 @@ import configparser
 import numpy as np
 import getpass
 import sys
-sys.path.append('/users/champ/delande/git/and-python/')
+sys.path.append('../')
+#sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
-import anderson.propagation
-import anderson.io
+#from anderson import *
+#import anderson.propagation
+#import anderson.io
 import mkl
 
 

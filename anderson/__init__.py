@@ -13,8 +13,9 @@ import math
 import numpy as np
 import scipy.sparse as ssparse
 import mkl_random
+from . import diag, io, lyapounov, propagation
 
-#__all__ = ["diag","lyapounov","propagation"]
+__all__ = ["diag","io","lyapounov","propagation"]
 
 class Timing:
   def __init__(self):
@@ -171,8 +172,8 @@ class Hamiltonian(Potential):
     sys.exit('Disorder '+self.disorder_type+' not yet implemented!')
     return
 
-  def print_potential(self):
-    np.savetxt('potential.dat',self.disorder-2.0*self.tunneling)
+  def print_potential(self,filename='potential.dat'):
+    np.savetxt(filename,self.disorder-2.0*self.tunneling)
     return
 
   """
@@ -339,6 +340,7 @@ class Wavefunction:
     density = np.abs(self.wfc_momentum)**2
     norm = np.sum(density)
     x = np.sum(density*local_operator)
+#    print(norm,x)
     return x/norm
 
   def energy(self, H):
