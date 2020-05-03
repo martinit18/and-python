@@ -493,7 +493,11 @@ on anaconda). Thus the code contains things like:
     nprocs = 1
     rank = 0
     environment_string += 'Single processor version\n\n'
-If no mpi4py module is found, a standard sequential routine is used.
+
+The MPI version is launched using e.g.:
+  mpiexec -n 8 python compute_prop.py
+If no mpi4py module is found, a standard sequential routine is used, which means
+that the same calculation is performed 8 time |-(.
 
 If MPI is activated, all I/O is done on process 0. Input data (parsed from the input
 file) are broadcasted to other processes. Then, each process builds its own objects
