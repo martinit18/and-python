@@ -9,8 +9,8 @@ Created on Tue Sep  3 17:00:38 2019
 from cffi import FFI
 ffibuilder = FFI()
 
-#ffibuilder.cdef("void elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
-#ffibuilder.cdef("void elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
+ffibuilder.cdef("void elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
+ffibuilder.cdef("void elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
 ffibuilder.cdef("void chebyshev_clenshaw_real(const int dim_x, const int max_order, const char * restrict boundary_condition, double * wfc, double * psi, double * psi_old, const double tunneling, const double * disorder, const double *tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * nonlinear_phase);")
 ffibuilder.cdef("void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * wfc, double _Complex * psi, double _Complex * psi_old, const double tunneling, const double * disorder, const double *tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * nonlinear_phase);")
 
@@ -27,7 +27,7 @@ r"""
 #endif
 #include <complex.h>
 
-void __inline elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
+inline static void elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
 {
   int i;
   if (add_real) {
@@ -98,7 +98,7 @@ void __inline elementary_clenshaw_step_real(const int dim_x, const char * restri
   return;
 }
 
-void __inline elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
+inline static void elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
 {
   int i;
   if (add_real) {
@@ -139,7 +139,7 @@ void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char *
 {
   int i, order;
   double argument;
-  double complex exp_i_argument;
+//  double complex exp_i_argument;
   double phase;
   double cos_phase;
   double sin_phase;

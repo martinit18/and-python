@@ -67,7 +67,7 @@ import copy
 import configparser
 import sys
 sys.path.append('../')
-#sys.path.append('/users/champ/delande/git/and-python/')
+sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
 import mkl
 
@@ -76,17 +76,34 @@ if __name__ == "__main__":
              +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Started on: {}'.format(time.asctime())+'\n'
   try:
+# First try to detect if the python script is launched by mpiexec/mpirun
+# It can be done by looking at an environment variable
+# Unfortunaltely, this variable depends on the MPI implementation
+# For MPICH and IntelMPI, MPI_LOCALNRANKS can be checked for existence
+#   os.environ['MPI_LOCALNRANKS']
+# For OpenMPI, it is OMPI_COMM_WORLD_SIZE
+#   os.environ['OMPI_COMM_WORLD_SIZE']
+# In any case, when importing the module mpi4py, the MPI implementation for which
+# the module was created is unknown. Thus, no portable way...
+# The following line is for OpenMPI
+    os.environ['OMPI_COMM_WORLD_SIZE']
+# If no KeyError raised, the script has been launched by MPI,
+# I must thus import the mpi4py module
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     nprocs = comm.Get_size()
     mpi_version = True
     environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
-  except ImportError:
+  except KeyError:
+# Not launched by MPI, use sequential code
     mpi_version = False
     nprocs = 1
     rank = 0
     environment_string += 'Single processor version\n\n'
+  except ImportError:
+# Launched by MPI, but no mpi4py module available. Abort the calculation.
+    exit('mpi4py module not available! I stop!')
 
   if rank==0:
     initial_time=time.asctime()
