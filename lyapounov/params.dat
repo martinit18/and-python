@@ -1,6 +1,6 @@
 [System]
 # System size in natural units
-size = 1.e4
+size = 1.e6
 # Spatial discretization
 delta_x = 0.25
 # either periodic or open

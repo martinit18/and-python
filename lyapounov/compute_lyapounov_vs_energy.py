@@ -35,6 +35,7 @@ import time
 import numpy as np
 import getpass
 import sys
+import timeit
 import configparser
 sys.path.append('../')
 #sys.path.append('/users/champ/delande/git/and-python/')
@@ -48,17 +49,34 @@ if __name__ == "__main__":
              +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Started on: {}'.format(time.asctime())+'\n'
   try:
+# First try to detect if the python script is launched by mpiexec/mpirun
+# It can be done by looking at an environment variable
+# Unfortunaltely, this variable depends on the MPI implementation
+# For MPICH and IntelMPI, MPI_LOCALNRANKS can be checked for existence
+#   os.environ['MPI_LOCALNRANKS']
+# For OpenMPI, it is OMPI_COMM_WORLD_SIZE
+#   os.environ['OMPI_COMM_WORLD_SIZE']
+# In any case, when importing the module mpi4py, the MPI implementation for which
+# the module was created is unknown. Thus, no portable way...
+# The following line is for OpenMPI
+    os.environ['OMPI_COMM_WORLD_SIZE']
+# If no KeyError raised, the script has been launched by MPI,
+# I must thus import the mpi4py module
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     nprocs = comm.Get_size()
     mpi_version = True
     environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
-  except ImportError:
+  except KeyError:
+# Not launched by MPI, use sequential code
     mpi_version = False
     nprocs = 1
     rank = 0
     environment_string += 'Single processor version\n\n'
+  except ImportError:
+# Launched by MPI, but no mpi4py module available. Abort the calculation.
+    exit('mpi4py module not available! I stop!')
 
   if rank==0:
     initial_time=time.asctime()
@@ -168,13 +186,16 @@ if __name__ == "__main__":
     tab_global_lyapounov[1] += tab_lyapounov**2
     timing.LYAPOUNOV_TIME+=used_time
     timing.LYAPOUNOV_NOPS+=number_of_ops
+  if mpi_version:
+    start_mpi_time = timeit.default_timer()
+    tab_global_lyapounov_glob = np.empty_like(tab_global_lyapounov)
+    comm.Reduce(tab_global_lyapounov,tab_global_lyapounov_glob)
+    tab_global_lyapounov = np.copy(tab_global_lyapounov_glob)
+    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
   t2 = time.perf_counter()
   timing.TOTAL_TIME = t2-t1
   if mpi_version:
     timing.mpi_merge(comm)
-    tab_global_lyapounov_glob = np.empty_like(tab_global_lyapounov)
-    comm.Reduce(tab_global_lyapounov,tab_global_lyapounov_glob)
-    tab_global_lyapounov = np.copy(tab_global_lyapounov_glob)
 #  else:
 # The parallel case
 #    pool = multiprocessing.Pool(number_of_cores)
@@ -213,8 +234,10 @@ if __name__ == "__main__":
 
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
-    print("Total execution time {0:.3f} seconds".format(t2-t1))
+    print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     print("Lyapounov time       = {0:.3f}".format(timing.LYAPOUNOV_TIME))
     print("Number of ops        = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
+    if mpi_version:
+      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
     print("Total_time           = {0:.3f}".format(timing.TOTAL_TIME))

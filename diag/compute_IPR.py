@@ -36,6 +36,7 @@ import math
 import numpy as np
 import getpass
 import configparser
+import timeit
 import sys
 sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/')
@@ -50,17 +51,34 @@ if __name__ == "__main__":
              +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Started on: {}'.format(time.asctime())+'\n'
   try:
+# First try to detect if the python script is launched by mpiexec/mpirun
+# It can be done by looking at an environment variable
+# Unfortunaltely, this variable depends on the MPI implementation
+# For MPICH and IntelMPI, MPI_LOCALNRANKS can be checked for existence
+#   os.environ['MPI_LOCALNRANKS']
+# For OpenMPI, it is OMPI_COMM_WORLD_SIZE
+#   os.environ['OMPI_COMM_WORLD_SIZE']
+# In any case, when importing the module mpi4py, the MPI implementation for which
+# the module was created is unknown. Thus, no portable way...
+# The following line is for OpenMPI
+    os.environ['OMPI_COMM_WORLD_SIZE']
+# If no KeyError raised, the script has been launched by MPI,
+# I must thus import the mpi4py module
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     nprocs = comm.Get_size()
     mpi_version = True
     environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
-  except ImportError:
+  except KeyError:
+# Not launched by MPI, use sequential code
     mpi_version = False
     nprocs = 1
     rank = 0
     environment_string += 'Single processor version\n\n'
+  except ImportError:
+# Launched by MPI, but no mpi4py module available. Abort the calculation.
+    exit('mpi4py module not available! I stop!')
 
   if (rank==0):
     initial_time=time.asctime()
@@ -111,10 +129,14 @@ if __name__ == "__main__":
     diagonalization_method = None
     targeted_energy = None
  #  n_config = comm.bcast(n_config,root=0)
+
   if mpi_version:
     n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
     disorder_type, correlation_length, disorder_strength = comm.bcast((disorder_type, correlation_length, disorder_strength))
     diagonalization_method, targeted_energy = comm.bcast((diagonalization_method, targeted_energy))
+
+  timing=anderson.Timing()
+  t1=time.perf_counter()
 
 #  delta_x = comm.bcast(delta_x)
 #  print(rank,n_config,system_size,delta_x)
@@ -146,14 +168,21 @@ if __name__ == "__main__":
   #  pool.apply_async(gpe_evolution, args)
   #  print(str(i), file=final_pf)
 #  anderson.io.output_density('IPR'+str(rank)+'.dat',tab_IPR,tab_energy,header_string,print_type='IPR')
+
   if mpi_version:
+    start_mpi_time = timeit.default_timer()
     tab_energy_glob = np.zeros(n_config*nprocs)
     tab_IPR_glob = np.zeros(n_config*nprocs)
     comm.Gather(tab_energy,tab_energy_glob)
     comm.Gather(tab_IPR,tab_IPR_glob)
+    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
   else:
     tab_energy_glob = tab_energy
     tab_IPR_glob = tab_IPR
+  t2=time.perf_counter()
+  timing.TOTAL_TIME = t2-t1
+  if mpi_version:
+    timing.mpi_merge(comm)
   if rank==0:
 #    print(tab_IPR_glob.shape)
     anderson.io.output_density('IPR.dat',tab_IPR_glob,tab_energy_glob,header_string,print_type='IPR')
@@ -161,12 +190,13 @@ if __name__ == "__main__":
 #  print(tab_histogram)
 #  print(bin_edges)
     anderson.io.output_density('histogram_IPR.dat',bin_edges[1:],tab_histogram,header_string,print_type='histogram_IPR')
-    t2=time.perf_counter()
 
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
-    print("Total execution time {0:.3f} seconds".format(t2-t1))
+    print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
-    print("Total_time           = {0:.3f}".format(t2-t1))
+    if mpi_version:
+      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
+    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
 
 

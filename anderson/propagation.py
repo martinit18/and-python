@@ -358,7 +358,8 @@ class Measurement:
       self.wfc_momentum += measurement.wfc_momentum
     return
 
-  def mpi_merge_measurement(self,comm):
+  def mpi_merge_measurement(self,comm,timing):
+    start_mpi_time = timeit.default_timer()
     try:
       from mpi4py import MPI
     except ImportError:
@@ -400,6 +401,7 @@ class Measurement:
       toto = np.empty_like(self.wfc_momentum)
       comm.Reduce(self.wfc_momentum,toto)
       self.wfc_momentum = np.copy(toto)
+    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 
   def normalize(self,n_config):
@@ -470,6 +472,7 @@ class Measurement:
       self.wfc_momentum /= n_config
   #  print(tab_strings)
   #  print(list_of_columns)
+
     return tab_strings, np.column_stack(list_of_columns)
 
   """

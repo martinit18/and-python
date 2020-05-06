@@ -31,6 +31,7 @@ class Timing:
     self.LYAPOUNOV_TIME=0.0
     self.LYAPOUNOV_NOPS=0
     self.MAX_NONLINEAR_PHASE=0.0
+    self.MPI_TIME=0.0
     return
 
   def mpi_merge(self,comm):
@@ -51,6 +52,9 @@ class Timing:
     self.LYAPOUNOV_TIME = comm.reduce(self.LYAPOUNOV_TIME)
     self.LYAPOUNOV_NOPS = comm.reduce(self.LYAPOUNOV_NOPS)
     self.MAX_NONLINEAR_PHASE = comm.reduce(self.MAX_NONLINEAR_PHASE,op=MPI.MAX)
+    self.MPI_TIME       = comm.reduce(self.MPI_TIME)
+    return
+
 
 """
 The class Potential is basically a 1D disordered potential, characterized by its length and the disorder strength

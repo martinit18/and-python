@@ -267,10 +267,11 @@ if __name__ == "__main__":
 #   print(measurement.tab_autocorrelation[-1])
     measurement_global.merge_measurement(measurement)
 
+  if mpi_version:
+    measurement_global.mpi_merge_measurement(comm,timing)
   t2 = time.perf_counter()
   timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    measurement_global.mpi_merge_measurement(comm)
     timing.mpi_merge(comm)
 #    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
 #    toto = np.empty_like(measurement_global.tab_autocorrelation)
@@ -335,6 +336,8 @@ if __name__ == "__main__":
       print("Max nonlinear phase  = {0:.3f}".format(timing.MAX_NONLINEAR_PHASE))
       print("Max order            =",timing.MAX_CHE_ORDER)
     print("Expect time          = {0:.3f}".format(timing.EXPECT_TIME))
+    if mpi_version:
+      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
     print("Dummy time           = {0:.3f}".format(timing.DUMMY_TIME))
     print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
     print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))

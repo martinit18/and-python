@@ -1,6 +1,6 @@
 [System]
 # System size in natural units
-size = 2.5e6
+size = 1.e5
 # Spatial discretization
 delta_x = 0.25
 # either periodic or open
@@ -46,7 +46,7 @@ range = 20.0
 resolution = 0.02
 
 [Averaging]
-n_config = 1
+n_config = 8
 
 [Measurement]
 delta_t_measurement = 2.
