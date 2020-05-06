@@ -173,7 +173,7 @@ void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char *
 #endif
     for (i=0;i<dim_x;i++) {
       phase = g_times_delta_t*(psi[i]*psi[i]+psi[i+dim_x]*psi[i+dim_x]);
-      *nonlinear_phase = (*nonlinear_phase > phase) ? *nonlinear_phase : phase;
+      *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
       argument =  e0_times_delta_t+phase;
       wfc[i] = psi[i]*cos(argument)+psi[i+dim_x]*sin(argument);
       wfc[i+dim_x] = psi[i+dim_x]*cos(argument)-psi[i]*sin(argument);
@@ -217,7 +217,7 @@ void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char
 #endif
     for (i=0;i<dim_x;i++) {
       phase = g_times_delta_t*(creal(psi[i])*creal(psi[i])+cimag(psi[i])*cimag(psi[i]));
-      *nonlinear_phase = (*nonlinear_phase > phase) ? *nonlinear_phase : phase;
+      *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
       argument =  e0_times_delta_t+phase;
       wfc[i] = psi[i]*(cos(argument)-I*sin(argument));
     }
