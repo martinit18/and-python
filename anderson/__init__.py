@@ -13,6 +13,7 @@ import math
 import numpy as np
 import scipy.sparse as ssparse
 import mkl_random
+import mkl_fft
 from . import diag, io, lyapounov, propagation
 
 __all__ = ["diag","io","lyapounov","propagation"]
@@ -157,6 +158,11 @@ class Hamiltonian(Potential):
 # disorder = np.random.normal(scale=self.disorder_strength/np.sqrt(self.delta_x), size=self.dim_x)+2.0*self.tunneling
     mkl_random.RandomState(77777, brng='SFMT19937')
     mkl_random.seed(seed,brng='SFMT19937')
+#    mkl_random.seed(seed)
+    if self.disorder_type=='anderson_uniform':
+      self.disorder = 2.0*self.tunneling + (self.disorder_strength/np.sqrt(self.delta_x))*mkl_random.uniform(-0.5,0.5,self.dim_x)
+#      print(self.disorder)
+      return
     if self.disorder_type=='anderson_gaussian':
       self.disorder = 2.0*self.tunneling + (self.disorder_strength/np.sqrt(self.delta_x))*mkl_random.standard_normal(self.dim_x)
       return
@@ -196,6 +202,18 @@ class Hamiltonian(Potential):
 #    print(matrix)
     return matrix
 
+  def generate_full_complex_matrix(self,pivot):
+    n = self.dim_x
+    matrix = np.diag(self.disorder-pivot)
+    for i in range(n-1):
+      matrix[i,i+1] = -self.tunneling
+      matrix[i+1,i] = -self.tunneling
+    if self.boundary_condition=='periodic':
+      matrix[0,n-1] = -self.tunneling
+      matrix[n-1,0] = -self.tunneling
+#    print(matrix)
+    return matrix
+
   """
   Converts Hamiltonian to a sparse matrix for sparse diagonalization
   """
@@ -206,6 +224,20 @@ class Hamiltonian(Potential):
       matrix = ssparse.diags(diagonals,[0,-1,1,1-n,n-1],format='csr')
     else:
       diagonals=[self.disorder,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling)]
+      matrix = ssparse.diags(diagonals,[0,-1,1],format='csr')
+#    print(matrix)
+    return matrix
+
+  """
+  Converts Hamiltonian to a complex sparse matrix for sparse diagonalization
+  """
+  def generate_sparse_complex_matrix(self,pivot):
+    n = self.dim_x
+    if self.boundary_condition=='periodic':
+      diagonals=[self.disorder-pivot,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling),[-self.tunneling],[-self.tunneling]]
+      matrix = ssparse.diags(diagonals,[0,-1,1,1-n,n-1],format='csr')
+    else:
+      diagonals=[self.disorder-pivot,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling)]
       matrix = ssparse.diags(diagonals,[0,-1,1],format='csr')
 #    print(matrix)
     return matrix
@@ -330,22 +362,29 @@ class Wavefunction:
     return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_x
 
   def expectation_value_local_operator(self, local_operator):
-    density = np.abs(self.wfc)**2
-    norm = np.sum(density)
-    x = np.sum(density*local_operator)
-    return x/norm
+#    density = np.abs(self.wfc)**2
+#   norm = np.sum(density)
+#    x = np.sum(density*local_operator)
+#    return np.sum(density*local_operator)/np.sum(density)
+    return (np.vdot(self.wfc,local_operator*self.wfc)/np.vdot(self.wfc,self.wfc)).real
+ #   return np.vdot(self.wfc,local_operator*self.wfc).real*self.delta_x
+#    return x/norm
 
   def convert_to_momentum_space(self):
 #    psic_momentum = self.delta_x*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
- #   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
-    return np.fft.fftshift(self.delta_x*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
+#   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
+#    return np.fft.fftshift(self.delta_x*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
+
+    return np.fft.fftshift(self.delta_x*mkl_fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
 
   def expectation_value_local_momentum_operator(self, local_operator):
-    density = np.abs(self.wfc_momentum)**2
-    norm = np.sum(density)
-    x = np.sum(density*local_operator)
+#    density = np.abs(self.wfc_momentum)**2
+#    norm = np.sum(density)
+#    x = np.sum(density*local_operator)
 #    print(norm,x)
-    return x/norm
+#    return x/norm
+#    return np.sum(density*local_operator)/np.sum(density)
+    return (np.vdot(self.wfc_momentum,local_operator*self.wfc_momentum)/np.vdot(self.wfc_momentum,self.wfc_momentum)).real
 
   def energy(self, H):
 #    rhs = H.apply_h(self.wfc)

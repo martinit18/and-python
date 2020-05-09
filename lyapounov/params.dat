@@ -51,31 +51,31 @@ range = 20.0
 resolution = 0.02
 
 [Averaging]
-n_config = 8
+n_config = 1
 
 [Measurement]
 delta_t_measurement = 2.
 # Not presently used
 #first_measurement = 0
 # Whether to measure the density in configuration space
-density = True
+#density = True
 # Whether to measure the density in momentum space
-density_momentum = True
+#density_momentum = True
 # Whether to measure <x(t)> and <x^2(t)>
-dispersion_position = True
+#dispersion_position = True
 # Whether to measure <p(t)>
 dispersion_momentum = True
 # Whether to compute the total energy (should be constant)
 # and the nonlinear part of the energy (=0 if g=0)
-dispersion_energy = True
+#dispersion_energy = True
 # Whether to compute the average final wavefunction in configuration and momentum spaces
-wavefunction_final = True
+#wavefunction_final = True
 # Whether to compute the autocorrelation function <psi(0)|psi(t)>
-autocorrelation = True
+#autocorrelation = True
 # Whether to compute the standard deviation (over disorder realizations) of
 # x(t), x^2(t), p(t), E_total(t) and E_nonlinear(t)
 # This is computed only for quantities whose average value is computed
-dispersion_variance = True
+#dispersion_variance = True
 
 [Diagonalization]
 method = sparse

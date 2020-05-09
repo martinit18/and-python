@@ -56,7 +56,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
 def output_density(file,position,density,general_string,print_type='density'):
 #  print(position)
 #  print(density.shape)
-  if print_type in ['density','density_momentum','spectral_function','IPR','histogram_IPR','lyapounov','histogram_lyapounov']:
+  if print_type in ['density','density_momentum','spectral_function','IPR','histogram_IPR','lyapounov','histogram_lyapounov','potential']:
     if density.ndim==1:
       array_to_print=np.column_stack((position,density))
       number_of_arrays=1
@@ -94,6 +94,10 @@ def output_density(file,position,density,general_string,print_type='density'):
       specific_string='Distribution of the Lyapounov exponent for the wavefunction (double this value for the Lyapounov exponent for intensity)\n'\
                    +'Column 1: Right bin edge\n'\
                    +'Column 2: Normalized distribution\n'
+    if print_type=='potential':
+      specific_string='Disordered potential\n'\
+                   +'Column 1: Position\n'\
+                   +'Column 2: Potential\n'
     if number_of_arrays == 2:
       specific_string+='Column 3: Standard deviation\n'
   if print_type in ['wavefunction','wavefunction_momentum','autocorrelation']:
@@ -114,6 +118,12 @@ def output_density(file,position,density,general_string,print_type='density'):
                      +'Column 1: Time\n'\
                      +'Column 2: Real(<psi(0)|psi(t)>)\n'\
                      +'Column 3: Imag(<psi(0)|psi(t)>)\n'
+  if print_type in ['wavefunction_eigenstate']:
+    array_to_print=np.column_stack((position,density))
+#    print(array_to_print.shape)
+    specific_string='Wavefunction in configuration space\n'\
+                     +'Column 1: Position\n'\
+                     +'From Column 2: Wavefunction for the various eigenstates\n'
   np.savetxt(file,array_to_print,header=general_string+specific_string)
   return
 
