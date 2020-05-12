@@ -338,7 +338,7 @@ class Wavefunction:
     self.position = 0.5*delta_x*np.arange(1-dim_x,dim_x+1,2)
     return
 
-  def gaussian(self,sigma_0,k_0):
+  def gaussian(self,k_0,sigma_0):
     psi=np.exp(1j*k_0*self.position-0.5*(self.position/sigma_0)**2)
 # The next two lines are to avoid too small values of abs(psi[i])
 # which slow down the calculation
@@ -374,7 +374,19 @@ class Wavefunction:
 #    psic_momentum = self.delta_x*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
 #   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
 #    return np.fft.fftshift(self.delta_x*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
-
+# The conversion space->momentum is a bit tricky, here are the explanations:
+# Position x_i is discretized as x_k=(k+1/2-dim_x/2)delta_x for 0\leq k \lt dim_x
+# Momentum is discretized as p_l = l delta_p for 0 \leq l \lt dim_x and delta_p=2\pi/(dim_x*delta_x)
+# (more on negative momenta below)
+# The position->momentum transformation is defined by \psi(p) = 1/\sqrt{2\pi} \int_0^L \psi(x) \exp(-ipx) dx
+# where L=dim_x*delta_x is the system size.
+# An elementary calculation shows that, after discretization:
+# \psi(p_l) = delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1)) \sum_{k=0..dim_x-1} \psi(x_k) \exp{-2i\pi kl/dim_x}
+# The last sum is directly given by the routine np.fft.fft (or mkl_fft.fft) applied on self.wfc
+# After that, remains the multiplication by delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1))
+# Because of FFT, the momentum is also periodic, meaning that the l values above are not 0..dim_x-1, but rather
+# -dim_x/2..dim_x/2-1. At the exist of np.fft.fft, they are in the order 0,1,...dim_x/2-1,-dim_x/2,..,-1.
+# They are put back in the natural orde -dim_x/2...dim_x/2-1 using he np.fft.fftshift routine.
     return np.fft.fftshift(self.delta_x*mkl_fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
 
   def expectation_value_local_momentum_operator(self, local_operator):
