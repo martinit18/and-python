@@ -14,10 +14,11 @@ boundary_condition = periodic
 # type = 'singapore'
 # type = 'speckle'
 type = anderson_gaussian
+use_mkl_random = True
 # Correlation length of disorder
 sigma = 0.0
 # Disorder strength
-V0 = 0.1
+V0 = 0.3
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -36,24 +37,25 @@ sigma_0 = 10.0
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
-data_layout = complex
+data_layout = real
 # Total duration of the propagation
 t_max = 2000.
 # Elementary time step
 delta_t = 2.
 
 [Averaging]
-n_config = 1
+n_config = 80
 
 [Measurement]
 delta_t_measurement = 2.
 #first_measurement = 0
 #density = True
-#density_momentum = True
+density_momentum = True
 #dispersion_position = True
 dispersion_momentum = True
 #dispersion_energy = True
 #wavefunction_final = True
 #autocorrelation = True
-#dispersion_variance = True
+dispersion_variance = True
+use_mkl_fft = True
 

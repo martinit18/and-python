@@ -214,7 +214,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     return rhs
 
 class Measurement:
-  def __init__(self, delta_t_measurement, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction_final=False,measure_extended=False):
+  def __init__(self, delta_t_measurement, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction_final=False,measure_extended=False,use_mkl_fft=True):
     self.delta_t_measurement = delta_t_measurement
     self.measure_density = measure_density
     self.measure_density_momentum = measure_density_momentum
@@ -225,6 +225,7 @@ class Measurement:
     self.measure_wavefunction_final = measure_wavefunction_final
     self.measure_wavefunction_momentum_final = measure_wavefunction_final
     self.extended = measure_extended
+    self.use_mkl_fft = use_mkl_fft
     return
 
   def prepare_measurement(self,propagation,delta_x,dim_x):
@@ -639,7 +640,7 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
       if measurement.measure_dispersion_energy:
         measurement.tab_energy[i_tab], measurement.tab_nonlinear_energy[i_tab] = psi.energy(H)
       if (measurement.measure_dispersion_momentum):
-        psi.wfc_momentum = psi.convert_to_momentum_space()
+        psi.wfc_momentum = psi.convert_to_momentum_space(measurement.use_mkl_fft)
         measurement.tab_momentum[i_tab] = psi.expectation_value_local_momentum_operator(measurement.frequencies)
       if (measurement.measure_autocorrelation):
         if (i_tab==i_tab_0):
@@ -650,16 +651,18 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
           measurement.tab_autocorrelation[i_tab-i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*delta_x
       timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
       i_tab+=1
+  start_expect_time = timeit.default_timer()
   if (measurement.measure_density):
     measurement.density_final = np.abs(psi.wfc)**2
   if (measurement.measure_density_momentum):
-    psic_momentum = psi.convert_to_momentum_space()
+    psic_momentum = psi.convert_to_momentum_space(measurement.use_mkl_fft)
     measurement.density_momentum_final = np.abs(psic_momentum)**2
   if (measurement.measure_wavefunction_final):
     measurement.wfc = psi.wfc
   if (measurement.measure_wavefunction_momentum_final):
     if not measurement.measure_density_momentum:
-      psic_momentum = psi.convert_to_momentum_space()
+      psic_momentum = psi.convert_to_momentum_space(measurement.use_mkl_fft)
     measurement.wfc_momentum = psic_momentum
+  timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
 #  print(timeit.default_timer())
   return

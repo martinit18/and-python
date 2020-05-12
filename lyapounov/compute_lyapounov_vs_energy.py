@@ -38,9 +38,8 @@ import sys
 import timeit
 import configparser
 sys.path.append('../')
-#sys.path.append('/users/champ/delande/git/and-python/')
+sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
-import mkl
 
 #import matplotlib.pyplot as plt
 
@@ -104,6 +103,7 @@ if __name__ == "__main__":
     correlation_length = Disorder.getfloat('sigma',0.0)
     V0 = Disorder.getfloat('V0',0.0)
     disorder_strength = V0
+    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
 
     #Nonlinearity = config['Nonlinearity']
     #interaction_strength = Nonlinearity.getfloat('g',0.0)
@@ -125,6 +125,7 @@ if __name__ == "__main__":
     disorder_type = None
     correlation_length = None
     disorder_strength = None
+    use_mkl_random = None
     e_min = None
     e_max = None
     number_of_e_steps = None
@@ -135,23 +136,26 @@ if __name__ == "__main__":
 
   if mpi_version:
     n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
-    disorder_type, correlation_length, disorder_strength = comm.bcast((disorder_type, correlation_length, disorder_strength))
+    disorder_type, correlation_length, disorder_strength, use_mkl_random = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random))
     e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins))
 
   t1=time.perf_counter()
   timing=anderson.Timing()
 
-  mkl.set_num_threads(1)
-  os.environ["MKL_NUM_THREADS"] = "1"
-
   # Number of sites
   dim_x = int(system_size/delta_x+0.5)
   # Renormalize delta_x so that the system size is exactly what is wanted and split in an integer number of sites
   delta_x = system_size/dim_x
+  try:
+    import mkl
+    mkl.set_num_threads(1)
+    os.environ["MKL_NUM_THREADS"] = "1"
+  except:
+    pass
 
   assert boundary_condition in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
   # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength)
+  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random)
 
 #  print(e_min,e_max,number_of_e_steps)
 

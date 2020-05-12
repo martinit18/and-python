@@ -1,8 +1,8 @@
 # README
 # and-python project
-# Version 1.0
+# Version 1.1
 # Author: Dominique Delande
-# April, 30, 2020
+# May, 12, 2020
 
 I. Physics
 In this section, I discuss physics, leaving numerical methods and implementation
@@ -144,17 +144,20 @@ The list of modules used is:
   getpass
   copy
   sys
-  mkl
   configparser
   timeit
-  mkl_random
   scipy.integrate.ode
   scipy.sparse.linalg
   scipy.special
   anderson
-While the module mkl_random is necessary (one could also implement the random
-part using numpy.random), the module mkl itself is optional. It have to be checked
-whether it really speads up things.
+  
+In addition, there are 3 optional modules: mkl, mkl_random and mkl_fft.
+The mkl module is only used to set the number of OpenMP threads, it is probably useless.
+If the mkl_random module is present, the MKL random number generator is used. If not,
+the program uses numpy.random. First tests seem to indicate that mkl_random is slower |-(.
+If the mkl_fft module is present, most FFTs (the ones which use a lot of CPU time) 
+are performed using the MKL FFT routines. If not present, the program uses numpy.fft,
+which is a bit slower.
 All the modules are available using anaconda, which is recommended.
 The last module "anderson" contains all the specific code of this software.
 
@@ -264,6 +267,7 @@ type = anderson_gaussian
 sigma = 1.591549431
 # Disorder strength
 V0 = 0.01
+use_mkl_random = False
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -323,6 +327,7 @@ autocorrelation = True
 # x(t), x^2(t), p(t), E_total(t) and E_nonlinear(t)
 # This is computed only for quantities whose average value is computed
 dispersion_variance = True
+use_mkl_fft = True
 
 [Diagonalization]
 method = sparse

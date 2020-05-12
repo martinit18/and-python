@@ -12,8 +12,6 @@ import sys
 import math
 import numpy as np
 import scipy.sparse as ssparse
-import mkl_random
-import mkl_fft
 from . import diag, io, lyapounov, propagation
 
 __all__ = ["diag","io","lyapounov","propagation"]
@@ -73,7 +71,7 @@ script_tunneling and script_disorder are just rescaled variables used when the t
 They are used in the rescaling of the Hamiltonian to bring its spectrum between -1 and +1
 """
 class Hamiltonian(Potential):
-  def __init__(self, dim_x, delta_x, boundary_condition='periodic', disorder_type='anderson gaussian', correlation_length=0.0, disorder_strength=0.0, interaction=0.0):
+  def __init__(self, dim_x, delta_x, boundary_condition='periodic', disorder_type='anderson gaussian', correlation_length=0.0, disorder_strength=0.0, use_mkl_random=False, interaction=0.0):
     super().__init__(dim_x)
     self.delta_x = delta_x
     self.disorder_strength = disorder_strength
@@ -82,6 +80,7 @@ class Hamiltonian(Potential):
     self.boundary_condition = boundary_condition
     self.disorder_type = disorder_type
     self.correlation_length = correlation_length
+    self.use_mkl_random = use_mkl_random
     self.diagonal_term = np.zeros(dim_x)
     self.script_tunneling = 0.
     self.script_disorder = np.zeros(dim_x)
@@ -152,29 +151,45 @@ class Hamiltonian(Potential):
   Generate a specific disorder configuration
   """
   def generate_disorder(self,seed):
+#    print(self.use_mkl_random)
+    if self.use_mkl_random:
+      try:
+        import mkl_random
+      except ImportError:
+        self.use_mkl_random=False
+        print('No mkl_random found; Fallback to Numpy random')
+
 # Here, the MKL Random Number Generator is used
 # Use instead the following two lines if you prefer Numpy RNG
 # np.random.seed(i)
 # disorder = np.random.normal(scale=self.disorder_strength/np.sqrt(self.delta_x), size=self.dim_x)+2.0*self.tunneling
-    mkl_random.RandomState(77777, brng='SFMT19937')
-    mkl_random.seed(seed,brng='SFMT19937')
-#    mkl_random.seed(seed)
+    if self.use_mkl_random:
+      mkl_random.RandomState(77777, brng='SFMT19937')
+      mkl_random.seed(seed,brng='SFMT19937')
+      my_random_normal = mkl_random.standard_normal
+      my_random_uniform = mkl_random.uniform
+    else:
+      np.random.seed(seed)
+      my_random_normal = np.random.standard_normal
+      my_random_uniform = np.random.uniform
+
     if self.disorder_type=='anderson_uniform':
-      self.disorder = 2.0*self.tunneling + (self.disorder_strength/np.sqrt(self.delta_x))*mkl_random.uniform(-0.5,0.5,self.dim_x)
+      self.disorder = 2.0*self.tunneling + (self.disorder_strength/np.sqrt(self.delta_x))*my_random_uniform(-0.5,0.5,self.dim_x)
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
-      self.disorder = 2.0*self.tunneling + (self.disorder_strength/np.sqrt(self.delta_x))*mkl_random.standard_normal(self.dim_x)
+      self.disorder = 2.0*self.tunneling + (self.disorder_strength/np.sqrt(self.delta_x))*my_random_normal(self.dim_x)
+#      print(self.disorder)
       return
     if self.generate=='simple mask':
-      self.disorder =  2.0*self.tunneling + self.disorder_strength*np.real(np.fft.ifft(self.mask*np.fft.fft(mkl_random.standard_normal(self.dim_x))))
+      self.disorder =  2.0*self.tunneling + self.disorder_strength*np.real(np.fft.ifft(self.mask*np.fft.fft(my_random_normal(self.dim_x))))
 #      self.print_potential()
       return
 # When a field_mask is used, the initial data is a complex uncorrelated set of Gaussian distributed random numbers in configuration space
 # The Fourier transform in momentum space is also a complex uncorrelated set of Gaussian distributed random numbers
 # Thus the first FT is useless and can be short circuited
     if self.generate=='field mask':
-      self.disorder =  2.0*self.tunneling +0.5*self.disorder_strength*self.dim_x*np.abs(np.fft.ifft(self.mask*mkl_random.standard_normal(2*self.dim_x).view(np.complex128)))**2
+      self.disorder =  2.0*self.tunneling +0.5*self.disorder_strength*self.dim_x*np.abs(np.fft.ifft(self.mask*my_random_normal(2*self.dim_x).view(np.complex128)))**2
 # Alternatively (slower)
 #      self.disorder =  2.0*self.tunneling +0.5*self.disorder_strength*np.abs(np.fft.ifft(self.mask*np.fft.fft(mkl_random.standard_normal(2*self.dim_x).view(np.complex128))))**2
 #      self.print_potential()
@@ -182,9 +197,9 @@ class Hamiltonian(Potential):
     sys.exit('Disorder '+self.disorder_type+' not yet implemented!')
     return
 
-  def print_potential(self,filename='potential.dat'):
-    np.savetxt(filename,self.disorder-2.0*self.tunneling)
-    return
+#  def print_potential(self,filename='potential.dat'):
+#    np.savetxt(filename,self.disorder-2.0*self.tunneling)
+#    return
 
   """
   Converts Hamiltonian to a full matrix for Lapack diagonalization
@@ -370,7 +385,7 @@ class Wavefunction:
  #   return np.vdot(self.wfc,local_operator*self.wfc).real*self.delta_x
 #    return x/norm
 
-  def convert_to_momentum_space(self):
+  def convert_to_momentum_space(self,use_mkl_fft=True):
 #    psic_momentum = self.delta_x*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
 #   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
 #    return np.fft.fftshift(self.delta_x*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
@@ -387,7 +402,15 @@ class Wavefunction:
 # Because of FFT, the momentum is also periodic, meaning that the l values above are not 0..dim_x-1, but rather
 # -dim_x/2..dim_x/2-1. At the exist of np.fft.fft, they are in the order 0,1,...dim_x/2-1,-dim_x/2,..,-1.
 # They are put back in the natural orde -dim_x/2...dim_x/2-1 using he np.fft.fftshift routine.
-    return np.fft.fftshift(self.delta_x*mkl_fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
+    if use_mkl_fft:
+      try:
+        import mkl_fft
+        my_fft = mkl_fft.fft
+      except ImportError:
+        my_fft = np.fft.fft
+    else:
+       my_fft = np.fft.fft
+    return np.fft.fftshift(self.delta_x*my_fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
 
   def expectation_value_local_momentum_operator(self, local_operator):
 #    density = np.abs(self.wfc_momentum)**2

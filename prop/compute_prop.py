@@ -69,7 +69,6 @@ import sys
 sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
-import mkl
 
 if __name__ == "__main__":
   environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
@@ -131,6 +130,7 @@ if __name__ == "__main__":
     correlation_length = Disorder.getfloat('sigma',0.0)
     V0 = Disorder.getfloat('V0',0.0)
     disorder_strength = V0
+    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
 
     Nonlinearity = config['Nonlinearity']
     interaction_strength = Nonlinearity.getfloat('g',0.0)
@@ -158,6 +158,7 @@ if __name__ == "__main__":
     measure_dispersion_energy = Measurement.getboolean('dispersion_energy',False)
     measure_wavefunction_final = Measurement.getboolean('wavefunction_final',False)
     measure_extended = Measurement.getboolean('dispersion_variance',False)
+    use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
   else:
     n_config = None
     system_size = None
@@ -166,6 +167,7 @@ if __name__ == "__main__":
     disorder_type = None
     correlation_length = None
     disorder_strength = None
+    use_mkl_random = None
     interaction_strength = None
     initial_state_type = None
     k_0 = None
@@ -185,13 +187,14 @@ if __name__ == "__main__":
     measure_dispersion_energy = None
     measure_wavefunction_final = None
     measure_extended = None
+    use_mkl_fft = None
 
   if mpi_version:
     n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
-    disorder_type, correlation_length, disorder_strength, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, interaction_strength))
+    disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, k_0, sigma_0 = comm.bcast((initial_state_type, k_0, sigma_0))
     method, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, data_layout, t_max, delta_t, i_tab_0))
-    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction_final, measure_extended = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_momentum, measure_dispersion_energy,measure_wavefunction_final, measure_extended))
+    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction_final, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_momentum, measure_dispersion_energy,measure_wavefunction_final, measure_extended, use_mkl_fft))
 
 
   t1=time.perf_counter()
@@ -203,13 +206,17 @@ if __name__ == "__main__":
   delta_x = system_size/dim_x
   #V0=0.025
   #disorder_strength = np.sqrt(V0)
-  mkl.set_num_threads(1)
-  os.environ["MKL_NUM_THREADS"] = "1"
+  try:
+    import mkl
+    mkl.set_num_threads(1)
+    os.environ["MKL_NUM_THREADS"] = "1"
+  except:
+    pass
 
   assert boundary_condition in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, interaction=interaction_strength)
+  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
 
   # Define an initial state
   initial_state = anderson.Wavefunction(dim_x,delta_x)
@@ -232,7 +239,7 @@ if __name__ == "__main__":
   # args.first_step_autocorr is the integer tau/delta_t_measurement
   # In other words, the measurement of the autocorrelation function starts as time tau=delta_t_measurement*first_mmeasurement_autocorr
 #  print(measure_density,measure_density_momentum,measure_autocorrelation,measure_dispersion,measure_dispersion_momentum,measure_wavefunction_final,measure_wavefunction_final,measure_extended)
-  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction_final=measure_wavefunction_final,measure_extended=measure_extended)
+  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction_final=measure_wavefunction_final,measure_extended=measure_extended,use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
   measurement.prepare_measurement(propagation,delta_x,dim_x)

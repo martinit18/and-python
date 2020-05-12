@@ -41,7 +41,6 @@ import sys
 sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
-import mkl
 
 
 
@@ -111,6 +110,7 @@ if __name__ == "__main__":
     correlation_length = Disorder.getfloat('sigma',0.0)
     V0 = Disorder.getfloat('V0',0.0)
     disorder_strength = V0
+    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
 
     Diagonalization = config['Diagonalization']
     diagonalization_method = Diagonalization.get('method','sparse')
@@ -126,13 +126,14 @@ if __name__ == "__main__":
     disorder_type = None
     correlation_length = None
     disorder_strength = None
+    use_mkl_random = None
     diagonalization_method = None
     targeted_energy = None
  #  n_config = comm.bcast(n_config,root=0)
 
   if mpi_version:
     n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
-    disorder_type, correlation_length, disorder_strength = comm.bcast((disorder_type, correlation_length, disorder_strength))
+    disorder_type, correlation_length, use_mkl_random, disorder_strength = comm.bcast((disorder_type, correlation_length, use_mkl_random, disorder_strength))
     diagonalization_method, targeted_energy = comm.bcast((diagonalization_method, targeted_energy))
 
   timing=anderson.Timing()
@@ -144,16 +145,19 @@ if __name__ == "__main__":
   dim_x = int(system_size/delta_x+0.5)
     # Renormalize delta_x so that the system size is exactly what is wanted and split in an integer number of sites
   delta_x = system_size/dim_x
-    #V0=0.025
-    #disorder_strength = np.sqrt(V0)
-  mkl.set_num_threads(1)
-  os.environ["MKL_NUM_THREADS"] = "1"
+
+  try:
+    import mkl
+    mkl.set_num_threads(1)
+    os.environ["MKL_NUM_THREADS"] = "1"
+  except:
+    pass
 
   assert boundary_condition in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
 
 
   # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, interaction=0.0)
+  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=0.0)
   diagonalization = anderson.diag.Diagonalization(targeted_energy,diagonalization_method)
 
   #comm.Bcast(H)
