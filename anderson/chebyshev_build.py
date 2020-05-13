@@ -11,8 +11,8 @@ ffibuilder = FFI()
 
 ffibuilder.cdef("void elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
 ffibuilder.cdef("void elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
-ffibuilder.cdef("void chebyshev_clenshaw_real(const int dim_x, const int max_order, const char * restrict boundary_condition, double * wfc, double * psi, double * psi_old, const double tunneling, const double * disorder, const double *tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * nonlinear_phase);")
-ffibuilder.cdef("void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * wfc, double _Complex * psi, double _Complex * psi_old, const double tunneling, const double * disorder, const double *tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * nonlinear_phase);")
+ffibuilder.cdef("void chebyshev_clenshaw_real(const int dim_x, const int max_order, const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double *restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
+ffibuilder.cdef("void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * restrict wfc, double _Complex *restrict psi, double _Complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
 
 
 ffibuilder.set_source("_chebyshev",
@@ -135,7 +135,7 @@ inline static void elementary_clenshaw_step_complex(const int dim_x, const char 
   return;
 }
 
-void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double *nonlinear_phase)
+void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
 {
   int i, order;
   double argument;
@@ -182,7 +182,7 @@ void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char *
   return;
 }
 
-void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double complex * restrict wfc, double  complex * restrict psi, double complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double *nonlinear_phase)
+void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double complex * restrict wfc, double  complex * restrict psi, double complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
 {
   int i, order;
   double argument;

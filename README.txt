@@ -2,7 +2,7 @@
 # and-python project
 # Version 1.1
 # Author: Dominique Delande
-# May, 12, 2020
+# May, 13, 2020
 
 I. Physics
 In this section, I discuss physics, leaving numerical methods and implementation
@@ -288,8 +288,8 @@ method = che
 # Internally, the wavefunction can be stored either as a complex numpy array
 # or as a real numpy array (twice the size) containing the real parts
 # followed by the imaginary parts
-# 'real' is usually a bit faster (10%)
-data_layout = real
+# real used to be a bit faster (10%), but, from May, 13, 2020, it is the reverse...
+data_layout = complex
 # Total duration of the propagation
 t_max = 2000.
 # Elementary time step
