@@ -234,9 +234,9 @@ class Hamiltonian(Potential):
 
   def generate_full_matrix(self):
 #    tab_index = np.zeros(self.dimension,dtype=int)
-    matrix = np.diag(self.disorder)
 #    print(matrix.shape)
     if (self.dimension==1):
+      matrix = np.diag(self.disorder)
       ntot = self.tab_dim_cumulative[0]
       np.fill_diagonal(matrix[1:,:],-self.tab_tunneling[0])
       np.fill_diagonal(matrix[:,1:],-self.tab_tunneling[0])
@@ -254,11 +254,13 @@ class Hamiltonian(Potential):
 #    print(matrix)
       return matrix
     if (self.dimension==2):
+#      print(self.disorder.ravel())
+      matrix = np.diag(self.disorder.ravel())
       ntot = self.tab_dim_cumulative[0]
       nx = self.tab_dim[0]
       ny = self.tab_dim[1]
 # Hopping along x
-      sub_diagonal= np.zeros((nx-1)*ny)
+      sub_diagonal= np.zeros(ntot)
       for i in range(0,nx-1):
         sub_diagonal[i*ny:(i+1)*ny] = -self.tab_tunneling[0]
       np.fill_diagonal(matrix[ny:,:],sub_diagonal)
@@ -266,13 +268,16 @@ class Hamiltonian(Potential):
       if self.tab_boundary_condition[0]=='periodic':
         pass
 # Hopping along y
-      sub_diagonal=np.zeros(ntot-1)
-      for i in range(0,nx-1):
-        sub_diagonal[i*ny:(i+1)*ny-1] = -self.tab_tunneling[1]
+      sub_diagonal=np.zeros(ntot)
+      for i in range(ny-1):
+        sub_diagonal[i:ntot:ny] = -self.tab_tunneling[1]
       np.fill_diagonal(matrix[1:,:],sub_diagonal)
       np.fill_diagonal(matrix[:,1:],sub_diagonal)
       if self.tab_boundary_condition[1]=='periodic':
-        pass
+        sub_diagonal=np.zeros(ntot)
+        sub_diagonal[0:ntot:ny] = -self.tab_tunneling[1]
+        np.fill_diagonal(matrix[ny-1:,:],sub_diagonal)
+        np.fill_diagonal(matrix[:,ny-1:],sub_diagonal)
 
 #        matrix[i,i+1] = -self.tab_tunneling[0]
 #        matrix[i+1,i] = -self.tab_tunneling[0]
