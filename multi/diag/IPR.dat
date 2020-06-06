@@ -1,0 +1,27 @@
+# Script ran by delande on machine scalp
+# Name of python script: /home/delande/git/and-python/multi/diag/compute_IPR.py
+# Started on: Thu Jun  4 08:07:46 2020
+# Single processor version
+# 
+# Disorder type                   = anderson_gaussian
+# correlation length              = 1.0
+# dimension                       = 1
+# Size_1                          = 100.0
+# delta_1                         = 0.5
+# N_1                             = 200
+# Boundary_Condition_1            = periodic
+# V0                              = 0.1
+# g                               = 0.0
+# Number of disorder realizations = 1
+# Number of processes             = 1
+# Number of realizations per proc = 1
+# targeted_energy                 = 0.6
+# diagonalization method          = lapack
+# 
+# Inverse participation ratio for the eigenstate closer to the targeted energy
+# Average IPR           = 0.01770764754209457
+# Std. deviation of IPR = 0.0
+# Column 1: IPR
+# Column 2: Energy of the state (should be very close to the targeted energy)
+# 
+1.770764754209457059e-02 6.195411164054401842e-01
