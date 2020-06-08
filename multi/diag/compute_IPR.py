@@ -174,7 +174,7 @@ if __name__ == "__main__":
   # Here starts the loop over disorder configurations
   for i in range(n_config):
     tab_energy[i], tab_IPR[i] = diagonalization.compute_IPR(i+rank*n_config, H)
-    np.savetxt('spectrum.dat',diagonalization.compute_full_spectrum(i+rank*n_config, H))
+#    np.savetxt('spectrum.dat',diagonalization.compute_full_spectrum(i+rank*n_config, H))
 #    print(IPR)
   #  pool.apply_async(gpe_evolution, args)
   #  print(str(i), file=final_pf)

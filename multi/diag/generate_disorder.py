@@ -177,6 +177,7 @@ if __name__ == "__main__":
   for i in range(n_config):
     H.generate_disorder(i+rank*n_config)
     H.generate_full_matrix()
+#    print(H.generate_full_complex_matrix(1.0j))
   print(H.disorder.shape)
   np.savetxt('potential.dat',H.disorder)
 #    tab_energy[i], tab_IPR[i] = diagonalization.compute_IPR(i+rank*n_config, H)

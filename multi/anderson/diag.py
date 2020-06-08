@@ -27,8 +27,6 @@ class Diagonalization:
       matrix = H.generate_sparse_matrix()
 # The following line is obviously less efficient
 #    matrix = H.generate_full_matrix()
-# The following line uses a CSR storage for the sparse matrix and is slightly less efficient
-#    matrix = scipy.sparse.csr_matrix(matrix)
       w, v = sparse_linalg.eigsh(matrix,k=1,sigma=self.targeted_energy,mode='normal')
       index = 0
 # The normalization (division by delta_x) ensures that IPR is roughly the inverse of the localization length
