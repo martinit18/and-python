@@ -10,8 +10,8 @@ import numpy as np
 
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None):
   params_string = 'Disorder type                   = '+H.disorder_type+'\n'\
-                 +'correlation length              = '+str(H.correlation_length)+'\n'\
-                 +'dimension                       = '+str(H.dimension)+'\n'
+                 +'Correlation length              = '+str(H.correlation_length)+'\n'\
+                 +'Dimension                       = '+str(H.dimension)+'\n'
   for i in range(H.dimension):
     params_string += \
                   'Size_'+str(i+1)+'                          = '+str(H.tab_dim[i]*H.tab_delta[i])+'\n'\

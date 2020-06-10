@@ -62,8 +62,9 @@ class Potential:
   def __init__(self, dimension, tab_dim):
     self.dimension = dimension
     self.tab_dim = tab_dim
-    self.tab_dim_cumulative = np.zeros(dimension,dtype=int)
+    self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
     ntot = 1
+    self.tab_dim_cumulative[dimension] = 1
     for i in range(dimension-1,-1,-1):
       ntot *= tab_dim[i]
       self.tab_dim_cumulative[i] = ntot
@@ -204,7 +205,6 @@ class Hamiltonian(Potential):
 #      print(diagonal,multiplicative_factor,self.ntot)
       self.disorder = diagonal + multiplicative_factor*my_random_normal(self.tab_dim_cumulative[0]).reshape(self.tab_dim)
 #      print(self.disorder)
-#      print(self.disorder)
       return
     """
     if self.generate=='simple mask':
@@ -233,7 +233,40 @@ class Hamiltonian(Potential):
   """
 
   def generate_full_matrix(self):
-#    tab_index = np.zeros(self.dimension,dtype=int)
+    tab_index = np.zeros(self.dimension,dtype=int)
+    matrix = np.diag(self.disorder.ravel())
+    ntot = self.tab_dim_cumulative[0]
+    sub_diagonal= np.zeros((2*self.dimension,ntot))
+    tab_offset = np.zeros(2*self.dimension,dtype=int)
+    for j in range(self.dimension):
+# Offsets for the regulat hoppings
+      tab_offset[j] = self.tab_dim_cumulative[j+1]
+# Offsets for the periodic hoppings
+      tab_offset[j+self.dimension] = self.tab_dim_cumulative[j+1]*(self.tab_dim[j]-1)
+#    print(tab_offset)
+    for i in range(ntot):
+      index = i
+      for j in range(self.dimension-1,-1,-1):
+        index,tab_index[j] = divmod(index,self.tab_dim[j])
+#      print(i,tab_index)
+# Hopping along the various dimensions
+      for j in range(self.dimension):
+# Regular hopping
+        if tab_index[j]<self.tab_dim[j]-1:
+          sub_diagonal[j,i] = -self.tab_tunneling[j]
+        else:
+# Only if periodic boundary condition
+          if self.tab_boundary_condition[j]=='periodic':
+            sub_diagonal[j+self.dimension,i-(self.tab_dim[j]-1)*self.tab_dim_cumulative[j+1]] = -self.tab_tunneling[j]
+    for j in range(self.dimension):
+      np.fill_diagonal(matrix[tab_offset[j]:,:],sub_diagonal[j,:])
+      np.fill_diagonal(matrix[:,tab_offset[j]:],sub_diagonal[j,:])
+      if self.tab_boundary_condition[j]=='periodic':
+        np.fill_diagonal(matrix[tab_offset[j+self.dimension]:,:],sub_diagonal[j+self.dimension,:])
+        np.fill_diagonal(matrix[:,tab_offset[j+self.dimension]:],sub_diagonal[j+self.dimension,:])
+#    print(matrix)
+    return matrix
+    """
     if (self.dimension==1):
       matrix = np.diag(self.disorder)
       ntot = self.tab_dim_cumulative[0]
@@ -245,7 +278,8 @@ class Hamiltonian(Potential):
 #    print(matrix)
       return matrix
     if (self.dimension==2):
-#      print(self.disorder.ravel())
+    """
+    """
       matrix = np.diag(self.disorder.ravel())
       ntot = self.tab_dim_cumulative[0]
       sub_diagonal= np.zeros(ntot)
@@ -271,8 +305,34 @@ class Hamiltonian(Potential):
         np.fill_diagonal(matrix[ny-1:,:],sub_diagonal)
         np.fill_diagonal(matrix[:,ny-1:],sub_diagonal)
 #      print(matrix)
+    """
+    """
+#      print(self.disorder.ravel())
+      matrix = np.diag(self.disorder.ravel())
+#      ntot = self.tab_dim_cumulative[0]
+      sub_diagonal= np.zeros(self.tab_dim_cumulative[0])
+# Hopping along x
+      for i in range(self.tab_dim[0]-1):
+        sub_diagonal[i*self.tab_dim_cumulative[1]:(i+1)*self.tab_dim_cumulative[1]] = -self.tab_tunneling[0]
+      np.fill_diagonal(matrix[self.tab_dim_cumulative[1]:,:],sub_diagonal)
+      np.fill_diagonal(matrix[:,self.tab_dim_cumulative[1]:],sub_diagonal)
+      if self.tab_boundary_condition[0]=='periodic':
+        np.fill_diagonal(matrix[self.tab_dim_cumulative[0]-self.tab_dim_cumulative[1]:,:],sub_diagonal)
+        np.fill_diagonal(matrix[:,self.tab_dim_cumulative[0]-self.tab_dim_cumulative[1]:],sub_diagonal)
+# Hopping along y
+      sub_diagonal[:]=0.0
+      for i in range(self.tab_dim_cumulative[1]-1):
+        sub_diagonal[i:self.tab_dim_cumulative[0]:self.tab_dim_cumulative[1]] = -self.tab_tunneling[1]
+      np.fill_diagonal(matrix[1:,:],sub_diagonal)
+      np.fill_diagonal(matrix[:,1:],sub_diagonal)
+      if self.tab_boundary_condition[1]=='periodic':
+        sub_diagonal[:]=0.0
+        sub_diagonal[0:self.tab_dim_cumulative[0]:self.tab_dim_cumulative[1]] = -self.tab_tunneling[1]
+        np.fill_diagonal(matrix[self.tab_dim_cumulative[1]-1:,:],sub_diagonal)
+        np.fill_diagonal(matrix[:,self.tab_dim_cumulative[1]-1:],sub_diagonal)
+      print(matrix)
       return matrix
-
+    """
     """
 # loop over all indices of the big matrix
     for i in range(self.tab_dim_cumulative[0]):
@@ -303,57 +363,53 @@ class Hamiltonian(Potential):
   Converts Hamiltonian to a sparse matrix for sparse diagonalization
   """
   def generate_sparse_matrix(self):
-    if (self.dimension==1):
-      n = self.tab_dim[0]
-      if self.tab_boundary_condition[0]=='periodic':
-        diagonals=[self.disorder,np.full(n-1,-self.tab_tunneling[0]),np.full(n-1,-self.tab_tunneling[0]),[-self.tab_tunneling[0]],[-self.tab_tunneling[0]]]
-        matrix = ssparse.diags(diagonals,[0,-1,1,1-n,n-1],format='dia')
-      else:
-        diagonals=[self.disorder,np.full(n-1,-self.tab_tunneling[0]),np.full(n-1,-self.tab_tunneling[0])]
-        matrix = ssparse.diags(diagonals,[0,-1,1],format='dia')
-      return matrix
-    if (self.dimension==2):
-      ntot = self.tab_dim_cumulative[0]
-      nx = self.tab_dim[0]
-      ny = self.tab_dim[1]
-      diagonal = self.disorder.ravel()
-      regular_x_hopping = np.zeros(ntot)
-      for i in range(0,nx-1):
-        regular_x_hopping[i*ny:(i+1)*ny] = -self.tab_tunneling[0]
-      regular_y_hopping = np.zeros(ntot)
-      for i in range(0,ny-1):
-        regular_y_hopping[i:ntot:ny] = -self.tab_tunneling[1]
-      diagonals = [diagonal,regular_x_hopping,regular_x_hopping,regular_y_hopping,regular_y_hopping]
-      offsets = [0, ny, -ny, 1, -1]
-#      print(diagonals)
-      if self.tab_boundary_condition[0]=='periodic':
-        periodic_x_hopping = regular_x_hopping[0:ny]
-        diagonals.extend([periodic_x_hopping,periodic_x_hopping])
-        offsets.extend([ntot-ny,-ntot+ny])
-      if self.tab_boundary_condition[1]=='periodic':
-        periodic_y_hopping = np.zeros(ntot)
-        periodic_y_hopping[0:ntot:ny] = -self.tab_tunneling[1]
-        diagonals.extend([periodic_y_hopping,periodic_y_hopping])
-        offsets.extend([ny-1,1-ny])
-#      diagonals.extend([regular_y_hopping])
-#      print(diagonals)
-#      print(offsets)
-      matrix = ssparse.diags(diagonals,offsets,format='csr')
-#      print(matrix.toarray())
-      return matrix
+    tab_index = np.zeros(self.dimension,dtype=int)
+    diagonal = self.disorder.ravel()
+    ntot = self.tab_dim_cumulative[0]
+    sub_diagonal= np.zeros((2*self.dimension,ntot))
+    tab_offset = np.zeros(2*self.dimension,dtype=int)
+    for j in range(self.dimension):
+# Offsets for the regulat hoppings
+      tab_offset[j] = self.tab_dim_cumulative[j+1]
+# Offsets for the periodic hoppings
+      tab_offset[j+self.dimension] = self.tab_dim_cumulative[j+1]*(self.tab_dim[j]-1)
+#    print(tab_offset)
+    for i in range(ntot):
+      index = i
+      for j in range(self.dimension-1,-1,-1):
+        index,tab_index[j] = divmod(index,self.tab_dim[j])
+#      print(i,tab_index)
+# Hopping along the various dimensions
+      for j in range(self.dimension):
+# Regular hopping
+        if tab_index[j]<self.tab_dim[j]-1:
+          sub_diagonal[j,i] = -self.tab_tunneling[j]
+        else:
+# Only if periodic boundary condition
+          if self.tab_boundary_condition[j]=='periodic':
+            sub_diagonal[j+self.dimension,i-(self.tab_dim[j]-1)*self.tab_dim_cumulative[j+1]] = -self.tab_tunneling[j]
+    diagonals = [diagonal]
+    offsets = [0]
+    for j in range(self.dimension):
+      diagonals.extend([sub_diagonal[j,:],sub_diagonal[j,:]])
+      offsets.extend([tab_offset[j],-tab_offset[j]])
+      if self.tab_boundary_condition[j]=='periodic':
+        diagonals.extend([sub_diagonal[j+self.dimension,:],sub_diagonal[j+self.dimension,:]])
+        offsets.extend([tab_offset[j+self.dimension],-tab_offset[j+self.dimension]])
+#    print(diagonals)
+#    print(offsets)
+    matrix = ssparse.diags(diagonals,offsets,format='dia')
+#    print('Sparse matrix computed')
+#    print(matrix.toarray())
+    return matrix
 
   """
   Converts Hamiltonian to a complex sparse matrix for sparse diagonalization
   """
   def generate_sparse_complex_matrix(self,pivot):
-    n = self.dim_x
-    if self.boundary_condition=='periodic':
-      diagonals=[self.disorder-pivot,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling),[-self.tunneling],[-self.tunneling]]
-      matrix = ssparse.diags(diagonals,[0,-1,1,1-n,n-1],format='csr')
-    else:
-      diagonals=[self.disorder-pivot,np.full(n-1,-self.tunneling),np.full(n-1,-self.tunneling)]
-      matrix = ssparse.diags(diagonals,[0,-1,1],format='csr')
-#    print(matrix)
+    matrix = self.generate_sparse_matrix().astype(np.complex128)
+    matrix.setdiag(matrix.diagonal()-pivot)
+#    print(matrix.toarray())
     return matrix
 
   """

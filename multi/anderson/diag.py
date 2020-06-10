@@ -25,11 +25,10 @@ class Diagonalization:
       index = np.abs(w-self.targeted_energy).argmin()
     if self.method=='sparse':
       matrix = H.generate_sparse_matrix()
-# The following line is obviously less efficient
-#    matrix = H.generate_full_matrix()
+#      matrix2 = H.generate_sparse_complex_matrix(1j)
       w, v = sparse_linalg.eigsh(matrix,k=1,sigma=self.targeted_energy,mode='normal')
       index = 0
-# The normalization (division by delta_x) ensures that IPR is roughly the inverse of the localization length
+# The normalization (division by delta_vol) ensures that IPR is roughly the inverse of the localization length
     IPR = np.sum(v[:,index]**4)/(H.delta_vol)
 #  print('Energy=',w[index])
     return (w[index],IPR)

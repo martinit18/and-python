@@ -43,8 +43,6 @@ sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
 
-
-
 if __name__ == "__main__":
   environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
              +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
@@ -126,9 +124,10 @@ if __name__ == "__main__":
     number_of_bins = Diagonalization.getint('number_of_bins')
   else:
     n_config = None
-    system_size = None
-    delta_x = None
-    boundary_condition = None
+    dimension = None
+    tab_size = None
+    tab_delta = None
+    tab_boundary_condition = None
     disorder_type = None
     correlation_length = None
     disorder_strength = None
@@ -138,7 +137,7 @@ if __name__ == "__main__":
  #  n_config = comm.bcast(n_config,root=0)
 
   if mpi_version:
-    n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
+    n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
     disorder_type, correlation_length, use_mkl_random, disorder_strength = comm.bcast((disorder_type, correlation_length, use_mkl_random, disorder_strength))
     diagonalization_method, targeted_energy = comm.bcast((diagonalization_method, targeted_energy))
 
@@ -148,7 +147,7 @@ if __name__ == "__main__":
   tab_dim = list()
   for i in range(dimension):
     tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
-    # Renormalize delta_x so that the system size is exactly what is wanted and split in an integer number of sites
+# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
     tab_delta[i] = tab_size[i]/tab_dim[i]
 #  print(tab_dim)
 
