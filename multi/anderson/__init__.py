@@ -88,6 +88,12 @@ class Hamiltonian(Potential):
     for i in range(dimension):
       self.tab_tunneling.append(0.5/tab_delta[i]**2)
       self.delta_vol *= tab_delta[i]
+    self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
+    ntot = 1
+    self.tab_dim_cumulative[dimension] = 1
+    for i in range(dimension-1,-1,-1):
+      ntot *= tab_dim[i]
+      self.tab_dim_cumulative[i] = ntot
     self.interaction = interaction
     self.tab_boundary_condition = tab_boundary_condition
     self.disorder_type = disorder_type
@@ -501,35 +507,58 @@ class Hamiltonian(Potential):
     return script_tunneling, script_disorder
 
 class Wavefunction:
-  def __init__(self, dim_x, delta_x):
-    self.dim_x = dim_x
-    self.delta_x = delta_x
-    self.wfc = np.zeros(dim_x,dtype=np.complex128)
-    self.position = 0.5*delta_x*np.arange(1-dim_x,dim_x+1,2)
+  def __init__(self, tab_dim, tab_delta):
+    self.tab_dim = tab_dim
+    self.tab_delta = tab_delta
+    self.wfc = np.zeros(tab_dim,dtype=np.complex128)
+#    dim_max = max(tab_dim)
+    dimension = len(tab_dim)
+#    self.tab_position = np.zeros((dimension,dim_max))
+    self.tab_position = list()
+    self.delta_vol = 1.0
+    for i in range(dimension):
+      self.delta_vol *= tab_delta[i]
+      self.tab_position.append(0.5*tab_delta[i]*np.arange(1-tab_dim[i],tab_dim[i]+1,2))
+    self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
+    ntot = 1
+    self.tab_dim_cumulative[dimension] = 1
+    for i in range(dimension-1,-1,-1):
+      ntot *= tab_dim[i]
+      self.tab_dim_cumulative[i] = ntot
+#    print(self.tab_position)
     return
 
-  def gaussian(self,k_0,sigma_0):
-    psi=np.exp(1j*k_0*self.position-0.5*(self.position/sigma_0)**2)
+  def gaussian(self,tab_k_0,tab_sigma_0):
+    self.tab_k_0 = tab_k_0
+    self.tab_sigma_0 = tab_sigma_0
+    tab_position = np.meshgrid(*self.tab_position,indexing='ij')
+    tab_phase = np.zeros(self.tab_dim)
+    tab_amplitude = np.zeros(self.tab_dim)
+    for i in range(len(tab_position)):
+      tab_phase += self.tab_k_0[i]*tab_position[i]
+      tab_amplitude += (tab_position[i]/self.tab_sigma_0[i])**2
 # The next two lines are to avoid too small values of abs(psi[i])
 # which slow down the calculation
-    threshold = 1.e-30
-    psi=np.where(abs(psi)<threshold,threshold,psi)
-    self.k_0 = k_0
-    self.sigma_0 = sigma_0
-    self.wfc = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_x))
+    threshold = 100.
+    tab_amplitude =np.where(tab_amplitude>threshold,threshold,tab_amplitude)
+    psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
+    self.wfc = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
     return
 
-  def plane_wave(self,k_0):
+  def plane_wave(self,tab_k_0):
 #    self.type = 'Plane wave'
-    self.k_0 = k_0
-    self.sigma_0 = 0.0
-    self.wfc = np.exp(1j*k_0*self.position)/np.sqrt(self.dim_x*self.delta_x)
+    self.tab_k_0 = tab_k_0
+    tab_position = np.meshgrid(*self.tab_position,indexing='ij')
+    tab_phase = np.zeros(self.tab_dim)
+    for i in range(len(tab_position)):
+      tab_phase += self.tab_k_0[i]*tab_position[i]
+    self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.tab_dim_cumulative[0]*self.delta_vol)
     return
 
   def overlap(self, other_wavefunction):
 #    return np.sum(self.wfc*np.conj(other_wavefunction.wfc))*self.delta_x
 # The following line is 5 times faster!
-    return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_x
+    return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_vol
 
   def expectation_value_local_operator(self, local_operator):
 #    density = np.abs(self.wfc)**2
@@ -560,12 +589,13 @@ class Wavefunction:
     if use_mkl_fft:
       try:
         import mkl_fft
-        my_fft = mkl_fft.fft
+        my_fft = mkl_fft.fftn
       except ImportError:
-        my_fft = np.fft.fft
+        my_fft = np.fft.fftn
     else:
-       my_fft = np.fft.fft
-    return np.fft.fftshift(self.delta_x*my_fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
+       my_fft = np.fft.fftn
+    return np.fft.fftshift(self.delta_vol*my_fft(self.wfc))
+#    return np.fft.fftshift(self.delta_x*my_fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
 
   def expectation_value_local_momentum_operator(self, local_operator):
 #    density = np.abs(self.wfc_momentum)**2
@@ -578,9 +608,9 @@ class Wavefunction:
 
   def energy(self, H):
 #    rhs = H.apply_h(self.wfc)
-    non_linear_energy = 0.5*H.interaction*np.sum(np.abs(self.wfc)**4)*self.delta_x
-    energy = np.sum(np.real(self.wfc*np.conjugate(H.apply_h(self.wfc))))*self.delta_x + non_linear_energy
-    norm = np.linalg.norm(self.wfc)**2*self.delta_x
+    non_linear_energy = 0.5*H.interaction*np.sum(np.abs(self.wfc)**4)*self.delta_vol
+    energy = np.sum(np.real(self.wfc*np.conjugate(H.apply_h(self.wfc))))*self.delta_vol + non_linear_energy
+    norm = np.linalg.norm(self.wfc)**2*self.delta_vol
 #  print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm
 

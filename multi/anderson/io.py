@@ -26,9 +26,13 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'Number of realizations per proc = '+str(n_config)+'\n'
   if not initial_state == None:
     params_string += \
-                  'Initial state                   = '+initial_state.type+'\n'\
-                 +'k_0                             = '+str(initial_state.k_0)+'\n'\
-                 +'sigma_0                         = '+str(initial_state.sigma_0)+'\n'
+                  'Initial state                   = '+initial_state.type+'\n'
+    for i in range(H.dimension):
+      params_string += \
+                  'k_0_'+str(i+1)+'                           = '+str(initial_state.tab_k_0[i])+'\n'
+      if initial_state.type == 'gaussian_wave_packet':
+        params_string += \
+                 +'sigma_0_'+str(i+1)+'                       = '+str(initial_state.tab_sigma_0[i])+'\n'
   if not propagation == None:
     params_string += \
                   'Integration Method              = '+propagation.method+'\n'\
@@ -57,6 +61,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
 #                  +'total measurement time          = '+str(my_t_max-my_first_measurement_autocorr*my_delta_t_measurement)+'\n'\
   return params_string
 
+"""
 def output_density(file,position,density,general_string,print_type='density'):
 #  print(position)
 #  print(density.shape)
@@ -129,6 +134,93 @@ def output_density(file,position,density,general_string,print_type='density'):
                      +'Column 1: Position\n'\
                      +'From Column 2: Wavefunction for the various eigenstates\n'
   np.savetxt(file,array_to_print,header=general_string+specific_string)
+  return
+"""
+
+def output_density(file,data,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
+#  print(data.shape)
+#  print(tab_abscissa)
+  if file_type=='savetxt':
+    if data_type=='density':
+      column_1='Position'
+      column_2='Density'
+      column_3='Std. deviation of density'
+      specific_string='Spatial density\n'
+    if data_type=='density_momentum':
+      column_1='Momentum'
+      column_2='Density'
+      column_3='Std. deviation of density'
+      specific_string='Density in momentum space\n'
+    if data_type=='wavefunction':
+      column_1='Position'
+      column_2='Re(wavefunction)'
+      column_3='Im(wavefunction)'
+      specific_string='Wavefunction in configuration space\n'
+    if data_type=='wavefunction_momentum':
+      column_1='Momentum'
+      column_2='Re(wavefunction)'
+      column_3='Im(wavefunction)'
+      specific_string='Wavefunction in momentum space\n'
+    if data_type=='autocorrelation':
+      column_1='Time'
+      column_2='Re(<psi(0)|psi(t)>)'
+      column_3='Im(<psi(0)|psi(t)>)'
+      specific_string='Temporal autocorrelation function\n'
+    list_of_columns = []
+    tab_strings = []
+    next_column = 1
+    if data_type in ['density','density_momentum']:
+# The simple case where there is only 1d data
+      if data.ndim==1:
+        if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
+          list_of_columns.append(tab_abscissa[0])
+          tab_strings.append('Column '+str(next_column)+': '+column_1)
+          next_column += 1
+        list_of_columns.append(data)
+        tab_strings.append('Column '+str(next_column)+': '+column_2)
+        next_column += 1
+        array_to_print=np.column_stack(list_of_columns)
+# 2d data : can be either true 2d data or 1d data with error bars
+      if data.ndim==2:
+# This is for 1d data with optionally error bars in the second row
+        if data.shape[0]<3 :
+          if tab_abscissa!=[] and data.shape[1]==tab_abscissa[0].size:
+            list_of_columns.append(tab_abscissa[0])
+            tab_strings.append('Column '+str(next_column)+': '+column_1)
+            next_column += 1
+          list_of_columns.append(data[0,:])
+          tab_strings.append('Column '+str(next_column)+': '+column_2)
+          next_column += 1
+# If there is a second row, it contains error bars
+          if data.shape[0]==2 :
+            list_of_columns.append(data[1,:])
+            tab_strings.append('Column '+str(next_column)+': '+column_3)
+            next_column += 1
+          array_to_print=np.column_stack(list_of_columns)
+# This is for true 2d data; tab_abscissa is ignored as numpy.savetxt is limited to a single 1d or 2d array
+        else:
+          array_to_print = data[:,:]
+      if data.ndim==3 and data.shape[0]<3:
+        array_to_print=data[0,:,:]
+    if data_type in ['wavefunction','wavefunction_momentum','autocorrelation']:
+      if data.ndim==1:
+#        print(data.size,tab_abscissa[0].size)
+        if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
+          list_of_columns.append(tab_abscissa[0])
+          tab_strings.append('Column '+str(next_column)+': '+column_1)
+          next_column += 1
+        list_of_columns.append(np.real(data))
+        tab_strings.append('Column '+str(next_column)+': '+column_2)
+        next_column += 1
+        list_of_columns.append(np.imag(data))
+        tab_strings.append('Column '+str(next_column)+': '+column_3)
+        next_column += 1
+        array_to_print=np.column_stack(list_of_columns)
+      if data.ndim==2:
+        array_to_print=data[:,:]
+#    print(list_of_columns)
+#    print(tab_strings)
+    np.savetxt(file,array_to_print,header=header_string+specific_string+'\n'.join(tab_strings)+'\n')
   return
 
 def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data not specified'):

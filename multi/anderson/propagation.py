@@ -196,12 +196,12 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """Returns rhs of Gross-Pitaevskii equation with discretized space
     For data_layout == 'complex':
       wfc is assumed to be in format where
-      wfc[0:2*dim_x:2] contains the real part of the wavefunction and
-      wfc[1:2*dim_x:2] contains the timing.timing(imag part of the wavefunction.
+      wfc[0:2*ntot:2] contains the real part of the wavefunction and
+      wfc[1:2*ntot:2] contains the imag part of the wavefunction.
     For data_layout == 'real':
       wfc is assumed to be in format where
-      wfc[0:dim_x] contains the real part of the wavefunction and
-      wfc[dim_x:2*dim_x] contains the imag part of the wavefunction.
+      wfc[0:ntot] contains the real part of the wavefunction and
+      wfc[ntot:2*ntot] contains the imag part of the wavefunction.
     """
 
     start_time = timeit.default_timer()
@@ -210,7 +210,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     else:
       apply_minus_i_h_gpe_complex(wfc.view(np.complex128), H, rhs.view(np.complex128))
     timing.GPE_TIME+=(timeit.default_timer() - start_time)
-    timing.NUMBER_OF_OPS+=16.0*H.dim_x
+    timing.NUMBER_OF_OPS+=16.0*H.tab_cumulative_dim[0]
     return rhs
 
 class Measurement:
@@ -228,13 +228,14 @@ class Measurement:
     self.use_mkl_fft = use_mkl_fft
     return
 
-  def prepare_measurement(self,propagation,delta_x,dim_x):
+  def prepare_measurement(self,propagation,tab_delta,tab_dim):
     delta_t = propagation.delta_t
     t_max = propagation.t_max
     how_often_to_measure = int(self.delta_t_measurement/delta_t+0.5)
     propagation.delta_t = self.delta_t_measurement/how_often_to_measure
     number_of_measurements = int(t_max/self.delta_t_measurement+1.99999)
     number_of_time_steps = int(t_max/delta_t+0.99999)
+    self.dimension = len(tab_dim)
     self.tab_i_measurement = np.arange(start=0,stop=number_of_measurements*how_often_to_measure,step=how_often_to_measure,dtype=int)
     self.tab_t_measurement = delta_t*self.tab_i_measurement
 # correct the last time
@@ -249,18 +250,19 @@ class Measurement:
 #    self.tab_energy = np.zeros(0)
 #    self.tab_nonlinear_energy = np.zeros(0)
 #    self.tab_momentum = np.zeros(0)
-    dim_density = (dim_x)
-    dim_dispersion = (number_of_measurements)
-    self.wfc =  np.zeros(dim_x,dtype=np.complex128)
-    self.wfc_momentum =  np.zeros(dim_x,dtype=np.complex128)
+    dim_dispersion = [number_of_measurements]
+    self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
+    self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_density):
-      self.density_final = np.zeros(dim_density)
+      self.density_final = np.zeros(tab_dim)
     if (self.measure_autocorrelation):
       self.tab_autocorrelation = np.zeros(number_of_measurements,dtype=np.complex128)
     if (self.measure_density_momentum):
-      self.density_momentum_final = np.zeros(dim_density)
+      self.density_momentum_final = np.zeros(tab_dim)
     if (self.measure_density_momentum or self.measure_dispersion_momentum):
-      self.frequencies = np.fft.fftshift(np.fft.fftfreq(dim_x,d=delta_x/(2.0*np.pi)))
+      self.frequencies = []
+      for i in range(self.dimension):
+        self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
     if (self.measure_dispersion_position):
       self.tab_position = np.zeros(dim_dispersion)
       self.tab_position2 = np.zeros(dim_dispersion)
@@ -270,18 +272,19 @@ class Measurement:
       self.tab_energy = np.zeros(dim_dispersion)
       self.tab_nonlinear_energy = np.zeros(dim_dispersion)
     if (self.measure_wavefunction_final):
-      self.wfc =  np.zeros(dim_x,dtype=np.complex128)
+      self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_wavefunction_momentum_final):
-      self.wfc_momentum =  np.zeros(dim_x,dtype=np.complex128)
+      self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     return
 
-  def prepare_measurement_global(self,propagation,delta_x,dim_x):
+  def prepare_measurement_global(self,propagation,tab_delta,tab_dim):
     delta_t = propagation.delta_t
     t_max = propagation.t_max
     how_often_to_measure = int(self.delta_t_measurement/delta_t+0.5)
     propagation.delta_t = self.delta_t_measurement/how_often_to_measure
     number_of_measurements = int(t_max/self.delta_t_measurement+1.99999)
     number_of_time_steps = int(t_max/delta_t+0.99999)
+    self.dimension = len(tab_dim)
     self.tab_i_measurement = np.arange(start=0,stop=number_of_measurements*how_often_to_measure,step=how_often_to_measure,dtype=int)
     self.tab_t_measurement = delta_t*self.tab_i_measurement
 # correct the last time
@@ -296,22 +299,27 @@ class Measurement:
 #    self.tab_energy = np.zeros(0)
 #    self.tab_nonlinear_energy = np.zeros(0)
 #    self.tab_momentum = np.zeros(0)
+    dim_density = tab_dim[:]
+    dim_dispersion = [number_of_measurements]
     if self.extended:
-      dim_density = (2,dim_x)
-      dim_dispersion = (2,number_of_measurements)
+      dim_density.insert(0,2)
+      dim_dispersion.insert(0,2)
     else:
-      dim_density = (1,dim_x)
-      dim_dispersion = (1,number_of_measurements)
-    self.wfc =  np.zeros(dim_x,dtype=np.complex128)
-    self.wfc_momentum =  np.zeros(dim_x,dtype=np.complex128)
+      dim_density.insert(0,1)
+      dim_dispersion.insert(0,1)
+#    print(dim_density)
+#    print(dim_dispersion)
+    self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
+    self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_density):
       self.density_final = np.zeros(dim_density)
     if (self.measure_autocorrelation):
       self.tab_autocorrelation = np.zeros(number_of_measurements,dtype=np.complex128)
-    if (self.measure_density_momentum):
+    if self.measure_density_momentum or self.measure_dispersion_momentum:
       self.density_momentum_final = np.zeros(dim_density)
-    if (self.measure_density_momentum or self.measure_dispersion_momentum):
-      self.frequencies = np.fft.fftshift(np.fft.fftfreq(dim_x,d=delta_x/(2.0*np.pi)))
+      self.frequencies = []
+      for i in range(self.dimension):
+        self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
     if (self.measure_dispersion_position):
       self.tab_position = np.zeros(dim_dispersion)
       self.tab_position2 = np.zeros(dim_dispersion)
@@ -321,9 +329,9 @@ class Measurement:
       self.tab_energy = np.zeros(dim_dispersion)
       self.tab_nonlinear_energy = np.zeros(dim_dispersion)
     if (self.measure_wavefunction_final):
-      self.wfc =  np.zeros(dim_x,dtype=np.complex128)
+      self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_wavefunction_momentum_final):
-      self.wfc_momentum =  np.zeros(dim_x,dtype=np.complex128)
+      self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     return
 
   def merge_measurement(self,measurement):
