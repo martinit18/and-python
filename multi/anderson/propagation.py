@@ -48,6 +48,27 @@ class Temporal_Propagation:
     return
 
 def apply_minus_i_h_gpe_complex(wfc, H, rhs):
+  ntot=H.tab_dim_cumulative[0]
+#  print('wfc',wfc.dtype,wfc.shape)
+  rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
+  rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
+#  print(H.sparse_matrix.dot(wfc.view(np.complex128)).dtype,H.sparse_matrix.dot(wfc.view(np.complex128)).shape)
+# rhs = np.copy(H.sparse_matrix.dot(wfc.view(np.complex128)))
+#  rhs=np.copy(toto.view(np.float64))
+#  print('rhs',rhs.dtype,rhs.shape)
+#  print(wfc[200],wfc[201],rhs[200],rhs[201])
+  return
+
+def apply_minus_i_h_gpe_real(wfc, H, rhs):
+#  print('wfc',wfc.dtype,wfc.shape)
+  ntot=H.tab_dim_cumulative[0]
+  rhs[0:ntot]=H.sparse_matrix.dot(wfc[ntot:2*ntot])
+  rhs[ntot:2*ntot]=-H.sparse_matrix.dot(wfc[0:ntot])
+#  print(wfc[100],rhs[100])
+  return
+
+"""
+def apply_minus_i_h_gpe_complex(wfc, H, rhs):
   dim_x = H.dim_x
   if (H.interaction == 0.0):
     H.diagonal_term=H.disorder
@@ -81,8 +102,12 @@ def apply_minus_i_h_gpe_real(wfc, H, rhs):
   rhs[1:dim_x-1]         = -H.tunneling * (wfc[dim_x:2*dim_x-2] + wfc[dim_x+2:2*dim_x]) + H.diagonal_term[1:dim_x-1]*wfc[dim_x+1:2*dim_x-1]
   rhs[dim_x+1:2*dim_x-1] =  H.tunneling * (wfc[0:dim_x-2]       + wfc[2:dim_x])         - H.diagonal_term[1:dim_x-1]*wfc[1:dim_x-1]
   return rhs
+"""
+
 
 def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+  if add_real:
+    psi_old =
   dim_x = H.dim_x
   if (add_real):
     if H.boundary_condition=='periodic':
@@ -138,28 +163,30 @@ The first use pure Python, the second one uses a C code and cffi (roughly 10 tim
 """
 
 def chebyshev_step_clenshaw_python(wfc, H, propagation,timing):
-  dim_x = H.dim_x
+#  tab_dim = H.tab_dim
+  ntot = H.tab_dim_cumulative[0]
   max_order = propagation.tab_coef.size-1
+  local_wfc = wfc.ravel()
   assert max_order%2==0,"Max order {} must be an even number".format(max_order)
   if propagation.data_layout == 'real':
     elementary_clenshaw_step_routine = elementary_clenshaw_step_real
-    psi_old = np.zeros(2*dim_x)
+    psi_old = np.zeros(2*ntot)
   else:
     elementary_clenshaw_step_routine = elementary_clenshaw_step_complex
-    psi_old = np.zeros(dim_x,dtype=np.complex128)
-  psi = propagation.tab_coef[-1] * wfc
-  elementary_clenshaw_step_routine(wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
+    psi_old = np.zeros(ntot,dtype=np.complex128)
+  psi = propagation.tab_coef[-1] * local_wfc
+  elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
   for order in range(propagation.tab_coef.size-3,0,-2):
-    elementary_clenshaw_step_routine(wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
-    elementary_clenshaw_step_routine(wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
-  elementary_clenshaw_step_routine(wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
+    elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
+    elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
+  elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
   if H.interaction==0.0:
     phase = propagation.delta_t*H.medium_energy
     cos_phase = math.cos(phase)
     sin_phase = math.sin(phase)
   else:
     if propagation.data_layout == 'real':
-      nonlinear_phase = propagation.delta_t*H.interaction*(psi[0:dim_x]**2+psi[dim_x:2*dim_x]**2)
+      nonlinear_phase = propagation.delta_t*H.interaction*(psi[0:ntot]**2+psi[ntot:2*ntot]**2)
     else:
       nonlinear_phase = propagation.delta_t*H.interaction*(np.real(psi)**2+np.imag(psi)**2)
     timing.MAX_NONLINEAR_PHASE = max(timing.MAX_NONLINEAR_PHASE,np.amax(nonlinear_phase))
@@ -167,10 +194,10 @@ def chebyshev_step_clenshaw_python(wfc, H, propagation,timing):
     cos_phase = np.cos(phase)
     sin_phase = np.sin(phase)
   if propagation.data_layout == 'real':
-      wfc[0:dim_x] = psi[0:dim_x]*cos_phase+psi[dim_x:2*dim_x]*sin_phase
-      wfc[dim_x:2*dim_x] = psi[dim_x:2*dim_x]*cos_phase-psi[0:dim_x]*sin_phase
+      local_wfc[0:ntot] = psi[0:ntot]*cos_phase+psi[ntot:2*ntot]*sin_phase
+      local_wfc[ntot:2*ntot] = psi[ntot:2*ntot]*cos_phase-psi[0:ntot]*sin_phase
   else:
-      wfc[:] = psi[:] * (cos_phase-1j*sin_phase)
+      local_wfc[:] = psi[:] * (cos_phase-1j*sin_phase)
 #  print(psi[2000],wfc[2000])
   return
 
@@ -203,14 +230,17 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
       wfc[0:ntot] contains the real part of the wavefunction and
       wfc[ntot:2*ntot] contains the imag part of the wavefunction.
     """
-
     start_time = timeit.default_timer()
     if (data_layout=='real'):
       apply_minus_i_h_gpe_real(wfc, H, rhs)
+#      print('inside gpe real',wfc[100],rhs[100])
     else:
-      apply_minus_i_h_gpe_complex(wfc.view(np.complex128), H, rhs.view(np.complex128))
+#     print('inside gpe wfc',wfc.dtype,wfc.shape)
+#     print('inside gpe rhs',rhs.dtype,rhs.shape)
+      apply_minus_i_h_gpe_complex(wfc, H, rhs)
+#      print('inside gpe complex',wfc[200],wfc[201],rhs[200],rhs[201])
     timing.GPE_TIME+=(timeit.default_timer() - start_time)
-    timing.NUMBER_OF_OPS+=16.0*H.tab_cumulative_dim[0]
+    timing.NUMBER_OF_OPS+=16.0*H.tab_dim_cumulative[0]
     return rhs
 
 class Measurement:
@@ -255,6 +285,7 @@ class Measurement:
     self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_density):
       self.density_final = np.zeros(tab_dim)
+#      print(self.density_final.shape,tab_dim)
     if (self.measure_autocorrelation):
       self.tab_autocorrelation = np.zeros(number_of_measurements,dtype=np.complex128)
     if (self.measure_density_momentum):
@@ -336,6 +367,8 @@ class Measurement:
 
   def merge_measurement(self,measurement):
     if self.measure_density:
+#      print(measurement.density_final.shape)
+#      print(self.density_final.shape)
       self.density_final[0] += measurement.density_final
       if self.extended:
         self.density_final[1] += measurement.density_final**2
@@ -538,7 +571,7 @@ class Spectral_function:
 
 def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=False):
   assert propagation.data_layout in ["real","complex"]
-  assert H.boundary_condition in ["periodic","open"]
+#  assert H.boundary_condition in ["periodic","open"]
   assert propagation.method in ["ode","che"]
   def solout(t,y):
     timing.N_SOLOUT+=1
@@ -556,13 +589,17 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
     print("\n Warning, this uses the slow Python version, you should build the C version!\n")
 
 
-
-  dim_x = H.dim_x
-  delta_x = H.delta_x
+  dimension = H.dimension
+  tab_dim = H.tab_dim
+  tab_delta = H.tab_delta
+  ntot=1
+  for i in range(dimension-1,-1,-1):
+    ntot *= tab_dim[i]
 #  i_tab_0 = propagation.first_measurement_autocorr
   i_tab_0 = 0
 #  print('start gen disorder',timeit.default_timer())
   H.generate_disorder(seed=i+1234)
+  H.generate_sparse_matrix()
 #  print('end   gen disorder',timeit.default_timer())
 #  tab_x = np.zeros_like(propagation.tab_i_measurement,dtype=np.float64)
 #  tab_x2 = np.zeros_like(propagation.tab_i_measurement,dtype=np.float64)
@@ -574,7 +611,7 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
 #  tab_energy[0], tab_nonlinear_energy[0] = initial_state.energy(H)
 #  init_state_autocorr = anderson.Wavefunction(dim_x,delta_x)
   if (measurement.measure_autocorrelation):
-    init_state_autocorr = anderson.Wavefunction(dim_x,delta_x)
+    init_state_autocorr = anderson.Wavefunction(tab_dim,tab_delta)
     if (i_tab_0==0):
       measurement.tab_autocorrelation[0] = initial_state.overlap(initial_state)
       init_state_autocorr.wfc[:] = initial_state.wfc[:]
@@ -589,12 +626,14 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
     measurement.tab_momentum[0] = initial_state.expectation_value_local_momentum_operator(measurement.frequencies)
 
   if propagation.data_layout=='real':
-    y = np.concatenate((np.real(initial_state.wfc),np.imag(initial_state.wfc)))
+    y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
   else:
-    y = np.copy(initial_state.wfc)
+    y = initial_state.wfc.view(np.float64).ravel()
 #  print(timeit.default_timer())
   if (propagation.method=='ode'):
-    rhs = np.zeros(2*dim_x)
+    rhs = np.zeros(2*ntot)
+#    print('y',y.dtype,y.shape)
+#    print('rhs',rhs.dtype,rhs.shape)
     solver = ode(f=lambda t,y: gross_pitaevskii(t,y,H,propagation.data_layout,rhs,timing)).set_integrator('dop853', atol=1e-5, rtol=1e-4)
     solver.set_solout(solout)
     solver.set_initial_value(y)
@@ -612,7 +651,7 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
 
 #time evolution
   i_tab = 1
-  psi = anderson.Wavefunction(dim_x,delta_x)
+  psi = anderson.Wavefunction(tab_dim,tab_delta)
 #  print(timeit.default_timer())
   for i_prop in range(1,measurement.tab_i_measurement[-1]+1):
     t_next=min(i_prop*propagation.delta_t,propagation.t_max)
@@ -629,16 +668,19 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
 #      print(timing.MAX_NONLINEAR_PHASE)
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
-      timing.NUMBER_OF_OPS+=16.0*dim_x*propagation.tab_coef.size
+      timing.NUMBER_OF_OPS+=16.0*ntot*propagation.tab_coef.size
     if i_prop==measurement.tab_i_measurement[i_tab]:
       start_dummy_time=timeit.default_timer()
       if (propagation.method == 'ode'): y=solver.y
+#      print('3',psi.wfc.shape,psi.wfc.dtype,y.shape,y.dtype)
       if propagation.data_layout=='real':
 # The following two lines are faster than the natural implementation psi.wfc= y[0:dim_x]+1j*y[dim_x:2*dim_x]
-        psi.wfc.real=y[0:dim_x]
-        psi.wfc.imag=y[dim_x:2*dim_x]
+        psi.wfc.real=y[0:ntot].reshape(tab_dim)
+        psi.wfc.imag=y[ntot:2*ntot].reshape(tab_dim)
       else:
-        psi.wfc = y.view(np.complex128)
+#        print( y.view(np.complex128).shape)
+        psi.wfc = y.view(np.complex128).reshape(tab_dim)
+#      print('4',psi.wfc.shape,psi.wfc.dtype)
       timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
       start_expect_time = timeit.default_timer()
 #      print(start_expect_time)
@@ -656,7 +698,7 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
         if (i_tab>=i_tab_0):
 # Inlining the overlap method is slighlty faster
 #          measurement.tab_autocorrelation[i_tab-i_tab_0] = psi.overlap(init_state_autocorr)
-          measurement.tab_autocorrelation[i_tab-i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*delta_x
+          measurement.tab_autocorrelation[i_tab-i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
       timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
       i_tab+=1
   start_expect_time = timeit.default_timer()

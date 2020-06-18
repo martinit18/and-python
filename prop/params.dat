@@ -36,7 +36,7 @@ sigma_0 = 10.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
-method = che
+method = ode
 data_layout = real
 # Total duration of the propagation
 t_max = 2000.
@@ -44,18 +44,18 @@ t_max = 2000.
 delta_t = 2.
 
 [Averaging]
-n_config = 80
+n_config = 1
 
 [Measurement]
 delta_t_measurement = 2.
 #first_measurement = 0
-#density = True
+density = True
 density_momentum = True
 #dispersion_position = True
-dispersion_momentum = True
+#dispersion_momentum = True
 #dispersion_energy = True
-#wavefunction_final = True
-#autocorrelation = True
-dispersion_variance = True
+wavefunction_final = True
+autocorrelation = True
+#dispersion_variance = True
 use_mkl_fft = True
 

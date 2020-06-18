@@ -337,7 +337,7 @@ if __name__ == "__main__":
     print()
     if (propagation.method=='ode'):
       print("GPE time             = {0:.3f}".format(timing.GPE_TIME))
-      print("Number of time steps =",timing.timing.N_SOLOUT)
+      print("Number of time steps =",timing.N_SOLOUT)
     else:
       print("CHE time             = {0:.3f}".format(timing.CHE_TIME))
       print("Max nonlinear phase  = {0:.3f}".format(timing.MAX_NONLINEAR_PHASE))

@@ -404,10 +404,10 @@ class Hamiltonian(Potential):
         offsets.extend([tab_offset[j+self.dimension],-tab_offset[j+self.dimension]])
 #    print(diagonals)
 #    print(offsets)
-    matrix = ssparse.diags(diagonals,offsets,format='dia')
+    self.sparse_matrix = ssparse.diags(diagonals,offsets,format='csr')
 #    print('Sparse matrix computed')
 #    print(matrix.toarray())
-    return matrix
+    return
 
   """
   Converts Hamiltonian to a complex sparse matrix for sparse diagonalization
