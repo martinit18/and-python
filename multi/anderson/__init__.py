@@ -94,15 +94,16 @@ class Hamiltonian(Potential):
     for i in range(dimension-1,-1,-1):
       ntot *= tab_dim[i]
       self.tab_dim_cumulative[i] = ntot
+    self.ntot = ntot
     self.interaction = interaction
     self.tab_boundary_condition = tab_boundary_condition
     self.disorder_type = disorder_type
     self.correlation_length = correlation_length
     self.use_mkl_random = use_mkl_random
-    self.diagonal_term = np.zeros(tab_dim)
-    self.script_tunneling = 0.
-    self.script_disorder = np.zeros(tab_dim)
-    self.medium_energy = 0.
+#    self.diagonal_term = np.zeros(tab_dim)
+#    self.script_tunneling = 0.
+#    self.script_disorder = np.zeros(tab_dim)
+#    self.medium_energy = 0.
     self.generate=''
     if (disorder_type in ['anderson_gaussian','anderson_uniform','anderson_cauchy']):
       self.generate='direct'
@@ -199,7 +200,7 @@ class Hamiltonian(Potential):
       for i in range(self.dimension):
         diagonal += 2.0*self.tab_tunneling[i]
         multiplicative_factor /= np.sqrt(self.tab_delta[i])
-      self.disorder = diagonal + multiplicative_factor*my_random_uniform(-0.5,0.5,self.tab_dim_cumulative[0]).reshape(self.tab_dim)
+      self.disorder = diagonal + multiplicative_factor*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
@@ -209,7 +210,7 @@ class Hamiltonian(Potential):
         diagonal += 2.0*self.tab_tunneling[i]
         multiplicative_factor /= np.sqrt(self.tab_delta[i])
 #      print(diagonal,multiplicative_factor,self.ntot)
-      self.disorder = diagonal + multiplicative_factor*my_random_normal(self.tab_dim_cumulative[0]).reshape(self.tab_dim)
+      self.disorder = diagonal + multiplicative_factor*my_random_normal(self.ntot).reshape(self.tab_dim)
 #      print(self.disorder)
       return
     """
@@ -241,7 +242,7 @@ class Hamiltonian(Potential):
   def generate_full_matrix(self):
     tab_index = np.zeros(self.dimension,dtype=int)
     matrix = np.diag(self.disorder.ravel())
-    ntot = self.tab_dim_cumulative[0]
+    ntot = self.ntot
     sub_diagonal= np.zeros((2*self.dimension,ntot))
     tab_offset = np.zeros(2*self.dimension,dtype=int)
     for j in range(self.dimension):
@@ -371,7 +372,7 @@ class Hamiltonian(Potential):
   def generate_sparse_matrix(self):
     tab_index = np.zeros(self.dimension,dtype=int)
     diagonal = self.disorder.ravel()
-    ntot = self.tab_dim_cumulative[0]
+    ntot = self.ntot
     sub_diagonal= np.zeros((2*self.dimension,ntot))
     tab_offset = np.zeros(2*self.dimension,dtype=int)
     for j in range(self.dimension):
@@ -441,13 +442,16 @@ class Hamiltonian(Potential):
 # The accurate determination should be used for starong disorder
     if (accurate):
   # rough estimate of the maximum energy (no disorder taken into account)
-      e_max_0 = 2.0/(self.delta_x**2)
+      e_max_0=0.0
+      for i in range(self.dimension):
+        e_max_0 += 2.0/(self.tab_delta[i]**2)
+
       n_iterations_hamiltonian_bounds=min(10,int(50./np.log10(e_max_0)))
   # rough estimate of the minimum energy (no disorder taken into account)
       e_min_0 = 0.0
   # First determine the lower bound
   # Start with plane wave k=0 (minimum energy state)
-      psic = Wavefunction(self.dim_x, self.delta_x)
+      psic = Wavefunction(self.tab_dim, self.tab_delta)
       psic.plane_wave(0.0)
   #    psic2 = np.empty(self.dim_x,dtype=np.complex128)
       finished = False
@@ -455,9 +459,9 @@ class Hamiltonian(Potential):
       while not finished:
         for i in range(n_iterations_hamiltonian_bounds-1):
           psic.wfc = self.apply_h(psic.wfc)-e_max_0*psic.wfc
-        norm = np.linalg.norm(psic.wfc)**2*self.delta_x
+        norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
         psic.wfc = self.apply_h(psic.wfc)-e_max_0*psic.wfc
-        new_norm = np.linalg.norm(psic.wfc)**2*self.delta_x
+        new_norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
         new_estimated_bound = np.sqrt(new_norm/norm)
         norm = new_norm
         if (norm>1.e100):
@@ -470,7 +474,10 @@ class Hamiltonian(Potential):
       e_max = e_min_0 + 1.01 * estimated_bound
   # Then determine the lower bound
   # Start with plane wave k=pi (maximum energy state)
-      psic.plane_wave(np.pi/self.delta_x)
+      tab_k= []
+      for i in range(self.dimension):
+        tab_k.append(np.pi/self.tab_delta[i])
+      psic.plane_wave(tab_k)
       finished = False
       estimated_bound = 0.0
       while not finished:
@@ -491,20 +498,30 @@ class Hamiltonian(Potential):
       e_min = e_max_0 - 1.01 * estimated_bound
     else:
 # Very basic bounds using the min/max of the potential
-      e_min=np.amin(self.disorder)-1.0/(self.delta_x**2)
-      e_max=np.amax(self.disorder)+1.0/(self.delta_x**2)
+      e_max_0=0.0
+      for i in range(self.dimension):
+        e_max_0 += 1.0/(self.tab_delta[i]**2)
+      e_min=np.amin(self.disorder)-e_max_0
+      e_max=np.amax(self.disorder)+e_max_0
 #    print(e_min,e_max)
-    return e_min,e_max
-
+    self.e_min = e_min
+    self.e_max = e_max
+    self.medium_energy = 0.5*(e_max+e_min)
+    self.two_over_delta_e = 2.0/(e_max-e_min)
+    self.two_e0_over_delta_e = self.medium_energy*self.two_over_delta_e
+    return
   """
   Computes the rescaling of Hamiltonian for the Chebyshev method
   """
   def script_h(self,e_min,e_max):
     one_over_delta_e = 1.0/(e_max-e_min)
-    script_tunneling = 2.0*self.tunneling*one_over_delta_e
-    script_disorder = (2.0*self.disorder-(e_min+e_max))*one_over_delta_e
+    #script_tunneling = 2.0*self.tunneling*one_over_delta_e
+    #script_disorder = (2.0*self.disorder-(e_min+e_max))*one_over_delta_e
+    self.two_over_delta_e = 2.0*one_over_delta_e
+    self.two_e0_over_delta_e = (e_min+e_max)*one_over_delta_e
 #  print(script_tunneling,script_disorder[0:10])
-    return script_tunneling, script_disorder
+    #return script_tunneling, script_disorder
+    return
 
 class Wavefunction:
   def __init__(self, tab_dim, tab_delta):
@@ -525,6 +542,7 @@ class Wavefunction:
     for i in range(dimension-1,-1,-1):
       ntot *= tab_dim[i]
       self.tab_dim_cumulative[i] = ntot
+    self.ntot=ntot
 #    print(self.tab_position)
     return
 
@@ -552,7 +570,7 @@ class Wavefunction:
     tab_phase = np.zeros(self.tab_dim)
     for i in range(len(tab_position)):
       tab_phase += self.tab_k_0[i]*tab_position[i]
-    self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.tab_dim_cumulative[0]*self.delta_vol)
+    self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
     return
 
   def overlap(self, other_wavefunction):

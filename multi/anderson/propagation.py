@@ -48,20 +48,17 @@ class Temporal_Propagation:
     return
 
 def apply_minus_i_h_gpe_complex(wfc, H, rhs):
-  ntot=H.tab_dim_cumulative[0]
-#  print('wfc',wfc.dtype,wfc.shape)
+  ntot=H.ntot
   rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
   rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
-#  print(H.sparse_matrix.dot(wfc.view(np.complex128)).dtype,H.sparse_matrix.dot(wfc.view(np.complex128)).shape)
-# rhs = np.copy(H.sparse_matrix.dot(wfc.view(np.complex128)))
-#  rhs=np.copy(toto.view(np.float64))
-#  print('rhs',rhs.dtype,rhs.shape)
+# The next line makes everything in one call, but is significantly slower
+#  rhs[:] = (-1j*H.sparse_matrix.dot(wfc.view(np.complex128))).view(np.float64)
 #  print(wfc[200],wfc[201],rhs[200],rhs[201])
   return
 
 def apply_minus_i_h_gpe_real(wfc, H, rhs):
 #  print('wfc',wfc.dtype,wfc.shape)
-  ntot=H.tab_dim_cumulative[0]
+  ntot=H.ntot
   rhs[0:ntot]=H.sparse_matrix.dot(wfc[ntot:2*ntot])
   rhs[ntot:2*ntot]=-H.sparse_matrix.dot(wfc[0:ntot])
 #  print(wfc[100],rhs[100])
@@ -106,8 +103,34 @@ def apply_minus_i_h_gpe_real(wfc, H, rhs):
 
 
 def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+#  print('wfc',wfc.shape,wfc.dtype)
+#  print('psi',psi.shape,psi.dtype)
+#  print('psi_old',psi_old.shape,psi_old.dtype)
+#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
   if add_real:
-    psi_old =
+    psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi)-H.two_e0_over_delta_e*psi)+c_coef*wfc-psi_old
+  else:
+    psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi)-H.two_e0_over_delta_e*psi)+1j*c_coef*wfc-psi_old
+#  print('out',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  return
+
+def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+#  print('wfc',wfc.shape,wfc.dtype)
+#  print('psi',psi.shape,psi.dtype)
+#  print('psi_old',psi_old.shape,psi_old.dtype)
+  ntot = H.ntot
+#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  if add_real:
+    psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])+c_coef*wfc[0:ntot]-psi_old[0:ntot]
+    psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
+  else:
+    psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
+    psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
+
+#  print('out',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  return
+
+  """
   dim_x = H.dim_x
   if (add_real):
     if H.boundary_condition=='periodic':
@@ -126,7 +149,8 @@ def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, a
       psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*psi[dim_x-2])+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
     psi_old[1:dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[1:dim_x-1]-H.script_tunneling*(psi[2:dim_x]+psi[0:dim_x-2]))+1j*c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
   return
-
+  """
+"""
 def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
   dim_x = H.dim_x
   if (add_real):
@@ -156,7 +180,7 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_
     psi_old[1:dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[1:dim_x-1]-H.script_tunneling*(psi[2:dim_x]+psi[0:dim_x-2]))-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
     psi_old[dim_x+1:2*dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[dim_x+1:2*dim_x-1]-H.script_tunneling*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
   return
-
+"""
 """
 The two routines chebyshev_step_clenshaw_python and chebyshev_step_clenshaw_cffi should be completely equivalent
 The first use pure Python, the second one uses a C code and cffi (roughly 10 times faster)
@@ -164,7 +188,7 @@ The first use pure Python, the second one uses a C code and cffi (roughly 10 tim
 
 def chebyshev_step_clenshaw_python(wfc, H, propagation,timing):
 #  tab_dim = H.tab_dim
-  ntot = H.tab_dim_cumulative[0]
+  ntot = H.ntot
   max_order = propagation.tab_coef.size-1
   local_wfc = wfc.ravel()
   assert max_order%2==0,"Max order {} must be an even number".format(max_order)
@@ -180,6 +204,7 @@ def chebyshev_step_clenshaw_python(wfc, H, propagation,timing):
     elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
     elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
   elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
+#  print(H.medium_energy)
   if H.interaction==0.0:
     phase = propagation.delta_t*H.medium_energy
     cos_phase = math.cos(phase)
@@ -240,7 +265,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
       apply_minus_i_h_gpe_complex(wfc, H, rhs)
 #      print('inside gpe complex',wfc[200],wfc[201],rhs[200],rhs[201])
     timing.GPE_TIME+=(timeit.default_timer() - start_time)
-    timing.NUMBER_OF_OPS+=16.0*H.tab_dim_cumulative[0]
+    timing.NUMBER_OF_OPS+=16.0*H.ntot
     return rhs
 
 class Measurement:
@@ -628,7 +653,10 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
   else:
-    y = initial_state.wfc.view(np.float64).ravel()
+    if propagation.method=='ode':
+      y = initial_state.wfc.view(np.float64).ravel()
+    else:
+      y = initial_state.wfc.ravel()
 #  print(timeit.default_timer())
   if (propagation.method=='ode'):
     rhs = np.zeros(2*ntot)
@@ -638,13 +666,14 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
     solver.set_solout(solout)
     solver.set_initial_value(y)
   else:
-#    start_dummy_time=timeit.default_timer()
-    e_min, e_max = H.energy_range()
-#    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-    H.medium_energy = 0.5*(e_min+e_max)
+    start_dummy_time=timeit.default_timer()
+    H.energy_range()
+    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+#    H.medium_energy = 0.5*(e_min+e_max)
 #    print(e_min,e_max)
-    H.script_tunneling, H.script_disorder = H.script_h(e_min,e_max)
-    propagation.script_delta_t = 0.5*propagation.delta_t*(e_max-e_min)
+    #H.script_tunneling, H.script_disorder =
+#    H.script_h(e_min,e_max)
+    propagation.script_delta_t = 0.5*propagation.delta_t*(H.e_max-H.e_min)
     accuracy = 1.e-6
     propagation.compute_chebyshev_coefficients(accuracy,timing)
 
@@ -665,6 +694,7 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
 #      print(i_prop,start_che_time)
 #      print(timing.MAX_NONLINEAR_PHASE)
       chebyshev_step(y, H, propagation,timing)
+#      print(np.vdot(y,y)*H.delta_vol)
 #      print(timing.MAX_NONLINEAR_PHASE)
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
