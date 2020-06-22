@@ -163,12 +163,14 @@ if __name__ == "__main__":
     measure_density_momentum = Measurement.getboolean('density_momentum',False)
     measure_autocorrelation = Measurement.getboolean('autocorrelation',False)
     measure_dispersion_position = Measurement.getboolean('dispersion_position',False)
+    measure_dispersion_position2 = Measurement.getboolean('dispersion_position2',False)
     measure_dispersion_momentum = Measurement.getboolean('dispersion_momentum',False)
     measure_dispersion_energy = Measurement.getboolean('dispersion_energy',False)
     measure_wavefunction_final = Measurement.getboolean('wavefunction_final',False)
     measure_extended = Measurement.getboolean('dispersion_variance',False)
     use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
   else:
+    dimension = None
     n_config = None
     tab_size = None
     tab_delta = None
@@ -192,6 +194,7 @@ if __name__ == "__main__":
     measure_density_momentum = None
     measure_autocorrelation = None
     measure_dispersion_position = None
+    measure_dispersion_position2 = None
     measure_dispersion_momentum = None
     measure_dispersion_energy = None
     measure_wavefunction_final = None
@@ -203,7 +206,7 @@ if __name__ == "__main__":
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
     method, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, data_layout, t_max, delta_t, i_tab_0))
-    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction_final, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_momentum, measure_dispersion_energy,measure_wavefunction_final, measure_extended, use_mkl_fft))
+    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction_final, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy,measure_wavefunction_final, measure_extended, use_mkl_fft))
 
 
   t1=time.perf_counter()
@@ -247,7 +250,7 @@ if __name__ == "__main__":
   # args.first_step_autocorr is the integer tau/delta_t_measurement
   # In other words, the measurement of the autocorrelation function starts as time tau=delta_t_measurement*first_mmeasurement_autocorr
 #  print(measure_density,measure_density_momentum,measure_autocorrelation,measure_dispersion,measure_dispersion_momentum,measure_wavefunction_final,measure_wavefunction_final,measure_extended)
-  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction_final=measure_wavefunction_final,measure_extended=measure_extended,use_mkl_fft=use_mkl_fft)
+  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction_final=measure_wavefunction_final,measure_extended=measure_extended,use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
   measurement.prepare_measurement(propagation,tab_delta,tab_dim)
@@ -283,6 +286,8 @@ if __name__ == "__main__":
 # Propagate from 0 to t_max
 #    print('1',measurement.density_final.shape)
     anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
+#    print(H.disorder)
+#    print(measurement.tab_position)
 #    print('2',measurement.density_final.shape)
 #   print(measurement.wfc_momentum[2128])
 #    print(measurement.tab_autocorrelation)
@@ -303,7 +308,8 @@ if __name__ == "__main__":
 #    anderson.io.output_density('wavefunction.dat',initial_state.wfc,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
 #    anderson.io.output_density('wavefunction2.dat',vector,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
     measurement_global.merge_measurement(measurement)
-
+#  print(measurement_global.tab_position)
+#
   if mpi_version:
     measurement_global.mpi_merge_measurement(comm,timing)
   t2 = time.perf_counter()
@@ -330,8 +336,9 @@ if __name__ == "__main__":
       anderson.io.output_density('wavefunction_momentum_final.dat',measurement_global.wfc_momentum,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
     if (measurement_global.measure_autocorrelation):
       anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_autocorrelation,tab_abscissa=[measurement.tab_t_measurement[i_tab_0:]-measurement.tab_t_measurement[i_tab_0]],header_string=header_string,data_type='autocorrelation')
-#    if (measurement_global.measure_dispersion_position or measurement_global.measure_dispersion_momentum or measurement_global.measure_dispersion_energy):
-#      anderson.io.output_dispersion('dispersion.dat',tab_dispersion,tab_strings,header_string)
+#    print(tab_dispersion)
+    if (measurement_global.measure_dispersion_position or measurement_global.measure_dispersion_momentum or measurement_global.measure_dispersion_energy):
+      anderson.io.output_dispersion('dispersion.dat',tab_dispersion,tab_strings,header_string)
 
 
 #  for i in range(n_config):

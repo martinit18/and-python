@@ -192,7 +192,7 @@ class Hamiltonian(Potential):
       np.random.seed(seed)
       my_random_normal = np.random.standard_normal
       my_random_uniform = np.random.uniform
-
+#    print('seed=',seed)
 #    print(self.tab_dim_cumulative)
     if self.disorder_type=='anderson_uniform':
       diagonal = 0.0
@@ -422,6 +422,7 @@ class Hamiltonian(Potential):
   """
   Apply Hamiltonian on a wavefunction
   """
+  """
   def apply_h(self, wfc):
     dim_x = self.dim_x
     rhs = np.empty(dim_x,dtype=np.complex128)
@@ -433,6 +434,14 @@ class Hamiltonian(Potential):
       rhs[dim_x-1] = -self.tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
     rhs[1:dim_x-1] = -self.tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
     return rhs
+  """
+
+  """
+  Apply Hamiltonian on a wavefunction
+  """
+
+  def apply_h(self, wfc):
+    return self.sparse_matrix.dot(wfc.ravel())
 
   """
   Try to estimate bounds of the spectrum of The Hamiltonian
@@ -529,17 +538,17 @@ class Wavefunction:
     self.tab_delta = tab_delta
     self.wfc = np.zeros(tab_dim,dtype=np.complex128)
 #    dim_max = max(tab_dim)
-    dimension = len(tab_dim)
+    self.dimension = len(tab_dim)
 #    self.tab_position = np.zeros((dimension,dim_max))
     self.tab_position = list()
     self.delta_vol = 1.0
-    for i in range(dimension):
+    for i in range(self.dimension):
       self.delta_vol *= tab_delta[i]
       self.tab_position.append(0.5*tab_delta[i]*np.arange(1-tab_dim[i],tab_dim[i]+1,2))
-    self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
+    self.tab_dim_cumulative = np.zeros(self.dimension+1,dtype=int)
     ntot = 1
-    self.tab_dim_cumulative[dimension] = 1
-    for i in range(dimension-1,-1,-1):
+    self.tab_dim_cumulative[self.dimension] = 1
+    for i in range(self.dimension-1,-1,-1):
       ntot *= tab_dim[i]
       self.tab_dim_cumulative[i] = ntot
     self.ntot=ntot
@@ -578,15 +587,6 @@ class Wavefunction:
 # The following line is 5 times faster!
     return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_vol
 
-  def expectation_value_local_operator(self, local_operator):
-#    density = np.abs(self.wfc)**2
-#   norm = np.sum(density)
-#    x = np.sum(density*local_operator)
-#    return np.sum(density*local_operator)/np.sum(density)
-    return (np.vdot(self.wfc,local_operator*self.wfc)/np.vdot(self.wfc,self.wfc)).real
- #   return np.vdot(self.wfc,local_operator*self.wfc).real*self.delta_x
-#    return x/norm
-
   def convert_to_momentum_space(self,use_mkl_fft=True):
 #    psic_momentum = self.delta_x*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
 #   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
@@ -615,19 +615,15 @@ class Wavefunction:
     return np.fft.fftshift(self.delta_vol*my_fft(self.wfc))
 #    return np.fft.fftshift(self.delta_x*my_fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
 
-  def expectation_value_local_momentum_operator(self, local_operator):
-#    density = np.abs(self.wfc_momentum)**2
-#    norm = np.sum(density)
-#    x = np.sum(density*local_operator)
-#    print(norm,x)
-#    return x/norm
-#    return np.sum(density*local_operator)/np.sum(density)
-    return (np.vdot(self.wfc_momentum,local_operator*self.wfc_momentum)/np.vdot(self.wfc_momentum,self.wfc_momentum)).real
-
   def energy(self, H):
 #    rhs = H.apply_h(self.wfc)
-    non_linear_energy = 0.5*H.interaction*np.sum(np.abs(self.wfc)**4)*self.delta_vol
-    energy = np.sum(np.real(self.wfc*np.conjugate(H.apply_h(self.wfc))))*self.delta_vol + non_linear_energy
+    if H.interaction==0.0:
+      non_linear_energy=0.0
+    else:
+#      non_linear_energy = 0.5*H.interaction*np.sum(np.abs(self.wfc)**4)*self.delta_vol
+      non_linear_energy = 0.5*H.interaction*np.sum((self.wfc.real**2+self.wfc.imag**2)**2)*self.delta_vol
+#    energy = np.sum(np.real(self.wfc.ravel()*np.conjugate(H.apply_h(self.wfc))))*self.delta_vol + non_linear_energy
+    energy = np.sum(self.wfc.ravel().real*H.apply_h(self.wfc.real)+self.wfc.ravel().imag*H.apply_h(self.wfc.imag))*self.delta_vol + non_linear_energy
     norm = np.linalg.norm(self.wfc)**2*self.delta_vol
 #  print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm

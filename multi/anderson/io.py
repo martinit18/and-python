@@ -32,7 +32,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'k_0_'+str(i+1)+'                           = '+str(initial_state.tab_k_0[i])+'\n'
       if initial_state.type == 'gaussian_wave_packet':
         params_string += \
-                 +'sigma_0_'+str(i+1)+'                       = '+str(initial_state.tab_sigma_0[i])+'\n'
+                 'sigma_0_'+str(i+1)+'                       = '+str(initial_state.tab_sigma_0[i])+'\n'
   if not propagation == None:
     params_string += \
                   'Integration Method              = '+propagation.method+'\n'\

@@ -269,12 +269,14 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     return rhs
 
 class Measurement:
-  def __init__(self, delta_t_measurement, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction_final=False,measure_extended=False,use_mkl_fft=True):
+  def __init__(self, delta_t_measurement, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction_final=False,measure_extended=False,use_mkl_fft=True):
     self.delta_t_measurement = delta_t_measurement
+    self.i_tab_0 = i_tab_0
     self.measure_density = measure_density
     self.measure_density_momentum = measure_density_momentum
     self.measure_autocorrelation = measure_autocorrelation
     self.measure_dispersion_position = measure_dispersion_position
+    self.measure_dispersion_position2 = measure_dispersion_position2
     self.measure_dispersion_momentum = measure_dispersion_momentum
     self.measure_dispersion_energy = measure_dispersion_energy
     self.measure_wavefunction_final = measure_wavefunction_final
@@ -296,16 +298,8 @@ class Measurement:
 # correct the last time
     self.tab_i_measurement[number_of_measurements-1]=number_of_time_steps
     self.tab_t_measurement[number_of_measurements-1]=t_max
-#    self.density_final = np.zeros(0)
-#    self.tab_autocorrelation = np.zeros(0,dtype=np.complex128)
-#    self.frequencies = np.zeros(0)
-#    self.density_momentum_final = np.zeros(0)
-#    self.tab_position = np.zeros(0)
-#    self.tab_position2 = np.zeros(0)
-#    self.tab_energy = np.zeros(0)
-#    self.tab_nonlinear_energy = np.zeros(0)
-#    self.tab_momentum = np.zeros(0)
     dim_dispersion = [number_of_measurements]
+    dim_dispersion_vec = [self.dimension,number_of_measurements]
     self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
     self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_density):
@@ -320,10 +314,11 @@ class Measurement:
       for i in range(self.dimension):
         self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
     if (self.measure_dispersion_position):
-      self.tab_position = np.zeros(dim_dispersion)
-      self.tab_position2 = np.zeros(dim_dispersion)
+      self.tab_position = np.zeros(dim_dispersion_vec)
+    if (self.measure_dispersion_position2):
+      self.tab_position2 = np.zeros(dim_dispersion_vec)
     if (self.measure_dispersion_momentum):
-      self.tab_momentum = np.zeros(dim_dispersion)
+      self.tab_momentum = np.zeros(dim_dispersion_vec)
     if (self.measure_dispersion_energy):
       self.tab_energy = np.zeros(dim_dispersion)
       self.tab_nonlinear_energy = np.zeros(dim_dispersion)
@@ -346,25 +341,20 @@ class Measurement:
 # correct the last time
     self.tab_i_measurement[number_of_measurements-1]=number_of_time_steps
     self.tab_t_measurement[number_of_measurements-1]=t_max
-#    self.density_final = np.zeros((1,0))
-#    self.tab_autocorrelation = np.zeros(0,dtype=np.complex128)
-#    self.frequencies = np.zeros(0)
-#    self.density_momentum_final = np.zeros(0)
-#    self.tab_position = np.zeros(0)
-#    self.tab_position2 = np.zeros(0)
-#    self.tab_energy = np.zeros(0)
-#    self.tab_nonlinear_energy = np.zeros(0)
-#    self.tab_momentum = np.zeros(0)
     dim_density = tab_dim[:]
     dim_dispersion = [number_of_measurements]
+    dim_dispersion_vec = [self.dimension,number_of_measurements]
     if self.extended:
       dim_density.insert(0,2)
       dim_dispersion.insert(0,2)
+      dim_dispersion_vec.insert(0,2)
     else:
       dim_density.insert(0,1)
       dim_dispersion.insert(0,1)
+      dim_dispersion_vec.insert(0,1)
 #    print(dim_density)
 #    print(dim_dispersion)
+#    print(dim_dispersion_vec)
     self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
     self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if (self.measure_density):
@@ -377,10 +367,11 @@ class Measurement:
       for i in range(self.dimension):
         self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
     if (self.measure_dispersion_position):
-      self.tab_position = np.zeros(dim_dispersion)
-      self.tab_position2 = np.zeros(dim_dispersion)
+      self.tab_position = np.zeros(dim_dispersion_vec)
+    if (self.measure_dispersion_position2):
+      self.tab_position2 = np.zeros(dim_dispersion_vec)
     if (self.measure_dispersion_momentum):
-        self.tab_momentum = np.zeros(dim_dispersion)
+        self.tab_momentum = np.zeros(dim_dispersion_vec)
     if (self.measure_dispersion_energy):
       self.tab_energy = np.zeros(dim_dispersion)
       self.tab_nonlinear_energy = np.zeros(dim_dispersion)
@@ -405,9 +396,11 @@ class Measurement:
       self.tab_autocorrelation += measurement.tab_autocorrelation
     if self.measure_dispersion_position:
       self.tab_position[0] += measurement.tab_position
-      self.tab_position2[0] += measurement.tab_position2
       if self.extended:
         self.tab_position[1] += measurement.tab_position**2
+    if self.measure_dispersion_position2:
+      self.tab_position2[0] += measurement.tab_position2
+      if self.extended:
         self.tab_position2[1] += measurement.tab_position2**2
     if self.measure_dispersion_momentum:
       self.tab_momentum[0] += measurement.tab_momentum
@@ -448,6 +441,8 @@ class Measurement:
       toto = np.empty_like(self.tab_position)
       comm.Reduce(self.tab_position,toto)
       self.tab_position = np.copy(toto)
+    if self.measure_dispersion_position2:
+      toto = np.empty_like(self.tab_position2)
       comm.Reduce(self.tab_position2,toto)
       self.tab_position2 =  np.copy(toto)
     if self.measure_dispersion_momentum:
@@ -487,33 +482,42 @@ class Measurement:
     next_column = 2
     if self.measure_dispersion_position:
       self.tab_position /= n_config
-      self.tab_position2 /= n_config
-      list_of_columns.append(self.tab_position[0])
-      tab_strings.append('Column '+str(next_column)+': <x>')
-      next_column += 1
       if self.tab_position.shape[0]==2:
         self.tab_position[1] = np.sqrt(np.abs(self.tab_position[1]-self.tab_position[0]**2)/n_config)
-        list_of_columns.append(self.tab_position[1])
-        tab_strings.append('Column '+str(next_column)+': Standard deviation of <x>')
-        next_column += 1
-      list_of_columns.append(self.tab_position2[0])
-      tab_strings.append('Column '+str(next_column)+': <x^2>')
-      next_column += 1
+    if self.measure_dispersion_position2:
+      self.tab_position2 /= n_config
       if self.tab_position2.shape[0]==2:
         self.tab_position2[1] = np.sqrt(np.abs(self.tab_position2[1]-self.tab_position2[0]**2)/n_config)
-        list_of_columns.append(self.tab_position2[1])
-        tab_strings.append('Column '+str(next_column)+': Standard deviation of <x^2>')
-        next_column += 1
+    if self.measure_dispersion_position or self.measure_dispersion_position2:
+      for i in range(self.dimension):
+        if self.measure_dispersion_position:
+          list_of_columns.append(self.tab_position[0,i])
+          tab_strings.append('Column '+str(next_column)+': <r_'+str(i+1)+'>')
+          next_column += 1
+          if self.tab_position.shape[0]==2:
+            list_of_columns.append(self.tab_position[1,i])
+            tab_strings.append('Column '+str(next_column)+': Standard deviation of <r_'+str(i+1)+'>')
+            next_column += 1
+        if self.measure_dispersion_position2:
+          list_of_columns.append(self.tab_position2[0,i])
+          tab_strings.append('Column '+str(next_column)+': <r_'+str(i+1)+'^2>')
+          next_column += 1
+          if self.tab_position2.shape[0]==2:
+            list_of_columns.append(self.tab_position2[1,i])
+            tab_strings.append('Column '+str(next_column)+': Standard deviation of <r_'+str(i+1)+'^2>')
+            next_column += 1
     if self.measure_dispersion_momentum:
       self.tab_momentum /= n_config
-      list_of_columns.append(self.tab_momentum[0])
-      tab_strings.append('Column '+str(next_column)+': <p>')
-      next_column += 1
       if self.tab_momentum.shape[0]==2:
         self.tab_momentum[1] = np.sqrt(np.abs(self.tab_momentum[1]-self.tab_momentum[0]**2)/n_config)
-        list_of_columns.append(self.tab_momentum[1])
-        tab_strings.append('Column '+str(next_column)+': Standard deviation of <p>')
+      for i in range(self.dimension):
+        list_of_columns.append(self.tab_momentum[0,i])
+        tab_strings.append('Column '+str(next_column)+': <p_'+str(i+1)+'>')
         next_column += 1
+        if self.tab_momentum.shape[0]==2:
+          list_of_columns.append(self.tab_momentum[1,i])
+          tab_strings.append('Column '+str(next_column)+': Standard deviation of <p_'+str(i+1)+'>')
+          next_column += 1
     if self.measure_dispersion_energy:
       self.tab_energy /= n_config
       self.tab_nonlinear_energy /= n_config
@@ -537,10 +541,54 @@ class Measurement:
       self.wfc /= n_config
     if self.measure_wavefunction_momentum_final:
       self.wfc_momentum /= n_config
-  #  print(tab_strings)
-  #  print(list_of_columns)
+#    print(tab_strings)
+#    print(list_of_columns)
 
     return tab_strings, np.column_stack(list_of_columns)
+
+  def perform_measurement(self, i_tab, H, psi, init_state_autocorr):
+    if self.measure_dispersion_position or self.measure_dispersion_position2:
+      density = psi.wfc.real**2+psi.wfc.imag**2
+      norm = np.sum(density)
+      for i in range(psi.dimension):
+        local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
+#    print(dim,local_density.shape,local_density)
+        if self.measure_dispersion_position:
+          self.tab_position[i,i_tab] = np.sum(psi.tab_position[i]*local_density)/norm
+        if self.measure_dispersion_position2:
+          self.tab_position2[i,i_tab] = np.sum(psi.tab_position[i]**2*local_density)/norm
+    if self.measure_dispersion_energy:
+      self.tab_energy[i_tab], self.tab_nonlinear_energy[i_tab] = psi.energy(H)
+    if (self.measure_dispersion_momentum):
+      psi.wfc_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+      density = psi.wfc_momentum.real**2+psi.wfc_momentum.imag**2
+      norm = np.sum(density)
+      for i in range(psi.dimension):
+        local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
+        self.tab_momentum[i,i_tab] = np.sum(self.frequencies[i]*local_density)/norm
+    if self.measure_autocorrelation and i_tab>=self.i_tab_0:
+# Inlining the overlap method is slighlty faster
+#          measurement.tab_autocorrelation[i_tab-i_tab_0] = psi.overlap(init_state_autocorr)
+      self.tab_autocorrelation[i_tab-self.i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
+    if i_tab==self.tab_i_measurement.size-1:
+# This is the last measurement
+# compute some needed quantities
+      if self.measure_density:
+        self.density_final = psi.wfc.real**2+psi.wfc.imag**2
+      if self.measure_density_momentum:
+        if self.measure_dispersion_momentum:
+# Wavefunction in momentum space has already been computed
+          self.density_momentum_final = density
+          if self.measure_wavefunction_momentum_final:
+            self.wfc_momentum = psi.wfc_momentum
+        else:
+          psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+          self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
+          if self.measure_wavefunction_momentum_final:
+            self.wfc_momentum = psi_momentum
+      if self.measure_wavefunction_final:
+        self.wfc = psi.wfc
+      return
 
   """
   def output_string(self, H, propagation,initial_state,n_config):
@@ -593,8 +641,7 @@ class Spectral_function:
     return tab_energies,tab_spectrum
 
 
-
-def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=False):
+def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, debug=False):
   assert propagation.data_layout in ["real","complex"]
 #  assert H.boundary_condition in ["periodic","open"]
   assert propagation.method in ["ode","che"]
@@ -611,44 +658,18 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
     if debug: print('Using CFFI version')
   except ImportError:
     chebyshev_step = chebyshev_step_clenshaw_python
-    print("\n Warning, this uses the slow Python version, you should build the C version!\n")
+    print("\nWarning, this uses the slow Python version, you should build the C version!\n")
 
 
-  dimension = H.dimension
+  start_dummy_time=timeit.default_timer()
+#  dimension = H.dimension
   tab_dim = H.tab_dim
   tab_delta = H.tab_delta
-  ntot=1
-  for i in range(dimension-1,-1,-1):
-    ntot *= tab_dim[i]
-#  i_tab_0 = propagation.first_measurement_autocorr
-  i_tab_0 = 0
+  ntot = H.ntot
+
 #  print('start gen disorder',timeit.default_timer())
-  H.generate_disorder(seed=i+1234)
+  H.generate_disorder(seed=i_seed+1234)
   H.generate_sparse_matrix()
-#  print('end   gen disorder',timeit.default_timer())
-#  tab_x = np.zeros_like(propagation.tab_i_measurement,dtype=np.float64)
-#  tab_x2 = np.zeros_like(propagation.tab_i_measurement,dtype=np.float64)
-#  tab_energy = np.zeros_like(propagation.tab_i_measurement,dtype=np.float64)
-#  tab_nonlinear_energy = np.zeros_like(propagation.tab_i_measurement,dtype=np.float64)
-#  tab_autocorrelation = np.zeros_like(propagation.tab_i_measurement,dtype=np.complex128)
-#  tab_x[0] = initial_state.expectation_value_local_operator(initial_state.position)
-#  tab_x2[0] = initial_state.expectation_value_local_operator(initial_state.position**2)
-#  tab_energy[0], tab_nonlinear_energy[0] = initial_state.energy(H)
-#  init_state_autocorr = anderson.Wavefunction(dim_x,delta_x)
-  if (measurement.measure_autocorrelation):
-    init_state_autocorr = anderson.Wavefunction(tab_dim,tab_delta)
-    if (i_tab_0==0):
-      measurement.tab_autocorrelation[0] = initial_state.overlap(initial_state)
-      init_state_autocorr.wfc[:] = initial_state.wfc[:]
-  if (measurement.measure_dispersion_position):
-    measurement.tab_position[0] = initial_state.expectation_value_local_operator(initial_state.position)
-    measurement.tab_position2[0] = initial_state.expectation_value_local_operator(initial_state.position**2)
-  if (measurement.measure_dispersion_energy):
-    measurement.tab_energy[0], measurement.tab_nonlinear_energy[0] = initial_state.energy(H)
-  if (measurement.measure_dispersion_momentum):
-    initial_state.wfc_momentum = initial_state.convert_to_momentum_space()
-#      initial_state.wfc_momentum = delta_x*np.fft.fftshift(np.fft.fft(initial_state.wfc))/np.sqrt((2.0*np.pi))
-    measurement.tab_momentum[0] = initial_state.expectation_value_local_momentum_operator(measurement.frequencies)
 
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
@@ -666,9 +687,7 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
     solver.set_solout(solout)
     solver.set_initial_value(y)
   else:
-    start_dummy_time=timeit.default_timer()
     H.energy_range()
-    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
 #    H.medium_energy = 0.5*(e_min+e_max)
 #    print(e_min,e_max)
     #H.script_tunneling, H.script_disorder =
@@ -677,11 +696,25 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
     accuracy = 1.e-6
     propagation.compute_chebyshev_coefficients(accuracy,timing)
 
-
-#time evolution
-  i_tab = 1
   psi = anderson.Wavefunction(tab_dim,tab_delta)
 #  print(timeit.default_timer())
+  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+
+  start_expect_time = timeit.default_timer()
+  if measurement.measure_autocorrelation:
+# Create a full structure for init_state_autocorr (the initial state for autocorrelation) and copy initial_state in it if i_tab_0=0
+    init_state_autocorr = anderson.Wavefunction(tab_dim,tab_delta)
+    if (measurement.i_tab_0==0):
+      init_state_autocorr.wfc[:] = initial_state.wfc[:]
+  else:
+# If no autocorrelation, init_state_autocorr will not be used, it can refer to anything
+    init_state_autocorr = initial_state
+  measurement.perform_measurement(0, H, initial_state, initial_state)
+  timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
+
+#  print(measurement.tab_i_measurement)
+#time evolution
+  i_tab = 1
   for i_prop in range(1,measurement.tab_i_measurement[-1]+1):
     t_next=min(i_prop*propagation.delta_t,propagation.t_max)
 #     print(i_prop,t_next)
@@ -714,35 +747,9 @@ def gpe_evolution(i, initial_state, H, propagation, measurement, timing, debug=F
       timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
       start_expect_time = timeit.default_timer()
 #      print(start_expect_time)
-      if (measurement.measure_dispersion_position):
-        measurement.tab_position[i_tab] = psi.expectation_value_local_operator(psi.position)
-        measurement.tab_position2[i_tab] = psi.expectation_value_local_operator(psi.position**2)
-      if measurement.measure_dispersion_energy:
-        measurement.tab_energy[i_tab], measurement.tab_nonlinear_energy[i_tab] = psi.energy(H)
-      if (measurement.measure_dispersion_momentum):
-        psi.wfc_momentum = psi.convert_to_momentum_space(measurement.use_mkl_fft)
-        measurement.tab_momentum[i_tab] = psi.expectation_value_local_momentum_operator(measurement.frequencies)
-      if (measurement.measure_autocorrelation):
-        if (i_tab==i_tab_0):
-          init_state_autocorr.wfc[:] = psi.wfc[:]
-        if (i_tab>=i_tab_0):
-# Inlining the overlap method is slighlty faster
-#          measurement.tab_autocorrelation[i_tab-i_tab_0] = psi.overlap(init_state_autocorr)
-          measurement.tab_autocorrelation[i_tab-i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
+      if (i_tab==measurement.i_tab_0):
+        init_state_autocorr.wfc[:] = psi.wfc[:]
+      measurement.perform_measurement(i_tab, H, psi, init_state_autocorr)
       timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
       i_tab+=1
-  start_expect_time = timeit.default_timer()
-  if (measurement.measure_density):
-    measurement.density_final = np.abs(psi.wfc)**2
-  if (measurement.measure_density_momentum):
-    psic_momentum = psi.convert_to_momentum_space(measurement.use_mkl_fft)
-    measurement.density_momentum_final = np.abs(psic_momentum)**2
-  if (measurement.measure_wavefunction_final):
-    measurement.wfc = psi.wfc
-  if (measurement.measure_wavefunction_momentum_final):
-    if not measurement.measure_density_momentum:
-      psic_momentum = psi.convert_to_momentum_space(measurement.use_mkl_fft)
-    measurement.wfc_momentum = psic_momentum
-  timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
-#  print(timeit.default_timer())
   return
