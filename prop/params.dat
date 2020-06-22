@@ -28,7 +28,7 @@ V0 = 0.3
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
 # make sure that k_0_over_2_pi*my_system_size is an integer
-k_0_over_2_pi = 0.16
+k_0_over_2_pi = 0.1
 #0.16
 
 # Size of Gaussian wavepacket
@@ -40,15 +40,15 @@ method = che
 #data_layout = real
 data_layout = complex
 # Total duration of the propagation
-t_max = 2.0
+t_max = 0.00001
 # Elementary time step
-delta_t = 0.02
+delta_t = 0.00001
 
 [Averaging]
 n_config = 1
 
 [Measurement]
-delta_t_measurement = 0.02
+delta_t_measurement = 0.00001
 #first_measurement = 0
 density = True
 density_momentum = True

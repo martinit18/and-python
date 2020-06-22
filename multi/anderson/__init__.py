@@ -68,6 +68,7 @@ class Potential:
     for i in range(dimension-1,-1,-1):
       ntot *= tab_dim[i]
       self.tab_dim_cumulative[i] = ntot
+    self.ntot = ntot
 #    print(self.tab_dim_cumulative)
     self.disorder = np.zeros(tab_dim)
     return
@@ -88,13 +89,6 @@ class Hamiltonian(Potential):
     for i in range(dimension):
       self.tab_tunneling.append(0.5/tab_delta[i]**2)
       self.delta_vol *= tab_delta[i]
-    self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
-    ntot = 1
-    self.tab_dim_cumulative[dimension] = 1
-    for i in range(dimension-1,-1,-1):
-      ntot *= tab_dim[i]
-      self.tab_dim_cumulative[i] = ntot
-    self.ntot = ntot
     self.interaction = interaction
     self.tab_boundary_condition = tab_boundary_condition
     self.disorder_type = disorder_type
@@ -602,8 +596,8 @@ class Wavefunction:
 # The last sum is directly given by the routine np.fft.fft (or mkl_fft.fft) applied on self.wfc
 # After that, remains the multiplication by delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1))
 # Because of FFT, the momentum is also periodic, meaning that the l values above are not 0..dim_x-1, but rather
-# -dim_x/2..dim_x/2-1. At the exist of np.fft.fft, they are in the order 0,1,...dim_x/2-1,-dim_x/2,..,-1.
-# They are put back in the natural orde -dim_x/2...dim_x/2-1 using he np.fft.fftshift routine.
+# -dim_x/2..dim_x/2-1. At the exit of np.fft.fft, they are in the order 0,1,...dim_x/2-1,-dim_x/2,..,-1.
+# They are put back in the natural order -dim_x/2...dim_x/2-1 using the np.fft.fftshift routine.
     if use_mkl_fft:
       try:
         import mkl_fft
@@ -612,8 +606,24 @@ class Wavefunction:
         my_fft = np.fft.fftn
     else:
        my_fft = np.fft.fftn
-    return np.fft.fftshift(self.delta_vol*my_fft(self.wfc))
-#    return np.fft.fftshift(self.delta_x*my_fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
+    wfc_momentum = self.delta_vol*my_fft(self.wfc)/(np.sqrt(2.0*np.pi)**self.dimension)
+# Limited to dimension 10
+    if (self.dimension>10):
+      print('too large dimension, phase factor for the wavefunction in momentum space is not computed')
+      return np.fft.fftshift(wfc_momentum)
+    else:
+# Multiplication by the proper phase factor is done consecutively along each direction
+# using the flexible einsum routine of Numpy
+      string = 'ijklmnopqr'
+# In 2d, the following two lines are a bit more efficient
+#      wfc_momentum = (wfc_momentum.T*np.exp(-1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0))).T
+#      wfc_momentum *= np.exp(-1j*np.arange(self.tab_dim[1])*np.pi*(1.0/self.tab_dim[1]-1.0))
+# This general case works in any dimension
+      for i in range(self.dimension):
+        phase_factor = np.exp(-1j*np.arange(self.tab_dim[i])*np.pi*(1.0/self.tab_dim[i]-1.0))
+        wfc_momentum = np.einsum(string[0:self.dimension]+','+string[i]+'->'+string[0:self.dimension],wfc_momentum,phase_factor)
+      return np.fft.fftshift(wfc_momentum)
+
 
   def energy(self, H):
 #    rhs = H.apply_h(self.wfc)
