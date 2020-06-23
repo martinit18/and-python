@@ -166,7 +166,8 @@ if __name__ == "__main__":
     measure_dispersion_position2 = Measurement.getboolean('dispersion_position2',False)
     measure_dispersion_momentum = Measurement.getboolean('dispersion_momentum',False)
     measure_dispersion_energy = Measurement.getboolean('dispersion_energy',False)
-    measure_wavefunction_final = Measurement.getboolean('wavefunction_final',False)
+    measure_wavefunction = Measurement.getboolean('wavefunction',False)
+    measure_wavefunction_momentum = Measurement.getboolean('wavefunction_momentum',False)
     measure_extended = Measurement.getboolean('dispersion_variance',False)
     use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
   else:
@@ -197,7 +198,8 @@ if __name__ == "__main__":
     measure_dispersion_position2 = None
     measure_dispersion_momentum = None
     measure_dispersion_energy = None
-    measure_wavefunction_final = None
+    measure_wavefunction = None
+    measure_wavefunction_momentum = None
     measure_extended = None
     use_mkl_fft = None
 
@@ -206,7 +208,7 @@ if __name__ == "__main__":
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
     method, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, data_layout, t_max, delta_t, i_tab_0))
-    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction_final, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy,measure_wavefunction_final, measure_extended, use_mkl_fft))
+    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft))
 
 
   t1=time.perf_counter()
@@ -232,7 +234,7 @@ if __name__ == "__main__":
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
-  # Define an initial state
+# Define an initial state
   initial_state = anderson.Wavefunction(tab_dim,tab_delta)
   initial_state.type = initial_state_type
   assert initial_state.type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
@@ -240,17 +242,17 @@ if __name__ == "__main__":
     anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
   if (initial_state.type=='gaussian_wave_packet'):
     anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
-  np.savetxt('wfc.dat',initial_state.wfc)
+#  np.savetxt('wfc.dat',initial_state.wfc)
 #  print(initial_state.overlap(initial_state))
+
 # Define the structure of the temporal integration
   propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method,data_layout=data_layout)
-
   # When computing an autocorrelation <psi(0)|psi(t)>, one can skip the first time steps, i.e. initialize
   # psi(0) with the wavefunction at some time tau. tau must be an integer multiple of delta_t_measurement.
   # args.first_step_autocorr is the integer tau/delta_t_measurement
   # In other words, the measurement of the autocorrelation function starts as time tau=delta_t_measurement*first_mmeasurement_autocorr
-#  print(measure_density,measure_density_momentum,measure_autocorrelation,measure_dispersion,measure_dispersion_momentum,measure_wavefunction_final,measure_wavefunction_final,measure_extended)
-  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction_final=measure_wavefunction_final,measure_extended=measure_extended,use_mkl_fft=use_mkl_fft)
+
+  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
   measurement.prepare_measurement(propagation,tab_delta,tab_dim)
@@ -260,37 +262,26 @@ if __name__ == "__main__":
 #  print(measurement.frequencies)
 #  print(measurement.measure_density,measurement_global.measure_density)
 #  print(measurement.density_final)
-#  print(initial_state.sigma_0)
   header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
 #  print(header_string)
-# Save the initial density in configuration space
-#  np.savetxt('density_initial.dat',np.column_stack([initial_state.position,np.abs(initial_state.wfc)**2]),header=header_string+'     Position              Density')
-#  anderson.io.output_density('density_initial.dat',initial_state.position,np.abs(initial_state.wfc)**2,header_string)
 
-#  xx = anderson.propagation.prepare_measurement(propagation,delta_x,dim_x,delta_t_measurement,measure_density,measure_density_momentum,measure_autocorrelation,measure_dispersion,measure_final_wavefunction)
-#  print(xx)
-
-#  tab_autocorrelation = np.zeros((n_config,number_of_measurements),dtype=np.complex128)
-#  print(measurement.measure_density,measurement.measure_autocorrelation,measurement .measure_dispersion,measurement.measure_dispersion_momentum)
-#  print(measurement_global.measure_density,measurement_global.measure_autocorrelation,measurement_global.measure_dispersion,measurement_global.measure_dispersion_momentum)
   if rank==0:
+# Print the initial density in configuration space
     if measurement_global.measure_density:
       anderson.io.output_density('density_initial.dat',np.abs(initial_state.wfc)**2,tab_abscissa=initial_state.tab_position,header_string=header_string,data_type='density',file_type='savetxt')
-#      anderson.io.output_density('density_initial.dat',np.abs(initial_state.wfc)**2,header_string=header_string,data_type='density',file_type='savetxt')
-#    if (measurement_global.measure_density_momentum):
-#      anderson.io.output_density('density_momentum_initial.dat',measurement.frequencies,np.abs(initial_state.convert_to_momentum_space())**2,header_string,print_type='density_momentum')
-#      anderson.io.output_density('wavefunction_momentum_initial.dat',measurement.frequencies,initial_state.convert_to_momentum_space(),header_string,print_type='wavefunction_momentum')
+ # Print the initial density in momentum space
+    if (measurement_global.measure_density_momentum):
+      anderson.io.output_density('density_momentum_initial.dat',np.abs(initial_state.convert_to_momentum_space())**2,tab_abscissa=measurement.frequencies,header_string=header_string,data_type='density_momentum',file_type='savetxt')
+    if (measurement_global.measure_wavefunction):
+      anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
+    if (measurement_global.measure_wavefunction_momentum):
+      anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagate from 0 to t_max
 #    print('1',measurement.density_final.shape)
     anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
-#    print(H.disorder)
-#    print(measurement.tab_position)
-#    print('2',measurement.density_final.shape)
-#   print(measurement.wfc_momentum[2128])
-#    print(measurement.tab_autocorrelation)
 #    H.generate_disorder(i+rank*n_config)
 #    matrix=H.generate_full_matrix()
 #    vector = matrix.dot(initial_state.wfc)
@@ -298,12 +289,12 @@ if __name__ == "__main__":
 #    print(H.sparse_matrix)
 #    print(initial_state.wfc.shape)
 #    print(initial_state.wfc)
-#    vector = H.sparse_matrix.dot(np.real(initial_state.wfc).reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)#+1j*H.sparse_matrix.dot(np.imag(initial_state.wfc).reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
+#    vector = H.sparse_matrix.dot(np.real(initial_state.wfc).reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
+#+1j*H.sparse_matrix.dot(np.imag(initial_state.wfc).reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
 #    print(vector)
 #    vector = H.sparse_matrix.dot(initial_state.wfc.reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
 #    print(vector)
 #    print('vector',vector.shape)
-#    print(vector[20,20])
 #    print(np.vdot(initial_state.wfc,vector)*H.delta_vol)
 #    anderson.io.output_density('wavefunction.dat',initial_state.wfc,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
 #    anderson.io.output_density('wavefunction2.dat',vector,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
@@ -327,12 +318,12 @@ if __name__ == "__main__":
   if rank==0:
     tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
     if (measurement_global.measure_density):
-      anderson.io.output_density('density_final.dat',measurement_global.density_final,header_string=header_string,tab_abscissa=initial_state.tab_position)
+      anderson.io.output_density('density_final.dat',measurement_global.density_final,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='density')
     if (measurement_global.measure_density_momentum):
       anderson.io.output_density('density_momentum_final.dat',measurement_global.density_momentum_final,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
-    if (measurement_global.measure_wavefunction_final):
+    if (measurement_global.measure_wavefunction):
       anderson.io.output_density('wavefunction_final.dat',measurement_global.wfc,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
-    if (measurement_global.measure_wavefunction_momentum_final):
+    if (measurement_global.measure_wavefunction_momentum):
       anderson.io.output_density('wavefunction_momentum_final.dat',measurement_global.wfc_momentum,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
     if (measurement_global.measure_autocorrelation):
       anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_autocorrelation,tab_abscissa=[measurement.tab_t_measurement[i_tab_0:]-measurement.tab_t_measurement[i_tab_0]],header_string=header_string,data_type='autocorrelation')
@@ -340,21 +331,6 @@ if __name__ == "__main__":
     if (measurement_global.measure_dispersion_position or measurement_global.measure_dispersion_momentum or measurement_global.measure_dispersion_energy):
       anderson.io.output_dispersion('dispersion.dat',tab_dispersion,tab_strings,header_string)
 
-
-#  for i in range(n_config):
-# Propagate from 0 to t_max
-#    final_state, tab_x[i,:], tab_x2[i,:], tab_energy[i,:], tab_nonlinear_energy[i,:], tab_autocorrelation[i,:] = anderson.propagation.gpe_evolution(i, initial_state, H, propagation,timing)
-#    tab_autocorrelation[i,:] = anderson.propagation.gpe_evolution(i, initial_state, H, propagation,timing)
-# Accumulate density in configuration space
-#    density_final += np.abs(final_state.wfc)**2
-# Compute wavefunction in momentum space and accumulate the density
-#    psic_momentum = delta_x*np.fft.fftshift(np.fft.fft(final_state.wfc))/np.sqrt((2.0*np.pi))
-#    density_momentum_final += np.abs(psic_momentum)**2
-#  args = (init_state, Npa, kick, deltax, tmax, dt, disorder_strength, interaction_strength, i)
-#  pool.apply_async(gpe_evolution, args)
-#  print(str(i), file=final_pf)
-#  density_final/=n_config
-#  density_momentum_final/=n_config
     """
   i_tab_0 = propagation.first_measurement_autocorr
 

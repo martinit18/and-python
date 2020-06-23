@@ -228,21 +228,3 @@ def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data n
   np.savetxt(file,tab_data,header=general_string+'\n'.join(tab_strings)+'\n')
   return
 
-"""
-def output_dispersion(file,time,tab_x,tab_x2,tab_p,tab_energy,tab_nonlinear_energy,string):
-#  print(position)
-#  print(density)
-  header_string = string\
-             +'Dispersion vs. time\n'\
-             +'Column 1: Time\n'\
-             +'Column 2: <x>\n'\
-             +'Column 3: Standard deviation of <x>\n'\
-             +'Column 4: <x^2>\n'\
-             +'Column 5: Standard deviation of <x^2>\n'\
-             +'Column 6: Total energy\n'\
-             +'Column 7: Standard deviation of total energy\n'\
-             +'Column 8: Nonlinear energy\n'\
-             +'Column 9: Standard deviation of nonlinear energy\n'
-  np.savetxt(file,np.column_stack([time,tab_x,tab_x2,tab_p,tab_energy,tab_nonlinear_energy]),header=header_string)
-  return
-"""
