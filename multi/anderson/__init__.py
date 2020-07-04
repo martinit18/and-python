@@ -86,9 +86,11 @@ class Hamiltonian(Potential):
     self.disorder_strength = disorder_strength
     self.tab_tunneling = list()
     self.delta_vol = 1.0
+    self.diagonal = 0.0
     for i in range(dimension):
       self.tab_tunneling.append(0.5/tab_delta[i]**2)
       self.delta_vol *= tab_delta[i]
+      self.diagonal += 1.0/tab_delta[i]**2
     self.interaction = interaction
     self.tab_boundary_condition = tab_boundary_condition
     self.disorder_type = disorder_type
@@ -103,20 +105,40 @@ class Hamiltonian(Potential):
       self.generate='direct'
       return
 # Build mask for correlated potentials
-    """
     if disorder_type=='regensburg':
       self.generate = 'simple mask'
-      self.mask = np.zeros(dim_x)
-      inv_k_length = 2.0*np.pi*self.correlation_length/(self.dim_x*self.delta_x)
-      if inv_k_length<20./dim_x:
-        mask_size = dim_x//2+1
-      else:
-        mask_size = int(10.0/inv_k_length+1.5)
-#      self.mask = np.zeros(dim_x)
-      self.mask[0:mask_size] = np.exp(-0.25*(np.arange(mask_size)*inv_k_length)**2)
-      self.mask[dim_x-mask_size+1:dim_x]=self.mask[mask_size-1:0:-1]
-      self.mask*=np.sqrt(dim_x/np.sum(self.mask**2))
+      self.mask = np.zeros(tab_dim)
+      tab_k = list()
+      for i in range(dimension):
+        toto = np.zeros(tab_dim[i])
+        half_size = tab_dim[i]//2+1
+        toto[0:half_size] = -0.25*(np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
+        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
+        tab_k.append(toto)
+      tab_distance = np.meshgrid(*tab_k,indexing='ij')
+      for i in range(dimension):
+         self.mask += tab_distance[i]
+      self.mask = np.exp(self.mask)
+      self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
+#      print(self.mask)
       return
+    if disorder_type=='konstanz':
+      self.generate = 'field mask'
+      self.mask = np.zeros(tab_dim)
+      tab_k = list()
+      for i in range(dimension):
+        toto = np.zeros(tab_dim[i])
+        half_size = tab_dim[i]//2+1
+        toto[0:half_size] = -0.5*(np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
+        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
+        tab_k.append(toto)
+      tab_distance = np.meshgrid(*tab_k,indexing='ij')
+      for i in range(dimension):
+         self.mask += tab_distance[i]
+      self.mask = np.exp(self.mask)
+      self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
+      return
+    """
     if disorder_type=='singapore':
       self.generate = 'simple mask'
       self.mask = np.zeros(dim_x)
@@ -146,21 +168,9 @@ class Hamiltonian(Potential):
 #      print(dim_x,mask_size)
 #      print(self.mask)
 #      self.mask[0]=dim_x
-    if disorder_type=='konstanz':
-      self.generate = 'field mask'
-      self.mask = np.zeros(dim_x)
-      inv_k_length = 2.0*np.pi*self.correlation_length/(self.dim_x*self.delta_x)
-      if inv_k_length<20./dim_x:
-        mask_size = dim_x//2+1
-      else:
-        mask_size = int(10.0/inv_k_length+1.5)
-#      self.mask = np.zeros(dim_x)
-      self.mask[0:mask_size] = np.exp(-0.5*(np.arange(mask_size)*inv_k_length)**2)
-      self.mask[dim_x-mask_size+1:dim_x]=self.mask[mask_size-1:0:-1]
-      self.mask*=np.sqrt(dim_x/np.sum(self.mask**2))
-      return
-    return
     """
+
+
 
   """
   Generate a specific disorder configuration
@@ -173,10 +183,6 @@ class Hamiltonian(Potential):
       except ImportError:
         self.use_mkl_random=False
         print('No mkl_random found; Fallback to Numpy random')
-# Here, the MKL Random Number Generator is used
-# Use instead the following two lines if you prefer Numpy RNG
-# np.random.seed(i)
-# disorder = np.random.normal(scale=self.disorder_strength/np.sqrt(self.delta_x), size=self.dim_x)+2.0*self.tunneling
     if self.use_mkl_random:
       mkl_random.RandomState(77777, brng='SFMT19937')
       mkl_random.seed(seed,brng='SFMT19937')
@@ -189,36 +195,23 @@ class Hamiltonian(Potential):
 #    print('seed=',seed)
 #    print(self.tab_dim_cumulative)
     if self.disorder_type=='anderson_uniform':
-      diagonal = 0.0
-      multiplicative_factor = self.disorder_strength
-      for i in range(self.dimension):
-        diagonal += 2.0*self.tab_tunneling[i]
-        multiplicative_factor /= np.sqrt(self.tab_delta[i])
-      self.disorder = diagonal + multiplicative_factor*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)
+      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
-      diagonal = 0.0
-      multiplicative_factor = self.disorder_strength
-      for i in range(self.dimension):
-        diagonal += 2.0*self.tab_tunneling[i]
-        multiplicative_factor /= np.sqrt(self.tab_delta[i])
-#      print(diagonal,multiplicative_factor,self.ntot)
-      self.disorder = diagonal + multiplicative_factor*my_random_normal(self.ntot).reshape(self.tab_dim)
-#      print(self.disorder)
+      self.disorder = self.diagonal + self.disorder_strength*my_random_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
       return
-    """
     if self.generate=='simple mask':
-      self.disorder =  2.0*self.tunneling + self.disorder_strength*np.real(np.fft.ifft(self.mask*np.fft.fft(my_random_normal(self.dim_x))))
+      self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(self.ntot).reshape(self.tab_dim))))
 #      self.print_potential()
       return
+    if self.generate=='field mask':
 # When a field_mask is used, the initial data is a complex uncorrelated set of Gaussian distributed random numbers in configuration space
 # The Fourier transform in momentum space is also a complex uncorrelated set of Gaussian distributed random numbers
 # Thus the first FT is useless and can be short circuited
-    if self.generate=='field mask':
-      self.disorder =  2.0*self.tunneling +0.5*self.disorder_strength*self.dim_x*np.abs(np.fft.ifft(self.mask*my_random_normal(2*self.dim_x).view(np.complex128)))**2
+      self.disorder =  self.diagonal + 0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2
 # Alternatively (slower)
-#      self.disorder =  2.0*self.tunneling +0.5*self.disorder_strength*np.abs(np.fft.ifft(self.mask*np.fft.fft(mkl_random.standard_normal(2*self.dim_x).view(np.complex128))))**2
+#      self.disorder =  self.diagonal + 0.5*self.disorder_strength*np.abs(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))))**2
 #      self.print_potential()
       return
     sys.exit('Disorder '+self.disorder_type+' not yet implemented!')
@@ -227,7 +220,6 @@ class Hamiltonian(Potential):
 #  def print_potential(self,filename='potential.dat'):
 #    np.savetxt(filename,self.disorder-2.0*self.tunneling)
 #    return
-    """
 
   """
   Converts Hamiltonian to a full matrix for Lapack diagonalization
@@ -555,6 +547,8 @@ class Wavefunction:
     tab_position = np.meshgrid(*self.tab_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
     tab_amplitude = np.zeros(self.tab_dim)
+#    print(tab_position[0].shape)
+#    print(tab_position[1].shape)
     for i in range(len(tab_position)):
       tab_phase += self.tab_k_0[i]*tab_position[i]
       tab_amplitude += (tab_position[i]/self.tab_sigma_0[i])**2
@@ -645,7 +639,7 @@ class Wavefunction:
 #  return x/norm
 
 def compute_correlation(x,y):
-  return np.fft.ifft(np.fft.fft(x)*np.conj(np.fft.fft(y)))/x.size
+  return np.fft.ifftn(np.fft.fftn(x)*np.conj(np.fft.fftn(y)))/x.size
 
 def determine_unique_postfix(fn):
   if not os.path.exists(fn):

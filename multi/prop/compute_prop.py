@@ -277,11 +277,18 @@ if __name__ == "__main__":
     if (measurement_global.measure_wavefunction_momentum):
       anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
 
+  pot_correl=np.zeros(tab_dim)
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagate from 0 to t_max
 #    print('1',measurement.density_final.shape)
     anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
+#    H.generate_disorder(i+rank*n_config+1234)
+#   print(H.disorder)
+#    np.savetxt('potential.dat',H.disorder-H.diagonal)
+#    pot_correl += np.real(anderson.compute_correlation(H.disorder-H.diagonal,H.disorder-H.diagonal))
+#  pot_correl /= n_config
+#  np.savetxt('potential_correlation.dat',np.fft.fftshift(pot_correl))
 #    H.generate_disorder(i+rank*n_config)
 #    matrix=H.generate_full_matrix()
 #    vector = matrix.dot(initial_state.wfc)

@@ -28,7 +28,7 @@ g = 0.0
 # Either plane_wave or gaussian_wave_packet
 initial_state = wave_packet
 # make sure that k_0_over_2_pi*my_system_size is an integer
-k_0_over_2_pi = 0.5
+k_0_over_2_pi = 0.0
 #0.16
 # Size of Gaussian wavepacket
 sigma_0 = 100.0
@@ -63,9 +63,9 @@ extended = True
 [Diagonalization]
 #method = lapack
 method = sparse
-targeted_energy = 0.5
+targeted_energy = 0.05
 number_of_energy_levels = 4
-pivot_real = 0.5
+pivot_real = 0.0
 pivot_imag = 0.0
 IPR_min = 0.0
 IPR_max = 0.01
