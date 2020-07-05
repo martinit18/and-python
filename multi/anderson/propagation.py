@@ -662,7 +662,8 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
     if debug: print('Using CFFI version')
   except ImportError:
     chebyshev_step = chebyshev_step_clenshaw_python
-    print("\nWarning, this uses the slow Python version, you should build the C version!\n")
+    if i_seed == 0:
+      print("\nWarning, this uses the slow Python version, you should build the C version!\n")
 
 
   start_dummy_time=timeit.default_timer()

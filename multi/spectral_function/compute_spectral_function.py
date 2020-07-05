@@ -28,11 +28,11 @@ Created on Fri Aug 16 17:05:10 2019
 
 @author: delande
 
-Disordered one-dimensional system
+Disordered many-dimensional system
 Discretization in configuration space
-3-point discretization of the Laplace operator
+3-point discretization of the Laplace operator (in each direction)
 
-This program computes either the potential correlaction function or the spectral function (using Fourier transform of the temporal propagation)
+This program computes the spectral function (using Fourier transform of the temporal propagation)
 
 V0 (=disorder_strength) is the square root of the variance of the disorder
 sigma (=correlation_length) is the correlation length of the disorder
@@ -43,42 +43,37 @@ Various disorder types can be used, defined by the disorder_type variable:
   konstanz: Rayleigh on-site distribution (average V_0, variance V_0^2) with spatial correlation function <V(r)V(r+delta)>=V_0^2 exp(-0.5*delta^2/sigma^2)
   speckle: Rayleigh on-site distribution (average V_0, variance V_0^2) with spatial correlation function <V(r)V(r+delta)>=V_0^2 (1+sinc^2(delta/sigma))
 
-There is addiitonally the possibility of adding a nonlinear term proportional to g in the GPE
-
   Internally, the wavefunction can be stored using two different layouts.
   This does NOT affect the storage of the wavefunctions used for measurements, which is always 'complex'
   This affecty only the vector used in the guts of the propagation algorithm.
   'real' is usually a bit faster.
   For data_layout == 'complex':
         wfc is assumed to be in format where
-        wfc[0:2*dim_x:2] contains the real part of the wavefunction and
-        wfc[1:2*dim_x:2] contains the imag part of the wavefunction.
+        wfc[0:2*ntot:2] contains the real part of the wavefunction and
+        wfc[1:2*ntot:2] contains the imag part of the wavefunction.
       For data_layout == 'real':
         wfc is assumed to be in format where
-        wfc[0:dim_x] contains the real part of the wavefunction and
-        wfc[dim_x:2*dim_x] contains the imag part of the wavefunction.
+        wfc[0:ntot] contains the real part of the wavefunction and
+        wfc[ntot:2*ntot] contains the imag part of the wavefunction.
 
 """
 
 import os
 import time
 import math
-import copy
-import configparser
 import numpy as np
 import getpass
+import copy
+import configparser
 import sys
 sys.path.append('../')
-sys.path.append('/users/champ/delande/git/and-python/')
+sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
-
-
 
 if __name__ == "__main__":
   environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
              +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Started on: {}'.format(time.asctime())+'\n'
-
   try:
 # First try to detect if the python script is launched by mpiexec/mpirun
 # It can be done by looking at an environment variable
@@ -126,9 +121,15 @@ if __name__ == "__main__":
     print("Number of processes: {}".format(nprocs))
 
     System = config['System']
-    system_size = System.getfloat('size')
-    delta_x = System.getfloat('delta_x')
-    boundary_condition = System.get('boundary_condition','periodic')
+    dimension = System.getint('dimension', 1)
+    tab_size = list()
+    tab_delta = list()
+    tab_boundary_condition = list()
+    for i in range(dimension):
+      tab_size.append(System.getfloat('size_'+str(i+1)))
+      tab_delta.append(System.getfloat('delta_'+str(i+1)))
+      tab_boundary_condition.append(System.get('boundary_condition_'+str(i+1),'periodic'))
+#    print(dimension,tab_size,tab_delta,tab_boundary_condition)
 
     Disorder = config['Disorder']
     disorder_type = Disorder.get('type','anderson gaussian')
@@ -142,8 +143,11 @@ if __name__ == "__main__":
 
     Wavefunction = config['Wavefunction']
     initial_state_type = Wavefunction.get('initial_state')
-    k_0 = 2.0*math.pi*Wavefunction.getfloat('k_0_over_2_pi')
-    sigma_0 = Wavefunction.getfloat('sigma_0')
+    tab_k_0 = list()
+    tab_sigma_0 = list()
+    for i in range(dimension):
+      tab_k_0.append(2.0*math.pi*Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1)))
+      tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
 
     Propagation = config['Propagation']
     method = Propagation.get('method','che')
@@ -153,38 +157,50 @@ if __name__ == "__main__":
     Spectral = config['Spectral']
     e_range = Spectral.getfloat('range')
     e_resolution = Spectral.getfloat('resolution')
+
+    Measurement = config['Measurement']
+    use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
   else:
+    dimension = None
     n_config = None
-    system_size = None
-    delta_x = None
-    boundary_condition = None
+    tab_size = None
+    tab_delta = None
+    tab_boundary_condition = None
     disorder_type = None
     correlation_length = None
     disorder_strength = None
     use_mkl_random = None
     interaction_strength = None
     initial_state_type = None
-    k_0 = None
-    sigma_0 = None
+    tab_k_0 = None
+    tab_sigma_0 = None
     method = None
     data_layout = None
+    t_max = None
+    delta_t = None
     i_tab_0 = None
     e_range = None
     e_resolution = None
+    use_mkl_fft = None
+
   if mpi_version:
-    n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
+    n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
-    initial_state_type, k_0, sigma_0 = comm.bcast((initial_state_type, k_0, sigma_0))
-    method, data_layout, i_tab_0, e_range, e_resolution = comm.bcast((method, data_layout,  i_tab_0, e_range, e_resolution)) # Number of sites
+    initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
+    method, data_layout, i_tab_0, e_range, e_resolution, use_mkl_fft = comm.bcast((method, data_layout,  i_tab_0, e_range, e_resolution, use_mkl_fft))
+
 
   t1=time.perf_counter()
   timing=anderson.Timing()
 
-  dim_x = int(system_size/delta_x+0.5)
-  # Renormalize delta_x so that the system size is exactly what is wanted and split in an integer number of sites
-  delta_x = system_size/dim_x
-  #V0=0.025
-  #disorder_strength = np.sqrt(V0)
+# Number of sites
+  tab_dim = list()
+  for i in range(dimension):
+    tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
+# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
+    tab_delta[i] = tab_size[i]/tab_dim[i]
+#  print(tab_dim)
+
   try:
     import mkl
     mkl.set_num_threads(1)
@@ -194,54 +210,76 @@ if __name__ == "__main__":
 
   spectral_function = anderson.propagation.Spectral_function(e_range,e_resolution)
 
-  assert boundary_condition in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
+  for i in range(dimension):
+    assert tab_boundary_condition[i] in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
-
-  # Define an initial state
-  initial_state = anderson.Wavefunction(dim_x,delta_x)
+  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+# Define an initial state
+  initial_state = anderson.Wavefunction(tab_dim,tab_delta)
   initial_state.type = initial_state_type
   assert initial_state.type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
   if (initial_state.type=='plane_wave'):
-    anderson.Wavefunction.plane_wave(initial_state,k_0)
+    anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
   if (initial_state.type=='gaussian_wave_packet'):
-    anderson.Wavefunction.gaussian(initial_state,sigma_0,k_0)
+    anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
+#  np.savetxt('wfc.dat',initial_state.wfc)
+#  print(initial_state.overlap(initial_state))
 
 # Define the structure of the temporal integration
   propagation = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method,data_layout=data_layout)
 
-  measurement = anderson.propagation.Measurement(spectral_function.delta_t,  measure_autocorrelation=True)
+  measurement = anderson.propagation.Measurement(spectral_function.delta_t,  measure_autocorrelation=True, use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
-  measurement.prepare_measurement(propagation,delta_x,dim_x)
-  measurement_global.prepare_measurement_global(propagation,delta_x,dim_x)
-
+  measurement.prepare_measurement(propagation,tab_delta,tab_dim)
+#  print(measurement.density_final.shape)
+  measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
   header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
+
+#  print(header_string)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-# Propagate from 0 to t_max
     anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
-#   print(measurement.wfc_momentum[2128])
-#   print(measurement.tab_autocorrelation[-1])
     measurement_global.merge_measurement(measurement)
-
+#  print(measurement_global.tab_position)
+#
   if mpi_version:
     measurement_global.mpi_merge_measurement(comm,timing)
   t2 = time.perf_counter()
   timing.TOTAL_TIME = t2-t1
   if mpi_version:
     timing.mpi_merge(comm)
-
+#    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
+#    toto = np.empty_like(measurement_global.tab_autocorrelation)
+#    comm.Reduce(measurement_global.tab_autocorrelation,toto,op=MPI.SUM)
+#    measurement_global.tab_autocorrelation = toto
+#    timing.CHE_TIME = comm.reduce(timing.CHE_TIME)
+#    global_timing=comm.reduce(timing)
+#    print(rank,global_timing.CHE_TIME)
+#    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
-    measurement_global.normalize(n_config*nprocs)
-    anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_t_measurement[i_tab_0:]-measurement_global.tab_t_measurement[i_tab_0],measurement_global.tab_autocorrelation,header_string,print_type='autocorrelation')
+    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
+    anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation, tab_abscissa=measurement_global.tab_t_measurement[i_tab_0:]-measurement_global.tab_t_measurement[i_tab_0], header_string=header_string,data_type='autocorrelation')
     tab_energies,tab_spectrum = spectral_function.compute_spectral_function(measurement_global.tab_autocorrelation)
-    anderson.io.output_density('spectral_function.dat',tab_energies,tab_spectrum,header_string,print_type='spectral_function')
+    anderson.io.output_density('spectral_function.dat',tab_spectrum,tab_abscissa=tab_energies,header_string=header_string,data_type='spectral_function')
+
+    """
+  i_tab_0 = propagation.first_measurement_autocorr
+
+  header_string=environment_string\
+             +params_string\
+             +'Temporal autocorrelation function\n'\
+             +'Column 1: Time\n'\
+             +'Column 2: Real(<psi(0)|psi(t)>)\n'\
+             +'Column 3: Imag(<psi(0)|psi(t)>)\n'\
+             +'\n'
+  np.savetxt('temporal_autocorrelation.dat',np.column_stack([propagation.tab_t_measurement[i_tab_0:]-propagation.tab_t_measurement[i_tab_0],np.mean(np.real(tab_autocorrelation[:,:number_of_measurements-i_tab_0]),0),np.mean(np.imag(tab_autocorrelation[:,:number_of_measurements-i_tab_0]),0)]),header=header_string)
+    """
 
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
-    print("Total execution time {0:.3f} seconds".format(t2-t1))
+    print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if (propagation.method=='ode'):
       print("GPE time             = {0:.3f}".format(timing.GPE_TIME))

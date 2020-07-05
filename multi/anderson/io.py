@@ -166,6 +166,10 @@ def output_density(file,data,header_string='Origin of data not specified',data_t
       column_2='Re(<psi(0)|psi(t)>)'
       column_3='Im(<psi(0)|psi(t)>)'
       specific_string='Temporal autocorrelation function\n'
+    if data_type=='spectral_function':
+      column_1='Energy'
+      column_2='Spectral function'
+      specific_string='Spectral function\n'
     list_of_columns = []
     tab_strings = []
     next_column = 1
@@ -202,7 +206,7 @@ def output_density(file,data,header_string='Origin of data not specified',data_t
           array_to_print = data[:,:]
       if data.ndim==3 and data.shape[0]<3:
         array_to_print=data[0,:,:]
-    if data_type in ['wavefunction','wavefunction_momentum','autocorrelation']:
+    if data_type in ['wavefunction','wavefunction_momentum']:
       if data.ndim==1:
 #        print(data.size,tab_abscissa[0].size)
         if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
@@ -218,6 +222,25 @@ def output_density(file,data,header_string='Origin of data not specified',data_t
         array_to_print=np.column_stack(list_of_columns)
       if data.ndim==2:
         array_to_print=data[:,:]
+    if data_type in ['autocorrelation']:
+      list_of_columns.append(tab_abscissa)
+      tab_strings.append('Column '+str(next_column)+': '+column_1)
+      next_column += 1
+      list_of_columns.append(np.real(data))
+      tab_strings.append('Column '+str(next_column)+': '+column_2)
+      next_column += 1
+      list_of_columns.append(np.imag(data))
+      tab_strings.append('Column '+str(next_column)+': '+column_3)
+      next_column += 1
+      array_to_print=np.column_stack(list_of_columns)
+    if data_type in ['spectral_function']:
+      list_of_columns.append(tab_abscissa)
+      tab_strings.append('Column '+str(next_column)+': '+column_1)
+      next_column += 1
+      list_of_columns.append(data)
+      tab_strings.append('Column '+str(next_column)+': '+column_2)
+      next_column += 1
+      array_to_print=np.column_stack(list_of_columns)
 #    print(list_of_columns)
 #    print(tab_strings)
     np.savetxt(file,array_to_print,header=header_string+specific_string+'\n'.join(tab_strings)+'\n')
