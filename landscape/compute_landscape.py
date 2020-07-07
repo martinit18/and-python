@@ -25,7 +25,7 @@ __version__ = "1.0"
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 # ____________________________________________________________________
 #
-# compute_IPR.py
+# compute_landscape.py
 # Author: Dominique Delande
 # Release date: April, 27, 2020
 # License: GPL2 or later
@@ -42,11 +42,17 @@ import sys
 sys.path.append('/users/champ/delande/git/and-python/')
 import anderson
 import mkl
+import matplotlib
+import matplotlib.cm as cm
+import matplotlib.mlab as mlab
+import matplotlib.pyplot as plt
+from matplotlib import rc
 
 def compute_wigner_function(H,tab_wfc):
   number_of_eigenvalues = tab_wfc.shape[1]
   dim_x = tab_wfc.shape[0]
   tab_wigner = np.zeros((dim_x//2,dim_x,number_of_eigenvalues))
+  tab_wigner = np.zeros((dim_x,dim_x,number_of_eigenvalues))
   tab_intermediate1 = np.zeros(dim_x,dtype=np.complex128)
   tab_intermediate2 = np.zeros(dim_x,dtype=np.complex128)
 #  np.savetxt('orig_x.dat',np.column_stack((np.real(tab_wfc[:,0]),np.imag(tab_wfc[:,0]))))
@@ -63,7 +69,13 @@ def compute_wigner_function(H,tab_wfc):
 #        np.savetxt('znort_x.dat',np.column_stack((np.real(tab_intermediate1*np.conj(tab_intermediate2)),np.imag(tab_intermediate1*np.conj(tab_intermediate2)))))
 #        np.savetxt('znort_p.dat',np.column_stack((np.real(np.fft.fft(tab_intermediate1*np.conj(tab_intermediate2))),np.imag(np.fft.fft(tab_intermediate1*np.conj(tab_intermediate2))))))
       tab_after_fft = np.real(np.fft.fftshift(np.fft.fft(tab_intermediate1*np.conj(tab_intermediate2))))
-      tab_wigner[0:dim_x//2,j,i] = tab_after_fft[0:dim_x:2]+tab_after_fft[1:dim_x:2]
+# The following line gives the "raw" Wigner function, which has a "ghost" shifted by L/2
+#      tab_wigner[0:dim_x,j,i] = H.delta_x*tab_after_fft[0:dim_x]/np.pi
+# In order to hide the ghost, one averages over consecutive p values in a symmetric way
+# p=0 is in line dim_x//2
+      tab_wigner[1:dim_x-1,j,i] = H.delta_x*(tab_after_fft[1:dim_x-1]+0.5*tab_after_fft[0:dim_x-2]+0.5*tab_after_fft[2:dim_x])/(2.0*np.pi)
+      tab_wigner[0,j,i] = H.delta_x*(tab_after_fft[0]+0.5*tab_after_fft[dim_x-1]+0.5*tab_after_fft[1])/(2.0*np.pi)
+      tab_wigner[dim_x-1,j,i] = H.delta_x*(tab_after_fft[dim_x-1]+0.5*tab_after_fft[dim_x-2]+0.5*tab_after_fft[0])/(2.0*np.pi)
   return tab_wigner
 
 
@@ -149,6 +161,12 @@ if __name__ == "__main__":
     IPR_min = Diagonalization.getfloat('IPR_min',0.0)
     IPR_max = Diagonalization.getfloat('IPR_max')
     number_of_bins = Diagonalization.getint('number_of_bins')
+
+    Wigner = config['Wigner']
+    p_max = Wigner.getfloat('p_max')
+    v_min = Wigner.getfloat('v_min')
+    v_max = Wigner.getfloat('v_max')
+    multiplicative_factor_for_wfc = Wigner.getfloat('multiplicative_factor_for_wfc',1.0)
   else:
     n_config = None
     system_size = None
@@ -168,7 +186,9 @@ if __name__ == "__main__":
 
   timing=anderson.Timing()
   t1=time.perf_counter()
-
+#  matplotlib.use('pgf')
+#  rc('text',usetex=True)
+#  rc('text.latex', preamble=r'\usepackage{color}')
 #  delta_x = comm.bcast(delta_x)
 #  print(rank,n_config,system_size,delta_x)
     # Number of sites
@@ -187,8 +207,9 @@ if __name__ == "__main__":
   H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, interaction=0.0)
   initial_state = anderson.Wavefunction(dim_x,delta_x)
   initial_state.type = initial_state_type
-  anderson.Wavefunction.gaussian(initial_state,k_0,sigma_0)
+  anderson.Wavefunction.plane_wave(initial_state,k_0)
   initial_state.wfc*=np.sqrt(system_size)
+  #print(initial_state.wfc)
   diagonalization = anderson.diag.Diagonalization(targeted_energy,diagonalization_method)
    #comm.Bcast(H)
   header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
@@ -203,11 +224,82 @@ if __name__ == "__main__":
 #  tab_wfc2[:,0]=initial_state.wfc
 #  np.savetxt('toto.dat',np.abs(tab_wfc2[:,0])**2)
   tab_wigner = compute_wigner_function(H,tab_wfc)
-  for i in range(number_of_energy_levels):
-    np.savetxt('wigner'+str(i)+'.dat',tab_wigner[:,:,i])
   anderson.io.output_density('potential.dat',position,H.disorder-2.0*H.tunneling,header_string,print_type='potential')
-  landscape = diagonalization.compute_landscape_2(0,H,pivot)
+  landscape = diagonalization.compute_landscape(0,H,initial_state,0.0)
   anderson.io.output_density('landscape.dat',position,landscape,header_string,print_type='wavefunction')
+  delta_p=np.pi/system_size
+  tab_p = np.arange(-delta_p*(dim_x//2),delta_p*(dim_x//2),step=delta_p)
+  i_max = np.argmax(tab_p>p_max)
+  i_min = np.argmax(tab_p>-p_max)
+  #print(i_min,tab_p[i_min],i_max,tab_p[i_max],delta_p)
+  tab_kinetic_energy = (1.0-np.cos(tab_p*delta_x))/delta_x**2
+  #print(tab_p,tab_kinetic_energy)
+  for i in range(number_of_energy_levels):
+    if np.amax(tab_wfc[:,i])<-np.amin(tab_wfc[:,i]):
+      tab_wfc[:,i]=-tab_wfc[:,i]
+    np.savetxt('wigner'+str(i+1)+'.dat',tab_wigner[:,:,i])
+#    np.savetxt('wigner'+str(i)+'_x.dat',np.column_stack([initial_state.position,np.sum(tab_wigner[:,:,i],axis=0)/dim_x]))
+ #   print(i,np.sum(np.abs(tab_wfc[:,i])**2)*delta_x,np.sum(tab_wigner[:,:,i])*delta_x*delta_p)
+#    np.savetxt('pipo.dat',tab_wigner[:,100,i])
+#    np.savetxt('pipo2.dat',tab_wigner[:,600,i])
+#    x_wfc = np.sum(np.abs(tab_wfc[:,i])**2*initial_state.position*delta_x)
+#    x_wigner = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*initial_state.position*delta_x/dim_x)
+#    print(i,x_wfc,x_wigner)
+    energy_potential = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*(H.disorder-2.0*H.tunneling)*delta_x*delta_p)
+    energy_kinetic = energy[i]-energy_potential
+    energy_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*landscape*delta_x*delta_p)
+    energy_kinetic_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=1)*delta_x*delta_p*tab_kinetic_energy)
+    if abs(energy_kinetic_landscape/energy_kinetic-1.0)>0.01:
+      print('Warning, problem with kinetic energy!')
+      print('Kinetic energy from potential = ',energy_kinetic)
+      print('Kinetic energy from Wigner    = ',energy_kinetic_landscape)
+#    print(i,energy_landscape,energy_kinetic_landscape,energy_landscape+energy_kinetic_landscape)
+#    fig, axs = plt.subplots(2,sharex=True,constrained_layout=True)
+#    plt.figure(dpi=300)
+    fig, axs = plt.subplots(2,sharex=True)
+#    fig.subplots_adjust(hspace=0.5)
+    axs[0].plot(initial_state.position,landscape,color='blue')
+    axs[0].plot(initial_state.position,energy[i]+multiplicative_factor_for_wfc*tab_wfc[:,i],color='red')
+    axs[0].plot(initial_state.position,H.disorder-2.0*H.tunneling,color='grey',linewidth=0.5)
+    axs[0].text(-0.7*system_size,v_min,'Landscape',color='blue',rotation='vertical')
+    axs[0].text(-0.75*system_size,v_min,'Wavefunction',color='red',rotation='vertical')
+    axs[0].text(-0.65*system_size,v_min,'Potential',color='grey',rotation='vertical')
+    axs[0].axis([-0.5*system_size,0.5*system_size,v_min,v_max])
+    my_string='From true potential: E='+"{:.4f}".format(energy[i])+' E_pot='+"{:.4f}".format(energy_potential)+' E_kin='+"{:.4f}".format(energy_kinetic)
+    axs[0].text(-0.5*system_size,1.3*v_max-0.3*v_min,my_string)
+    my_string='From landscape:                       E_pot='+"{:.4f}".format(energy_landscape)+' E_kin='+"{:.4f}".format(energy[i]-energy_landscape)
+    axs[0].text(-0.5*system_size,1.1*v_max-0.1*v_min,my_string,color='blue')
+    w_max = np.amax(tab_wigner[i_min:i_max,:,i])
+#    print('w_max=',w_max)
+    im=axs[1].imshow(tab_wigner[i_min:i_max,:,i],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
+    axs[1].set_xlabel('Position')
+    axs[1].set_ylabel('Momentum')
+    plt.title('Wigner function')
+    cbaxes = fig.add_axes([0.87, 0.12, 0.03, 0.32])
+    cb = plt.colorbar(im, cax = cbaxes)
+ #   fig.colorbar(im)
+    fig.subplots_adjust(hspace=0.4)
+    fig.subplots_adjust(bottom=0.12, left=0.18, right=0.85, top=0.85)
+    """
+    plt.subplot(221)
+    plt.plot(initial_state.position,landscape,color='blue')
+    plt.plot(initial_state.position,energy[i]+multiplicative_factor_for_wfc*tab_wfc[:,i],color='red')
+    plt.text(-0.6*system_size,v_min,'Landscape',color='blue',rotation='vertical')
+    plt.text(-0.65*system_size,v_min,'Wavefunction',color='red',rotation='vertical')
+    plt.axis([-0.5*system_size,0.5*system_size,v_min,v_max])
+    w_max = np.amax(tab_wigner[i_min:i_max,:,i])
+    print('w_max=',w_max)
+    plt.subplot(223)
+    im=plt.imshow(tab_wigner[i_min:i_max,:,i],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
+    plt.subplots_adjust(bottom=0.0, left=0.0, right=1.0, top=1.0)
+    plt.xlabel('Position')
+    plt.ylabel('Momentum')
+    plt.subplot(224)
+    plt.colorbar()
+    """
+
+    plt.savefig('figure'+str(i+1)+'.png', dpi=300)
+    plt.show()
 #  tab_IPR = np.zeros(n_config)
 #  tab_energy = np.zeros(n_config)
   # Here starts the loop over disorder configurations

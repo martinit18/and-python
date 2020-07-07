@@ -1,13 +1,13 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 10.
-size_2 = 10.
+size_1 = 20.
+size_2 = 20.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
-delta_1 = 0.1
-delta_2 = 0.1
+delta_1 = 0.5
+delta_2 = 0.5
 delta_3 = 0.25
 delta_4 = 0.25
 # either periodic or open
@@ -28,7 +28,7 @@ use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 128.0
+V0 = 1.0
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -56,7 +56,7 @@ t_max = 25.0
 delta_t = 1.0
 
 [Averaging]
-n_config = 100
+n_config = 10000
 
 [Measurement]
 delta_t_measurement = 1.0
@@ -74,5 +74,5 @@ dispersion_variance = True
 use_mkl_fft = True
 
 [Spectral]
-range = 1000.0
-resolution = 1.
+range = 20.0
+resolution = 0.01

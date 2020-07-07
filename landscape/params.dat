@@ -9,16 +9,15 @@ boundary_condition = periodic
 [Disorder]
 #  Various disorder types can be used
 #type = anderson_gaussian
-type = anderson_uniform
-# type = 'regensburg'
-# type = 'konstanz'
-# type = 'singapore'
-# type = 'speckle'
+#type = anderson_uniform
+# type = regensburg
+type = konstanz
+# type = singapore
 # type = speckle
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 1.0
+V0 = 0.1
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -26,7 +25,8 @@ g = 0.0
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
-initial_state = wave_packet
+#initial_state = wave_packet
+initial_state = plane_wave
 # make sure that k_0_over_2_pi*my_system_size is an integer
 k_0_over_2_pi = 0.0
 #0.16
@@ -63,10 +63,16 @@ extended = True
 [Diagonalization]
 #method = lapack
 method = sparse
-targeted_energy = 0.05
+targeted_energy = 0.2
 number_of_energy_levels = 4
 pivot_real = 0.0
 pivot_imag = 0.0
 IPR_min = 0.0
 IPR_max = 0.01
 number_of_bins = 50
+
+[Wigner]
+p_max = 1.0
+v_min = -0.1
+v_max = 0.5
+multiplicative_factor_for_wfc = 1.0

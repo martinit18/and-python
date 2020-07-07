@@ -85,7 +85,7 @@ class Diagonalization:
 #    matrix = H.generate_full_matrix()
 # The following line uses a CSR storage for the sparse matrix and is slightly less efficient
 #    matrix = scipy.sparse.csr_matrix(matrix)
-      landscape = 1.0/np.abs(sparse_linalg.spsolve(matrix,initial_state.wfc))+self.targeted_energy
+      landscape = 1.0/np.abs(sparse_linalg.spsolve(matrix,initial_state.wfc))
     return landscape
 
   def compute_landscape_2(self,i,H,pivot):
