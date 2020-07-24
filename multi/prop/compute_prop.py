@@ -333,7 +333,7 @@ if __name__ == "__main__":
     if (measurement_global.measure_wavefunction_momentum):
       anderson.io.output_density('wavefunction_momentum_final.dat',measurement_global.wfc_momentum,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
     if (measurement_global.measure_autocorrelation):
-      anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_autocorrelation,tab_abscissa=[measurement.tab_t_measurement[i_tab_0:]-measurement.tab_t_measurement[i_tab_0]],header_string=header_string,data_type='autocorrelation')
+      anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_autocorrelation,tab_abscissa=measurement.tab_t_measurement[i_tab_0:]-measurement.tab_t_measurement[i_tab_0],header_string=header_string,data_type='autocorrelation')
 #    print(tab_dispersion)
     if (measurement_global.measure_dispersion_position or measurement_global.measure_dispersion_momentum or measurement_global.measure_dispersion_energy):
       anderson.io.output_dispersion('dispersion.dat',tab_dispersion,tab_strings,header_string)

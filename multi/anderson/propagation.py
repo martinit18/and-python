@@ -49,19 +49,28 @@ class Temporal_Propagation:
 
 def apply_minus_i_h_gpe_complex(wfc, H, rhs):
   ntot=H.ntot
-  rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
-  rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
+  if H.interaction == 0.0:
+    rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
+    rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
 # The next line makes everything in one call, but is significantly slower
 #  rhs[:] = (-1j*H.sparse_matrix.dot(wfc.view(np.complex128))).view(np.float64)
+  else:
+    non_linear_phase = H.interaction*(wfc[0:2*ntot:2]**2+wfc[1:2*ntot:2]**2)
+    rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])+non_linear_phase*wfc[1:2*ntot:2]
+    rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])-non_linear_phase*wfc[0:2*ntot:2]
 #  print(wfc[200],wfc[201],rhs[200],rhs[201])
   return
 
 def apply_minus_i_h_gpe_real(wfc, H, rhs):
 #  print('wfc',wfc.dtype,wfc.shape)
   ntot=H.ntot
-  rhs[0:ntot]=H.sparse_matrix.dot(wfc[ntot:2*ntot])
-  rhs[ntot:2*ntot]=-H.sparse_matrix.dot(wfc[0:ntot])
-#  print(wfc[100],rhs[100])
+  if H.interaction == 0.0:
+    rhs[0:ntot]=H.sparse_matrix.dot(wfc[ntot:2*ntot])
+    rhs[ntot:2*ntot]=-H.sparse_matrix.dot(wfc[0:ntot])
+  else:
+    non_linear_phase = H.interaction*(wfc[0:ntot]**2+wfc[ntot:2*ntot]**2)
+    rhs[0:ntot]=H.sparse_matrix.dot(wfc[ntot:2*ntot])+non_linear_phase*wfc[ntot:2*ntot]
+    rhs[ntot:2*ntot]=-H.sparse_matrix.dot(wfc[0:ntot])-non_linear_phase*wfc[0:ntot]
   return
 
 """
