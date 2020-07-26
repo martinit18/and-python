@@ -12,15 +12,21 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   params_string = 'Disorder type                   = '+H.disorder_type+'\n'\
                  +'Correlation length              = '+str(H.correlation_length)+'\n'\
                  +'Dimension                       = '+str(H.dimension)+'\n'
+  volume = 1.0
   for i in range(H.dimension):
+    volume *= H.tab_dim[i]*H.tab_delta[i]
     params_string += \
                   'Size_'+str(i+1)+'                          = '+str(H.tab_dim[i]*H.tab_delta[i])+'\n'\
                  +'delta_'+str(i+1)+'                         = '+str(H.tab_delta[i])+'\n'\
                  +'N_'+str(i+1)+'                             = '+str(H.tab_dim[i])+'\n'\
                  +'Boundary_Condition_'+str(i+1)+'            = '+H.tab_boundary_condition[i]+'\n'
+
+  params_string += \
+                  'Volume                          = '+str(volume)+'\n'
   params_string += \
                   'V0                              = '+str(H.disorder_strength)+'\n'\
                  +'g                               = '+str(H.interaction)+'\n'\
+                 +'g_over_volume                   = '+str(H.interaction/volume)+'\n'\
                  +'Number of disorder realizations = '+str(n_config*nprocs)+'\n'\
                  +'Number of processes             = '+str(nprocs)+'\n'\
                  +'Number of realizations per proc = '+str(n_config)+'\n'

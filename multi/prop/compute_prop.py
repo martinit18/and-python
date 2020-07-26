@@ -139,7 +139,16 @@ if __name__ == "__main__":
     use_mkl_random = Disorder.getboolean('use_mkl_random',True)
 
     Nonlinearity = config['Nonlinearity']
-    interaction_strength = Nonlinearity.getfloat('g',0.0)
+# First try to see if g_over_volume is defined
+    interaction_strength = Nonlinearity.getfloat('g_over_volume')
+# If not, try g
+    if interaction_strength==None:
+      interaction_strength = Nonlinearity.getfloat('g')
+    else:
+ # Multiply g_over_V by the volume of the system
+      for i in range(dimension):
+        interaction_strength *= tab_size[i]
+#    print(interaction_strength)
 
     Wavefunction = config['Wavefunction']
     initial_state_type = Wavefunction.get('initial_state')
