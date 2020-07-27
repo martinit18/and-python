@@ -9,10 +9,10 @@ Created on Tue Sep  3 17:00:38 2019
 from cffi import FFI
 ffibuilder = FFI()
 
-ffibuilder.cdef("void elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
-ffibuilder.cdef("void elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
-ffibuilder.cdef("void chebyshev_clenshaw_real(const int dim_x, const int max_order, const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double *restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
-ffibuilder.cdef("void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * restrict wfc, double _Complex *restrict psi, double _Complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
+ffibuilder.cdef("void elementary_clenshaw_step_real_1d(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
+ffibuilder.cdef("void elementary_clenshaw_step_complex_1d(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
+ffibuilder.cdef("void chebyshev_clenshaw_real_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double *restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
+ffibuilder.cdef("void chebyshev_clenshaw_complex_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * restrict wfc, double _Complex *restrict psi, double _Complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
 
 
 ffibuilder.set_source("_chebyshev",
@@ -27,7 +27,7 @@ r"""
 #endif
 #include <complex.h>
 
-inline static void elementary_clenshaw_step_real(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
+inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
 {
   int i;
   if (add_real) {
@@ -98,7 +98,7 @@ inline static void elementary_clenshaw_step_real(const int dim_x, const char * r
   return;
 }
 
-inline static void elementary_clenshaw_step_complex(const int dim_x, const char * restrict boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
+inline static void elementary_clenshaw_step_complex_1d(const int dim_x, const char * restrict boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
 {
   int i;
   if (add_real) {
@@ -135,7 +135,7 @@ inline static void elementary_clenshaw_step_complex(const int dim_x, const char 
   return;
 }
 
-void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
+void chebyshev_clenshaw_real_1d(const int dim_x, const int max_order,  const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
 {
   int i, order;
   double argument;
@@ -146,14 +146,14 @@ void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char *
   for (i=0;i<2*dim_x;i++) {
     psi[i] = tab_coef[max_order] * wfc[i];
   }
-  elementary_clenshaw_step_real(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[max_order-1], 2.0, 0, tunneling, disorder);
+  elementary_clenshaw_step_real_1d(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[max_order-1], 2.0, 0, tunneling, disorder);
 // WARNING: max_order MUST be an even number, otherwise disaster guaranteed
   for (order=max_order-2;order>1;order-=2) {
 //    printf("order = %d %d %lf %lf\n",order,(order+1)%2,tab_coef[order],tunneling);
-    elementary_clenshaw_step_real(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[order], 2.0, 1, tunneling, disorder);
-    elementary_clenshaw_step_real(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[order-1], 2.0, 0, tunneling, disorder);
+    elementary_clenshaw_step_real_1d(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[order], 2.0, 1, tunneling, disorder);
+    elementary_clenshaw_step_real_1d(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[order-1], 2.0, 0, tunneling, disorder);
   }
-  elementary_clenshaw_step_real(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[0], 1.0, 1, tunneling, disorder);
+  elementary_clenshaw_step_real_1d(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[0], 1.0, 1, tunneling, disorder);
 // apply nonlinear shift
   if (g_times_delta_t==0.0) {
     cos_phase=cos(e0_times_delta_t);
@@ -182,7 +182,7 @@ void chebyshev_clenshaw_real(const int dim_x, const int max_order,  const char *
   return;
 }
 
-void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char * restrict boundary_condition, double complex * restrict wfc, double  complex * restrict psi, double complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
+void chebyshev_clenshaw_complex_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double complex * restrict wfc, double  complex * restrict psi, double complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
 {
   int i, order;
   double argument;
@@ -192,14 +192,14 @@ void chebyshev_clenshaw_complex(const int dim_x, const int max_order, const char
   for (i=0;i<dim_x;i++) {
     psi[i] = tab_coef[max_order] * wfc[i];
   }
-  elementary_clenshaw_step_complex(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[max_order-1], 2.0, 0, tunneling, disorder);
+  elementary_clenshaw_step_complex_1d(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[max_order-1], 2.0, 0, tunneling, disorder);
 // WARNING: max_order MUST be an even number, otherwise disaster guaranteed
   for (order=max_order-2;order>1;order-=2) {
 //    printf("order = %d %d %lf %lf\n",order,(order+1)%2,tab_coef[order],tunneling);
-    elementary_clenshaw_step_complex(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[order], 2.0, 1, tunneling, disorder);
-    elementary_clenshaw_step_complex(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[order-1], 2.0, 0, tunneling, disorder);
+    elementary_clenshaw_step_complex_1d(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[order], 2.0, 1, tunneling, disorder);
+    elementary_clenshaw_step_complex_1d(dim_x, boundary_condition, wfc, psi, psi_old, tab_coef[order-1], 2.0, 0, tunneling, disorder);
   }
-  elementary_clenshaw_step_complex(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[0], 1.0, 1, tunneling, disorder);
+  elementary_clenshaw_step_complex_1d(dim_x, boundary_condition, wfc, psi_old, psi, tab_coef[0], 1.0, 1, tunneling, disorder);
 // apply nonlinear shift
   if (g_times_delta_t==0.0) {
     complex_argument=cos(e0_times_delta_t)-I*sin(e0_times_delta_t);

@@ -177,6 +177,7 @@ class Hamiltonian(Potential):
   """
   def generate_disorder(self,seed):
 #    print(self.use_mkl_random)
+    self.seed = seed
     if self.use_mkl_random:
       try:
         import mkl_random

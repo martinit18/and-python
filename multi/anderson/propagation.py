@@ -14,9 +14,10 @@ import anderson
 import timeit
 
 class Temporal_Propagation:
-  def __init__(self, t_max, delta_t, method='che', data_layout='real'):
+  def __init__(self, t_max, delta_t, method='che', data_layout='real', use_cffi=True):
     self.t_max = t_max
     self.method = method
+    self.use_cffi = use_cffi
     self.data_layout = data_layout
     self.delta_t = delta_t
     self.script_delta_t = 0.
@@ -195,8 +196,22 @@ The two routines chebyshev_step_clenshaw_python and chebyshev_step_clenshaw_cffi
 The first use pure Python, the second one uses a C code and cffi (roughly 10 times faster)
 """
 
-def chebyshev_step_clenshaw_python(wfc, H, propagation,timing):
+def chebyshev_step(wfc, H, propagation,timing):
 #  tab_dim = H.tab_dim
+  if propagation.use_cffi:
+    try:
+      from anderson._chebyshev import ffi,lib
+      if propagation.data_layout == 'real':
+#        print('chebyshev_clenshaw_real_'+str(H.dimension)+'d')
+        use_cffi =  hasattr(lib,'chebyshev_clenshaw_real_'+str(H.dimension)+'d')
+      if propagation.data_layout == 'complex':
+        use_cffi =  hasattr(lib,'chebyshev_clenshaw_complex_'+str(H.dimension)+'d')
+    except ImportError:
+      use_cffi = False
+    if not use_cffi and H.seed == 1234:
+      print("\nWarning, no C version found, this uses the slow Python version!\n")
+  else:
+    use_cffi = False
   ntot = H.ntot
   max_order = propagation.tab_coef.size-1
   local_wfc = wfc.ravel()
@@ -665,15 +680,15 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
   Determines whether the cffi version is present
   If not, use Python version
   """
-  try:
-    from anderson._chebyshev import ffi,lib
+  """
+  from anderson._chebyshev import ffi,lib
 #    chebyshev_step = chebyshev_step_clenshaw_cffi
     if debug: print('Using CFFI version')
   except ImportError:
     chebyshev_step = chebyshev_step_clenshaw_python
     if i_seed == 0:
       print("\nWarning, this uses the slow Python version, you should build the C version!\n")
-
+  """
 
   start_dummy_time=timeit.default_timer()
 #  dimension = H.dimension

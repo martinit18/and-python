@@ -160,6 +160,7 @@ if __name__ == "__main__":
 
     Propagation = config['Propagation']
     method = Propagation.get('method','che')
+    use_cffi = Propagation.getboolean('use_cffi',True)
     data_layout = Propagation.get('data_layout','real')
     t_max = Propagation.getfloat('t_max')
     delta_t = Propagation.getfloat('delta_t')
@@ -194,6 +195,7 @@ if __name__ == "__main__":
     tab_k_0 = None
     tab_sigma_0 = None
     method = None
+    use_cffi = None
     data_layout = None
     t_max = None
     delta_t = None
@@ -216,7 +218,7 @@ if __name__ == "__main__":
     n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
-    method, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, data_layout, t_max, delta_t, i_tab_0))
+    method, use_cfft, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, use_cffi, data_layout, t_max, delta_t, i_tab_0))
     delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft))
 
 
@@ -255,7 +257,7 @@ if __name__ == "__main__":
 #  print(initial_state.overlap(initial_state))
 
 # Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method,data_layout=data_layout)
+  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method,data_layout=data_layout,use_cffi=use_cffi)
   # When computing an autocorrelation <psi(0)|psi(t)>, one can skip the first time steps, i.e. initialize
   # psi(0) with the wavefunction at some time tau. tau must be an integer multiple of delta_t_measurement.
   # args.first_step_autocorr is the integer tau/delta_t_measurement
