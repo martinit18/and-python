@@ -117,10 +117,18 @@ def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, a
 #  print('psi',psi.shape,psi.dtype)
 #  print('psi_old',psi_old.shape,psi_old.dtype)
 #  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  use_sparse = True
   if add_real:
-    psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi)-H.two_e0_over_delta_e*psi)+c_coef*wfc-psi_old
+    if use_sparse:
+      psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[:])-H.two_e0_over_delta_e*psi[:])+c_coef*wfc[:]-psi_old[:]
+    else:  
+      dim_x = H.tab_dim[0]
+      if H.tab_boundary_condition[0]=='periodic':
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]     
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+        psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]        
   else:
-    psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi)-H.two_e0_over_delta_e*psi)+1j*c_coef*wfc-psi_old
+    psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[:])-H.two_e0_over_delta_e*psi[:])+1j*c_coef*wfc[:]-psi_old[:]
 #  print('out',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
   return
 
@@ -129,7 +137,7 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_
 #  print('psi',psi.shape,psi.dtype)
 #  print('psi_old',psi_old.shape,psi_old.dtype)
   ntot = H.ntot
-#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
   if add_real:
     psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])+c_coef*wfc[0:ntot]-psi_old[0:ntot]
     psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
@@ -212,43 +220,65 @@ def chebyshev_step(wfc, H, propagation,timing):
       print("\nWarning, no C version found, this uses the slow Python version!\n")
   else:
     use_cffi = False
-  ntot = H.ntot
-  max_order = propagation.tab_coef.size-1
-  local_wfc = wfc.ravel()
-  assert max_order%2==0,"Max order {} must be an even number".format(max_order)
-  if propagation.data_layout == 'real':
-    elementary_clenshaw_step_routine = elementary_clenshaw_step_real
-    psi_old = np.zeros(2*ntot)
+  """  
+  if use_cffi and H.dimension==1:
+    dim_x = tab_dim[0]
+    boundary_condition = H.tab_boundary_condition[0]
+    script_tunneling = H.tab_script_tunneling[0]
+    max_order = propagation.tab_coef.size-1
+    nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
+    assert max_order%2==0,"Max order {} must be an even number".format(max_order)
+    if propagation.data_layout=='real':
+      psi_old = np.zeros(2*dim_x)
+      psi = np.zeros(2*dim_x)
+    lib.chebyshev_clenshaw_real(dim_x,max_order,str.encode(H.boundary_condition),ffi.cast('double *',ffi.from_buffer(wfc)),ffi.cast('double *',ffi.from_buffer(psi)),ffi.cast('double *',ffi.from_buffer(psi_old)),H.script_tunneling,ffi.cast('double *',ffi.from_buffer(H.script_disorder)),ffi.cast('double *',ffi.from_buffer(propagation.tab_coef)),H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
   else:
-    elementary_clenshaw_step_routine = elementary_clenshaw_step_complex
-    psi_old = np.zeros(ntot,dtype=np.complex128)
-  psi = propagation.tab_coef[-1] * local_wfc
-  elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
-  for order in range(propagation.tab_coef.size-3,0,-2):
-    elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
-    elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
-  elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
-#  print(H.medium_energy)
-  if H.interaction==0.0:
-    phase = propagation.delta_t*H.medium_energy
-    cos_phase = math.cos(phase)
-    sin_phase = math.sin(phase)
+    psi_old = np.zeros(dim_x,dtype=np.complex128)
+    psi = np.zeros(dim_x,dtype=np.complex128)
+#    print('Entering toto_che_complex')
+    lib.chebyshev_clenshaw_complex(dim_x,max_order,str.encode(H.boundary_condition),ffi.cast('double _Complex *',ffi.from_buffer(wfc)),ffi.cast('double _Complex *',ffi.from_buffer(psi)),ffi.cast('double _Complex *',ffi.from_buffer(psi_old)),H.script_tunneling,ffi.cast('double *',ffi.from_buffer(H.script_disorder)),ffi.cast('double *',ffi.from_buffer(propagation.tab_coef)),H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+    timing.MAX_NONLINEAR_PHASE = nonlinear_phase[0]
+    return    
   else:
+  """  
+  if not use_cffi:
+    ntot = H.ntot
+    max_order = propagation.tab_coef.size-1
+    local_wfc = wfc.ravel()
+    assert max_order%2==0,"Max order {} must be an even number".format(max_order)
     if propagation.data_layout == 'real':
-      nonlinear_phase = propagation.delta_t*H.interaction*(psi[0:ntot]**2+psi[ntot:2*ntot]**2)
+      elementary_clenshaw_step_routine = elementary_clenshaw_step_real
+      psi_old = np.zeros(2*ntot)
     else:
-      nonlinear_phase = propagation.delta_t*H.interaction*(np.real(psi)**2+np.imag(psi)**2)
-    timing.MAX_NONLINEAR_PHASE = max(timing.MAX_NONLINEAR_PHASE,np.amax(nonlinear_phase))
-    phase=propagation.delta_t*H.medium_energy+nonlinear_phase
-    cos_phase = np.cos(phase)
-    sin_phase = np.sin(phase)
-  if propagation.data_layout == 'real':
-      local_wfc[0:ntot] = psi[0:ntot]*cos_phase+psi[ntot:2*ntot]*sin_phase
-      local_wfc[ntot:2*ntot] = psi[ntot:2*ntot]*cos_phase-psi[0:ntot]*sin_phase
-  else:
-      local_wfc[:] = psi[:] * (cos_phase-1j*sin_phase)
-#  print(psi[2000],wfc[2000])
-  return
+      elementary_clenshaw_step_routine = elementary_clenshaw_step_complex
+      psi_old = np.zeros(ntot,dtype=np.complex128)
+    psi = propagation.tab_coef[-1] * local_wfc
+    elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
+    for order in range(propagation.tab_coef.size-3,0,-2):
+      elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
+      elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
+    elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
+  #  print(H.medium_energy)
+    if H.interaction==0.0:
+      phase = propagation.delta_t*H.medium_energy
+      cos_phase = math.cos(phase)
+      sin_phase = math.sin(phase)
+    else:
+      if propagation.data_layout == 'real':
+        nonlinear_phase = propagation.delta_t*H.interaction*(psi[0:ntot]**2+psi[ntot:2*ntot]**2)
+      else:
+        nonlinear_phase = propagation.delta_t*H.interaction*(np.real(psi)**2+np.imag(psi)**2)
+      timing.MAX_NONLINEAR_PHASE = max(timing.MAX_NONLINEAR_PHASE,np.amax(nonlinear_phase))
+      phase=propagation.delta_t*H.medium_energy+nonlinear_phase
+      cos_phase = np.cos(phase)
+      sin_phase = np.sin(phase)
+    if propagation.data_layout == 'real':
+        local_wfc[0:ntot] = psi[0:ntot]*cos_phase+psi[ntot:2*ntot]*sin_phase
+        local_wfc[ntot:2*ntot] = psi[ntot:2*ntot]*cos_phase-psi[0:ntot]*sin_phase
+    else:
+        local_wfc[:] = psi[:] * (cos_phase-1j*sin_phase)
+  #  print(psi[2000],wfc[2000])
+    return
 
 """
 def chebyshev_step_clenshaw_cffi(wfc, H, propagation,timing):
