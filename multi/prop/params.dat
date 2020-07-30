@@ -1,19 +1,29 @@
 [System]
+dimension = 1
 # System size in natural units
-size = 20000.
+size_1 = 20000.
+size_2 = 20.
+size_3 = 5.
+size_4 = 1.
 # Spatial discretization
-delta_x = 0.5
+delta_1 = 0.5
+delta_2 = 0.5
+delta_3 = 0.25
+delta_4 = 0.25
 # either periodic or open
-boundary_condition = periodic
+boundary_condition_1 = periodic
+boundary_condition_2 = periodic
+boundary_condition_3 = periodic
+boundary_condition_4 = periodic
 
 [Disorder]
 #  Various disorder types can be used
-# type = 'anderson_gaussian'
-# type = 'regensburg'
+# type = anderson
+# type = anderson_gaussian
+# type = regensburg
 type = konstanz
-# type = 'singapore'
-# type = 'speckle'
-#type = anderson_gaussian
+# type = singapore
+# type = speckle
 use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
@@ -22,17 +32,18 @@ V0 = 1.0
 
 [Nonlinearity]
 # g is the nonlinear interaction
-#g = 0.0
+g = 0.0
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
-# make sure that k_0_over_2_pi*my_system_size is an integer
-k_0_over_2_pi = 0.16
-#0.16
-
+#initial_state = gaussian_wave_packet
+# make sure that k_0_over_2_pi_i*size_i is an integer
+k_0_over_2_pi_1 = 0.16
+k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
-sigma_0 = 10.0
+sigma_0_1 = 10.0
+sigma_0_2 = 10.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
@@ -43,6 +54,7 @@ data_layout = real
 t_max = 25.0
 # Elementary time step
 delta_t = 1.0
+use_cffi = False
 
 [Averaging]
 n_config = 10
@@ -53,10 +65,15 @@ delta_t_measurement = 1.0
 #density = True
 density_momentum = True
 #dispersion_position = True
+#dispersion_position2 = True
 dispersion_momentum = True
-#dispersion_energy = True
-#wavefunction_final = True
-#autocorrelation = True
+dispersion_energy = True
 dispersion_variance = True
+#wavefunction = True
+#wavefunction_momentum = True
+#autocorrelation = True
 use_mkl_fft = True
 
+[Spectral]
+range = 20.0
+resolution = 0.01

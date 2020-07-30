@@ -5,8 +5,10 @@ export CC=icc
 #export CFLAGS=-Ofast -xHost -ftz -fno-alias -qopt-prefetch=4 -qopt-report=4 -qopt-report-phase=vec -no-prec-div -IPF-fp-relaxed -fp-model fast=2 
 # Do not put -ip, -ipo or -ipo2
 export CFLAGS=-Ofast -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range -qopt-mem-layout-trans=3
+#export CFLAGS=-Ofast -xCORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range -qopt-mem-layout-trans=3
 #-axCORE-AVX512 
-#export CFLAGS=-Ofast -xHost -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range
+#export CFLAGS=-Ofast -xHost -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range -qopt-mem-layout-trans=3
+
 #-qopt-streaming-stores=auto
 #-qopt-mem-layout-trans=3
 #-funroll-loops
