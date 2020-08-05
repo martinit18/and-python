@@ -9,10 +9,10 @@ Created on Tue Sep  3 17:00:38 2019
 from cffi import FFI
 ffibuilder = FFI()
 
-ffibuilder.cdef("void elementary_clenshaw_step_real_1d(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
-ffibuilder.cdef("void elementary_clenshaw_step_complex_1d(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
-ffibuilder.cdef("void chebyshev_clenshaw_real_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double *restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
-ffibuilder.cdef("void chebyshev_clenshaw_complex_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * restrict wfc, double _Complex *restrict psi, double _Complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
+ffibuilder.cdef("void elementary_clenshaw_step_real_1d(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder, const double two_over_delta_e, const double two_e0_over_delta_e);")
+#ffibuilder.cdef("void elementary_clenshaw_step_complex_1d(const int dim_x, const char * restrict boundary_condition, const double _Complex * restrict wfc, const double _Complex * restrict psi, double _Complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder);")
+#//ffibuilder.cdef("void chebyshev_clenshaw_real_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double * restrict wfc, double * restrict psi, double *restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
+#//ffibuilder.cdef("void chebyshev_clenshaw_complex_1d(const int dim_x, const int max_order, const char * restrict boundary_condition, double _Complex * restrict wfc, double _Complex *restrict psi, double _Complex * restrict psi_old, const double tunneling, const double * restrict disorder, const double * restrict tab_coef, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase);")
 
 
 ffibuilder.set_source("_chebyshev",
@@ -27,15 +27,15 @@ r"""
 #endif
 #include <complex.h>
 
-inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
+inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char * restrict boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder, const double two_over_delta_e, const double two_e0_over_delta_e)
 {
   int i;
   if (add_real) {
     if (strcmp(boundary_condition,"periodic") == 0) {
-      psi_old[0]=one_or_two*(disorder[0]*psi[0]-tunneling*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0];
-      psi_old[dim_x]=one_or_two*(disorder[0]*psi[dim_x]-tunneling*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[dim_x]-psi_old[dim_x];
-      psi_old[dim_x-1]=one_or_two*(disorder[dim_x-1]*psi[dim_x-1]-tunneling*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1] ;
-      psi_old[2*dim_x-1]=one_or_two*(disorder[dim_x-1]*psi[2*dim_x-1]-tunneling*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1];
+      psi_old[0]=one_or_two*((two_over_delta_e*disorder[0]-two_e0_over_delta_e)*psi[0]-tunneling*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0];
+      psi_old[dim_x]=one_or_two*((two_over_delta_e*disorder[0]-two_e0_over_delta_e)*psi[dim_x]-tunneling*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[dim_x]-psi_old[dim_x];
+      psi_old[dim_x-1]=one_or_two*((two_over_delta_e*disorder[dim_x-1]-two_e0_over_delta_e)*psi[dim_x-1]-tunneling*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1] ;
+      psi_old[2*dim_x-1]=one_or_two*((two_over_delta_e*disorder[dim_x-1]-two_e0_over_delta_e)*psi[2*dim_x-1]-tunneling*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1];
     } else {
       psi_old[0]=one_or_two*(disorder[0]*psi[0]-tunneling*psi[1])+c_coef*wfc[0]-psi_old[0];
       psi_old[dim_x]=one_or_two*(disorder[0]*psi[dim_x]-tunneling*psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x];
@@ -50,7 +50,7 @@ inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char 
 #endif
 #endif
     for (i=1;i<dim_x-1;i++) {
-      psi_old[i]=one_or_two*(disorder[i]*psi[i]-tunneling*(psi[i+1]+psi[i-1]))+c_coef*wfc[i]-psi_old[i];
+      psi_old[i]=one_or_two*((two_over_delta_e*disorder[i]-two_e0_over_delta_e)*psi[i]-tunneling*(psi[i+1]+psi[i-1]))+c_coef*wfc[i]-psi_old[i];
     }
 #ifdef __clang__
 #else
@@ -60,19 +60,19 @@ inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char 
 #endif
 #endif
     for (i=dim_x+1;i<2*dim_x-1;i++) {
-      psi_old[i]=one_or_two*(disorder[i-dim_x]*psi[i]-tunneling*(psi[i+1]+psi[i-1]))+c_coef*wfc[i]-psi_old[i];
+      psi_old[i]=one_or_two*((two_over_delta_e*disorder[i-dim_x]-two_e0_over_delta_e)*psi[i]-tunneling*(psi[i+1]+psi[i-1]))+c_coef*wfc[i]-psi_old[i];
     }
   } else {
     if (strcmp(boundary_condition,"periodic") == 0) {
-      psi_old[0]=one_or_two*(disorder[0]*psi[0]-tunneling*(psi[1]+psi[dim_x-1]))-c_coef*wfc[dim_x]-psi_old[0];
-      psi_old[dim_x]=one_or_two*(disorder[0]*psi[dim_x]-tunneling*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[0]-psi_old[dim_x];
-      psi_old[dim_x-1]=one_or_two*(disorder[dim_x-1]*psi[dim_x-1]-tunneling*(psi[0]+psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1] ;
-      psi_old[2*dim_x-1]=one_or_two*(disorder[dim_x-1]*psi[2*dim_x-1]-tunneling*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1];
+      psi_old[0]=one_or_two*((two_over_delta_e*disorder[0]-two_e0_over_delta_e)*psi[0]-tunneling*(psi[1]+psi[dim_x-1]))-c_coef*wfc[dim_x]-psi_old[0];
+      psi_old[dim_x]=one_or_two*((two_over_delta_e*disorder[0]-two_e0_over_delta_e)*psi[dim_x]-tunneling*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[0]-psi_old[dim_x];
+      psi_old[dim_x-1]=one_or_two*((two_over_delta_e*disorder[dim_x-1]-two_e0_over_delta_e)*psi[dim_x-1]-tunneling*(psi[0]+psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1] ;
+      psi_old[2*dim_x-1]=one_or_two*((two_over_delta_e*disorder[dim_x-1]-two_e0_over_delta_e)*psi[2*dim_x-1]-tunneling*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1];
     } else {
-      psi_old[0]=one_or_two*(disorder[0]*psi[0]-tunneling*psi[1])-c_coef*wfc[dim_x]-psi_old[0];
-      psi_old[dim_x]=one_or_two*(disorder[0]*psi[dim_x]-tunneling*psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x];
-      psi_old[dim_x-1]=one_or_two*(disorder[dim_x-1]*psi[dim_x-1]-tunneling*psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1] ;
-      psi_old[2*dim_x-1]=one_or_two*(disorder[dim_x-1]*psi[2*dim_x-1]-tunneling*psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1];
+      psi_old[0]=one_or_two*((two_over_delta_e*disorder[0]-two_e0_over_delta_e)*psi[0]-tunneling*psi[1])-c_coef*wfc[dim_x]-psi_old[0];
+      psi_old[dim_x]=one_or_two*((two_over_delta_e*disorder[0]-two_e0_over_delta_e)*psi[dim_x]-tunneling*psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x];
+      psi_old[dim_x-1]=one_or_two*((two_over_delta_e*disorder[dim_x-1]-two_e0_over_delta_e)*psi[dim_x-1]-tunneling*psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1] ;
+      psi_old[2*dim_x-1]=one_or_two*((two_over_delta_e*disorder[dim_x-1]-two_e0_over_delta_e)*psi[2*dim_x-1]-tunneling*psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1];
     }
 #ifdef __clang__
 #else
@@ -82,7 +82,7 @@ inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char 
 #endif
 #endif
     for (i=1;i<dim_x-1;i++) {
-      psi_old[i]=one_or_two*(disorder[i]*psi[i]-tunneling*(psi[i+1]+psi[i-1]))-c_coef*wfc[i+dim_x]-psi_old[i];
+      psi_old[i]=one_or_two*((two_over_delta_e*disorder[i]-two_e0_over_delta_e)*psi[i]-tunneling*(psi[i+1]+psi[i-1]))-c_coef*wfc[i+dim_x]-psi_old[i];
     }
 #ifdef __clang__
 #else
@@ -92,12 +92,13 @@ inline static void elementary_clenshaw_step_real_1d(const int dim_x, const char 
 #endif
 #endif
     for (i=dim_x+1;i<2*dim_x-1;i++) {
-      psi_old[i]=one_or_two*(disorder[i-dim_x]*psi[i]-tunneling*(psi[i+1]+psi[i-1]))+c_coef*wfc[i-dim_x]-psi_old[i];
+      psi_old[i]=one_or_two*((two_over_delta_e*disorder[i-dim_x]-two_e0_over_delta_e)*psi[i]-tunneling*(psi[i+1]+psi[i-1]))+c_coef*wfc[i-dim_x]-psi_old[i];
     }
   }
   return;
 }
 
+/*
 inline static void elementary_clenshaw_step_complex_1d(const int dim_x, const char * restrict boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double c_coef, const double one_or_two, const int add_real, const double tunneling, const double * restrict disorder)
 {
   int i;
@@ -224,6 +225,7 @@ void chebyshev_clenshaw_complex_1d(const int dim_x, const int max_order, const c
   }
   return;
 }
+*/    
 """)
 
 if __name__ == "__main__":

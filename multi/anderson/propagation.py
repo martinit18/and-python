@@ -212,63 +212,11 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_
         psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
         psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]                
       psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
-      psi_old[dim_x+1:2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x+1:2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
-       
-#  print('out',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+      psi_old[dim_x+1:2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x+1:2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]    
+  print('out',wfc[0],psi[0],psi_old[0])
   return
 
-  """
-  dim_x = H.dim_x
-  if (add_real):
-    if H.boundary_condition=='periodic':
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    else:
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*psi[1])+c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    psi_old[1:dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[1:dim_x-1]-H.script_tunneling*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-  else:
-    if H.boundary_condition=='periodic':
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*(psi[1]+psi[dim_x-1]))+1j*c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*(psi[0]+psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    else:
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*psi[1])+1j*c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*psi[dim_x-2])+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    psi_old[1:dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[1:dim_x-1]-H.script_tunneling*(psi[2:dim_x]+psi[0:dim_x-2]))+1j*c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-  return
-  """
-  
-"""
-def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
-  dim_x = H.dim_x
-  if (add_real):
-    if H.boundary_condition=='periodic':
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x]=one_or_two*(H.script_disorder[0]*psi[dim_x]-H.script_tunneling*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[dim_x]-psi_old[dim_x]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[2*dim_x-1]-H.script_tunneling*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
-    else:
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*psi[1])+c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x]=one_or_two*(H.script_disorder[0]*psi[dim_x]-H.script_tunneling*psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[2*dim_x-1]-H.script_tunneling*psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
-    psi_old[1:dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[1:dim_x-1]-H.script_tunneling*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-    psi_old[dim_x+1:2*dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[dim_x+1:2*dim_x-1]-H.script_tunneling*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
-  else:
-    if H.boundary_condition=='periodic':
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*(psi[1]+psi[dim_x-1]))-c_coef*wfc[dim_x]-psi_old[0]
-      psi_old[dim_x]=one_or_two*(H.script_disorder[0]*psi[dim_x]-H.script_tunneling*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[0]-psi_old[dim_x]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*(psi[0]+psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[2*dim_x-1]-H.script_tunneling*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-    else:
-      psi_old[0]=one_or_two*(H.script_disorder[0]*psi[0]-H.script_tunneling*psi[1])-c_coef*wfc[dim_x]-psi_old[0]
-      psi_old[dim_x]=one_or_two*(H.script_disorder[0]*psi[dim_x]-H.script_tunneling*psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x]
-      psi_old[dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[dim_x-1]-H.script_tunneling*psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1]=one_or_two*(H.script_disorder[dim_x-1]*psi[2*dim_x-1]-H.script_tunneling*psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-    psi_old[1:dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[1:dim_x-1]-H.script_tunneling*(psi[2:dim_x]+psi[0:dim_x-2]))-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
-    psi_old[dim_x+1:2*dim_x-1]=one_or_two*(H.script_disorder[1:dim_x-1]*psi[dim_x+1:2*dim_x-1]-H.script_tunneling*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
-  return
-"""
+
 """
 The two routines chebyshev_step_clenshaw_python and chebyshev_step_clenshaw_cffi should be completely equivalent
 The first use pure Python, the second one uses a C code and cffi (roughly 10 times faster)
@@ -281,37 +229,45 @@ def chebyshev_step(wfc, H, propagation,timing):
       from anderson._chebyshev import ffi,lib
       if propagation.data_layout == 'real':
 #        print('chebyshev_clenshaw_real_'+str(H.dimension)+'d')
-        use_cffi =  hasattr(lib,'chebyshev_clenshaw_real_'+str(H.dimension)+'d')
+        use_cffi =  hasattr(lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
       if propagation.data_layout == 'complex':
         use_cffi =  hasattr(lib,'chebyshev_clenshaw_complex_'+str(H.dimension)+'d')
     except ImportError:
       use_cffi = False
-#    if not use_cffi and H.seed == 1234:
-#      print("\nWarning, no C version found, this uses the slow Python version!\n")
+    if not use_cffi and H.seed == 1234:
+      print("\nWarning, no C version found, this uses the slow Python version!\n")
   else:
     use_cffi = False
-  """
-  if use_cffi and H.dimension==1:
-    dim_x = tab_dim[0]
+  if use_cffi and H.dimension==1 and propagation.data_layout=='real':
+    local_wfc = wfc.ravel()
+    dim_x = H.tab_dim[0]
     boundary_condition = H.tab_boundary_condition[0]
-    script_tunneling = H.tab_script_tunneling[0]
+    tunneling = H.tab_tunneling[0]*H.two_over_delta_e
+    two_over_delta_e = H.two_over_delta_e
+    two_e0_over_delta_e = H.two_e0_over_delta_e
     max_order = propagation.tab_coef.size-1
-    nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
+#    nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
     assert max_order%2==0,"Max order {} must be an even number".format(max_order)
     if propagation.data_layout=='real':
       psi_old = np.zeros(2*dim_x)
-      psi = np.zeros(2*dim_x)
-    lib.chebyshev_clenshaw_real(dim_x,max_order,str.encode(H.boundary_condition),ffi.cast('double *',ffi.from_buffer(wfc)),ffi.cast('double *',ffi.from_buffer(psi)),ffi.cast('double *',ffi.from_buffer(psi_old)),H.script_tunneling,ffi.cast('double *',ffi.from_buffer(H.script_disorder)),ffi.cast('double *',ffi.from_buffer(propagation.tab_coef)),H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
-  else:
-    psi_old = np.zeros(dim_x,dtype=np.complex128)
-    psi = np.zeros(dim_x,dtype=np.complex128)
-#    print('Entering toto_che_complex')
-    lib.chebyshev_clenshaw_complex(dim_x,max_order,str.encode(H.boundary_condition),ffi.cast('double _Complex *',ffi.from_buffer(wfc)),ffi.cast('double _Complex *',ffi.from_buffer(psi)),ffi.cast('double _Complex *',ffi.from_buffer(psi_old)),H.script_tunneling,ffi.cast('double *',ffi.from_buffer(H.script_disorder)),ffi.cast('double *',ffi.from_buffer(propagation.tab_coef)),H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
-    timing.MAX_NONLINEAR_PHASE = nonlinear_phase[0]
+#      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_real_1d
+    else:  
+      psi_old = np.zeros(dim_x,dtype=np.complex128)
+#      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_complex_1d
+    psi = propagation.tab_coef[-1] * local_wfc
+    lib.elementary_clenshaw_step_real_1d(dim_x,str.encode(boundary_condition),ffi.cast('double *',ffi.from_buffer(local_wfc)),ffi.cast('double *',ffi.from_buffer(psi)),ffi.cast('double *',ffi.from_buffer(psi_old)),propagation.tab_coef[-2], 2.0, 0,tunneling,ffi.cast('double *',ffi.from_buffer(H.disorder)),two_over_delta_e,two_e0_over_delta_e)
+#    elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
+    for order in range(propagation.tab_coef.size-3,0,-2):
+      print(order,psi[0])
+      lib.elementary_clenshaw_step_real_1d(dim_x,str.encode(boundary_condition),ffi.cast('double *',ffi.from_buffer(local_wfc)),ffi.cast('double *',ffi.from_buffer(psi_old)),ffi.cast('double *',ffi.from_buffer(psi)),propagation.tab_coef[order], 2.0, 1,tunneling,ffi.cast('double *',ffi.from_buffer(H.disorder)),two_over_delta_e,two_e0_over_delta_e)
+      lib.elementary_clenshaw_step_real_1d(dim_x,str.encode(boundary_condition),ffi.cast('double *',ffi.from_buffer(local_wfc)),ffi.cast('double *',ffi.from_buffer(psi)),ffi.cast('double *',ffi.from_buffer(psi_old)),propagation.tab_coef[order-1], 2.0, 0,tunneling,ffi.cast('double *',ffi.from_buffer(H.disorder)),two_over_delta_e,two_e0_over_delta_e)
+    lib.elementary_clenshaw_step_real_1d(dim_x,str.encode(boundary_condition),ffi.cast('double *',ffi.from_buffer(local_wfc)),ffi.cast('double *',ffi.from_buffer(psi_old)),ffi.cast('double *',ffi.from_buffer(psi)),propagation.tab_coef[0], 1.0, 1,tunneling,ffi.cast('double *',ffi.from_buffer(H.disorder)),two_over_delta_e,two_e0_over_delta_e)
+#      elementary_clenshaw_step_routine(dim_x,local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
+#      elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
+#    elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
+  
     return
   else:
-  """
-  if not use_cffi:
     ntot = H.ntot
     max_order = propagation.tab_coef.size-1
     local_wfc = wfc.ravel()
@@ -325,6 +281,7 @@ def chebyshev_step(wfc, H, propagation,timing):
     psi = propagation.tab_coef[-1] * local_wfc
     elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
     for order in range(propagation.tab_coef.size-3,0,-2):
+      print(order,psi[0])
       elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
       elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
     elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)

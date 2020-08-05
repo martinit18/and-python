@@ -57,7 +57,7 @@ delta_t = 1.0
 use_cffi = False
 
 [Averaging]
-n_config = 10
+n_config = 1
 
 [Measurement]
 delta_t_measurement = 1.0
