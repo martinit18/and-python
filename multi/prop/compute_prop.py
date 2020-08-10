@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     Propagation = config['Propagation']
     method = Propagation.get('method','che')
-    use_cffi = Propagation.getboolean('use_cffi',True)
+    want_cffi = Propagation.getboolean('want_cffi',True)
     data_layout = Propagation.get('data_layout','real')
     t_max = Propagation.getfloat('t_max')
     delta_t = Propagation.getfloat('delta_t')
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     tab_k_0 = None
     tab_sigma_0 = None
     method = None
-    use_cffi = None
+    want_cffi = None
     data_layout = None
     t_max = None
     delta_t = None
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
-    method, use_cfft, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, use_cffi, data_layout, t_max, delta_t, i_tab_0))
+    method, want_cffi, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, want_cffi, data_layout, t_max, delta_t, i_tab_0))
     delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft))
 
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
 #  print(initial_state.overlap(initial_state))
 
 # Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method,data_layout=data_layout,use_cffi=use_cffi)
+  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method,data_layout=data_layout,want_cffi=want_cffi)
   # When computing an autocorrelation <psi(0)|psi(t)>, one can skip the first time steps, i.e. initialize
   # psi(0) with the wavefunction at some time tau. tau must be an integer multiple of delta_t_measurement.
   # args.first_step_autocorr is the integer tau/delta_t_measurement
@@ -273,10 +273,10 @@ if __name__ == "__main__":
 #  print(measurement.frequencies)
 #  print(measurement.measure_density,measurement_global.measure_density)
 #  print(measurement.density_final)
-  header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
-#  print(header_string)
-
   if rank==0:
+# At this point, it it not yet known whether there is a CFFI implementation available
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
+#  print(header_string)
 # Print the initial density in configuration space
     if measurement_global.measure_density:
       anderson.io.output_density('density_initial.dat',np.abs(initial_state.wfc)**2,tab_abscissa=initial_state.tab_position,header_string=header_string,data_type='density',file_type='savetxt')
@@ -334,6 +334,8 @@ if __name__ == "__main__":
 #    print(rank,global_timing.CHE_TIME)
 #    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
+# After the calculation, whether the CFFI implementation has been used is known, hence recompute the header string
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
     tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
     if (measurement_global.measure_density):
       anderson.io.output_density('density_final.dat',measurement_global.density_final,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='density')

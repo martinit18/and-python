@@ -45,7 +45,7 @@ t_max = 25.0
 delta_t = 1.0
 
 [Averaging]
-n_config = 10
+n_config = 100
 
 [Measurement]
 delta_t_measurement = 1.0
@@ -53,10 +53,10 @@ delta_t_measurement = 1.0
 #density = True
 density_momentum = True
 #dispersion_position = True
-dispersion_momentum = True
+#dispersion_momentum = True
 #dispersion_energy = True
 #wavefunction_final = True
-#autocorrelation = True
+autocorrelation = True
 dispersion_variance = True
 use_mkl_fft = True
 

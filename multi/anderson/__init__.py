@@ -62,6 +62,7 @@ class Potential:
   def __init__(self, dimension, tab_dim):
     self.dimension = dimension
     self.tab_dim = tab_dim
+#    self.array_dim = np.array(tab_dim,dtype=np.intc)
     self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
     ntot = 1
     self.tab_dim_cumulative[dimension] = 1
@@ -87,10 +88,13 @@ class Hamiltonian(Potential):
     self.tab_tunneling = list()
     self.delta_vol = 1.0
     self.diagonal = 0.0
+    self.array_boundary_condition = np.zeros(dimension,dtype=np.intc)
     for i in range(dimension):
       self.tab_tunneling.append(0.5/tab_delta[i]**2)
       self.delta_vol *= tab_delta[i]
       self.diagonal += 1.0/tab_delta[i]**2
+      if tab_boundary_condition[i]=='periodic':
+        self.array_boundary_condition[i] = 1
     self.interaction = interaction
     self.tab_boundary_condition = tab_boundary_condition
     self.disorder_type = disorder_type
@@ -428,7 +432,23 @@ class Hamiltonian(Potential):
   """
 
   def apply_h(self, wfc):
-    return self.sparse_matrix.dot(wfc.ravel())
+    if self.dimension==1:
+      dim_x = self.tab_dim[0]
+      tunneling = self.tab_tunneling[0]
+      if wfc.dtype==np.float64:
+        rhs = np.empty(dim_x,dtype=np.float64)
+      else:
+        rhs = np.empty(dim_x,dtype=np.complex128)
+      if self.tab_boundary_condition[0]=='periodic':
+        rhs[0]       = -tunneling * (wfc[dim_x-1] + wfc[1]) + self.disorder[0] * wfc[0]
+        rhs[dim_x-1] = -tunneling * (wfc[dim_x-2] + wfc[0]) + self.disorder[dim_x-1] * wfc[dim_x-1]
+      else:
+        rhs[0]       = -tunneling * wfc[1]       + self.disorder[0]       * wfc[0]
+        rhs[dim_x-1] = -tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
+      rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
+      return rhs
+    else:
+      return self.sparse_matrix.dot(wfc.ravel())
 
   """
   Try to estimate bounds of the spectrum of The Hamiltonian
@@ -628,9 +648,10 @@ class Wavefunction:
 #      non_linear_energy = 0.5*H.interaction*np.sum(np.abs(self.wfc)**4)*self.delta_vol
       non_linear_energy = 0.5*H.interaction*np.sum((self.wfc.real**2+self.wfc.imag**2)**2)*self.delta_vol
 #    energy = np.sum(np.real(self.wfc.ravel()*np.conjugate(H.apply_h(self.wfc))))*self.delta_vol + non_linear_energy
+#    print(self.wfc.ravel().real.dtype,self.wfc.real.dtype,H.apply_h(self.wfc.real).dtype)
     energy = np.sum(self.wfc.ravel().real*H.apply_h(self.wfc.real)+self.wfc.ravel().imag*H.apply_h(self.wfc.imag))*self.delta_vol + non_linear_energy
     norm = np.linalg.norm(self.wfc)**2*self.delta_vol
-#  print('norm=',norm,energy,non_linear_energy)
+#    print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm
 
 #def expectation_value_local_operator(wfc, local_operator):

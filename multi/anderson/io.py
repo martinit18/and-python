@@ -11,7 +11,8 @@ import numpy as np
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None):
   params_string = 'Disorder type                   = '+H.disorder_type+'\n'\
                  +'Correlation length              = '+str(H.correlation_length)+'\n'\
-                 +'Dimension                       = '+str(H.dimension)+'\n'
+                 +'Dimension                       = '+str(H.dimension)+'\n'\
+                 +'use MKL random number generator = '+str(H.use_mkl_random)+'\n'
   volume = 1.0
   for i in range(H.dimension):
     volume *= H.tab_dim[i]*H.tab_delta[i]
@@ -42,8 +43,12 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not propagation == None:
     params_string += \
                   'Integration Method              = '+propagation.method+'\n'\
+                 +'data layout                     = '+propagation.data_layout+'\n'\
                  +'time step                       = '+str(propagation.delta_t)+'\n'\
                  +'total time                      = '+str(propagation.t_max)+'\n'
+    if propagation.method=='che':
+      params_string += \
+                  'use CFFI implementation         = '+str(propagation.use_cffi)+'\n'
   if not measurement == None:
     params_string += \
                   'time step for measurement       = '+str(measurement.delta_t_measurement)+'\n'

@@ -48,30 +48,30 @@ sigma_0_2 = 10.0
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
-data_layout = real
-#data_layout = complex
+#data_layout = real
+data_layout = complex
 # Total duration of the propagation
 t_max = 25.0
 # Elementary time step
 delta_t = 1.0
-use_cffi = False
+#want_cffi = False
 
 [Averaging]
-n_config = 1
+n_config = 100
 
 [Measurement]
 delta_t_measurement = 1.0
 #first_measurement = 0
-#density = True
+density = True
 density_momentum = True
-#dispersion_position = True
-#dispersion_position2 = True
+dispersion_position = True
+dispersion_position2 = True
 dispersion_momentum = True
 dispersion_energy = True
 dispersion_variance = True
-#wavefunction = True
-#wavefunction_momentum = True
-#autocorrelation = True
+wavefunction = True
+wavefunction_momentum = True
+autocorrelation = True
 use_mkl_fft = True
 
 [Spectral]
