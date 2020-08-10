@@ -66,7 +66,7 @@ import getpass
 import copy
 import configparser
 import sys
-sys.path.append('../')
+#sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 

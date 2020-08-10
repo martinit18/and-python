@@ -19,16 +19,16 @@ boundary_condition_4 = periodic
 [Disorder]
 #  Various disorder types can be used
 # type = anderson
-# type = anderson_gaussian
+type = anderson_gaussian
 # type = regensburg
-type = konstanz
+# type = konstanz
 # type = singapore
 # type = speckle
 use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 1.0
+V0 = 0.2
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -48,29 +48,29 @@ sigma_0_2 = 10.0
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
-#data_layout = real
-data_layout = complex
+data_layout = real
+#data_layout = complex
 # Total duration of the propagation
-t_max = 25.0
+t_max = 2000.0
 # Elementary time step
 delta_t = 1.0
 #want_cffi = False
 
 [Averaging]
-n_config = 100
+n_config = 8
 
 [Measurement]
 delta_t_measurement = 1.0
 #first_measurement = 0
-density = True
-density_momentum = True
-dispersion_position = True
-dispersion_position2 = True
+#density = True
+#density_momentum = True
+#dispersion_position = True
+#dispersion_position2 = True
 dispersion_momentum = True
 dispersion_energy = True
 dispersion_variance = True
-wavefunction = True
-wavefunction_momentum = True
+#wavefunction = True
+#wavefunction_momentum = True
 autocorrelation = True
 use_mkl_fft = True
 

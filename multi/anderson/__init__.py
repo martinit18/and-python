@@ -413,23 +413,6 @@ class Hamiltonian(Potential):
   """
   Apply Hamiltonian on a wavefunction
   """
-  """
-  def apply_h(self, wfc):
-    dim_x = self.dim_x
-    rhs = np.empty(dim_x,dtype=np.complex128)
-    if self.boundary_condition=='periodic':
-      rhs[0]       = -self.tunneling * (wfc[dim_x-1] + wfc[1]) + self.disorder[0] * wfc[0]
-      rhs[dim_x-1] = -self.tunneling * (wfc[dim_x-2] + wfc[0]) + self.disorder[dim_x-1] * wfc[dim_x-1]
-    else:
-      rhs[0]       = -self.tunneling * wfc[1]       + self.disorder[0]       * wfc[0]
-      rhs[dim_x-1] = -self.tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
-    rhs[1:dim_x-1] = -self.tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
-    return rhs
-  """
-
-  """
-  Apply Hamiltonian on a wavefunction
-  """
 
   def apply_h(self, wfc):
     if self.dimension==1:

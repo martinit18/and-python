@@ -146,29 +146,8 @@ def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, a
         psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+1j*c_coef*wfc[0]-psi_old[0]
         psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
       psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+1j*c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-#  print('out',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+#  print('out',wfc[0],psi[0],psi_old[0])
   return
-
-
-"""
-# What follows is a very simplified version of the routine, removing as many if as possible
-def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
-#  print('wfc',wfc.shape,wfc.dtype)
-#  print('psi',psi.shape,psi.dtype)
-#  print('psi_old',psi_old.shape,psi_old.dtype)
-#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
-  dim_x = H.tab_dim[0]
-  if add_real:
-    psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
-    psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-  else:
-    psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+1j*c_coef*wfc[0]-psi_old[0]
-    psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+1j*c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-#  print('out',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
-  return
-"""
 
 def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
 #  print('wfc',wfc.shape,wfc.dtype)
@@ -221,24 +200,12 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_
 # ,H.two_over_delta_e,H.two_e0_over_delta_e,H.tab_tunneling[0],c_coef,one_or_two,add_real)
   return
 
-
-"""
-The two routines chebyshev_step_clenshaw_python and chebyshev_step_clenshaw_cffi should be completely equivalent
-The first use pure Python, the second one uses a C code and cffi (roughly 10 times faster)
-"""
-
 def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
   if propagation.use_cffi:
-#    print(dir(lib))
     local_wfc = wfc.ravel()
     ntot = H.ntot
- #   boundary_condition = H.tab_boundary_condition[0]
- #   tunneling = H.tab_tunneling[0]*H.two_over_delta_e
- #   two_over_delta_e = H.two_over_delta_e
- #   two_e0_over_delta_e = H.two_e0_over_delta_e
     max_order = propagation.tab_coef.size-1
     nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
-#    nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
     assert max_order%2==0,"Max order {} must be an even number".format(max_order)
     if propagation.data_layout=='real':
       psi_old = np.zeros(2*ntot)
@@ -247,8 +214,8 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     else:
       psi_old = np.zeros(ntot,dtype=np.complex128)
       psi     = np.zeros(ntot,dtype=np.complex128)
-      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
-##
+      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+
     """
 #      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_complex_1d
     psi = propagation.tab_coef[-1] * local_wfc
@@ -285,8 +252,8 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
       elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
       elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
     elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
-#    print('end_no_cffi',psi[0],psi[1],psi[ntot-1])
-    local_wfc[:]=psi[:]
+#    print('end_no_cffi',psi[100],psi_old[100],wfc[100])
+#    local_wfc[:]=psi[:]
   #  print(H.medium_energy)
     if H.interaction==0.0:
       phase = propagation.delta_t*H.medium_energy
@@ -308,28 +275,8 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     else:
         local_wfc[:] = psi[:] * (cos_phase-1j*sin_phase)
   #  print(psi[2000],wfc[2000])
-#    print('endend_no_cffi',local_wfc[0],local_wfc[1],local_wfc[ntot-1],local_wfc[ntot])
+#    print('endend_no_cffi',local_wfc[0],local_wfc[1],local_wfc[ntot-1])
     return
-
-"""
-def chebyshev_step_clenshaw_cffi(wfc, H, propagation,timing):
-  from anderson._chebyshev import ffi,lib
-  dim_x = H.dim_x
-  max_order = propagation.tab_coef.size-1
-  nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
-  assert max_order%2==0,"Max order {} must be an even number".format(max_order)
-  if propagation.data_layout=='real':
-    psi_old = np.zeros(2*dim_x)
-    psi = np.zeros(2*dim_x)
-    lib.chebyshev_clenshaw_real(dim_x,max_order,str.encode(H.boundary_condition),ffi.cast('double *',ffi.from_buffer(wfc)),ffi.cast('double *',ffi.from_buffer(psi)),ffi.cast('double *',ffi.from_buffer(psi_old)),H.script_tunneling,ffi.cast('double *',ffi.from_buffer(H.script_disorder)),ffi.cast('double *',ffi.from_buffer(propagation.tab_coef)),H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
-  else:
-    psi_old = np.zeros(dim_x,dtype=np.complex128)
-    psi = np.zeros(dim_x,dtype=np.complex128)
-#    print('Entering toto_che_complex')
-    lib.chebyshev_clenshaw_complex(dim_x,max_order,str.encode(H.boundary_condition),ffi.cast('double _Complex *',ffi.from_buffer(wfc)),ffi.cast('double _Complex *',ffi.from_buffer(psi)),ffi.cast('double _Complex *',ffi.from_buffer(psi_old)),H.script_tunneling,ffi.cast('double *',ffi.from_buffer(H.script_disorder)),ffi.cast('double *',ffi.from_buffer(propagation.tab_coef)),H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
-  timing.MAX_NONLINEAR_PHASE = nonlinear_phase[0]
-  return
-"""
 
 def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """Returns rhs of Gross-Pitaevskii equation with discretized space
@@ -737,19 +684,6 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
   def solout(t,y):
     timing.N_SOLOUT+=1
     return None
-  """
-  Determines whether the cffi version is present
-  If not, use Python version
-  """
-  """
-  from anderson._chebyshev import ffi,lib
-#    chebyshev_step = chebyshev_step_clenshaw_cffi
-    if debug: print('Using CFFI version')
-  except ImportError:
-    chebyshev_step = chebyshev_step_clenshaw_python
-    if i_seed == 0:
-      print("\nWarning, this uses the slow Python version, you should build the C version!\n")
-  """
 
   start_dummy_time=timeit.default_timer()
 #  dimension = H.dimension
