@@ -167,6 +167,12 @@ if __name__ == "__main__":
     v_min = Wigner.getfloat('v_min')
     v_max = Wigner.getfloat('v_max')
     multiplicative_factor_for_wfc = Wigner.getfloat('multiplicative_factor_for_wfc',1.0)
+    multiplicative_factor_for_density = Wigner.getfloat('multiplicative_factor_for_density',0.0)
+    if multiplicative_factor_for_density==0.0:
+      multiplicative_factor_for_density = multiplicative_factor_for_wfc**2
+    plot_individuals = Wigner.getboolean('plot_individuals',True)
+    plot_global = Wigner.getboolean('plot_global',True)
+
   else:
     n_config = None
     system_size = None
@@ -231,95 +237,186 @@ if __name__ == "__main__":
   tab_p = np.arange(-delta_p*(dim_x//2),delta_p*(dim_x//2),step=delta_p)
   i_max = np.argmax(tab_p>p_max)
   i_min = np.argmax(tab_p>-p_max)
-  #print(i_min,tab_p[i_min],i_max,tab_p[i_max],delta_p)
   tab_kinetic_energy = (1.0-np.cos(tab_p*delta_x))/delta_x**2
-  #print(tab_p,tab_kinetic_energy)
-  for i in range(number_of_energy_levels):
-    if np.amax(tab_wfc[:,i])<-np.amin(tab_wfc[:,i]):
-      tab_wfc[:,i]=-tab_wfc[:,i]
-    np.savetxt('wigner'+str(i+1)+'.dat',tab_wigner[:,:,i])
-#    np.savetxt('wigner'+str(i)+'_x.dat',np.column_stack([initial_state.position,np.sum(tab_wigner[:,:,i],axis=0)/dim_x]))
- #   print(i,np.sum(np.abs(tab_wfc[:,i])**2)*delta_x,np.sum(tab_wigner[:,:,i])*delta_x*delta_p)
-#    np.savetxt('pipo.dat',tab_wigner[:,100,i])
-#    np.savetxt('pipo2.dat',tab_wigner[:,600,i])
-#    x_wfc = np.sum(np.abs(tab_wfc[:,i])**2*initial_state.position*delta_x)
-#    x_wigner = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*initial_state.position*delta_x/dim_x)
-#    print(i,x_wfc,x_wigner)
-    energy_potential = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*(H.disorder-2.0*H.tunneling)*delta_x*delta_p)
-    energy_kinetic = energy[i]-energy_potential
-    energy_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*landscape*delta_x*delta_p)
-    energy_kinetic_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=1)*delta_x*delta_p*tab_kinetic_energy)
-    if abs(energy_kinetic_landscape/energy_kinetic-1.0)>0.01:
-      print('Warning, problem with kinetic energy!')
-      print('Kinetic energy from potential = ',energy_kinetic)
-      print('Kinetic energy from Wigner    = ',energy_kinetic_landscape)
-#    print(i,energy_landscape,energy_kinetic_landscape,energy_landscape+energy_kinetic_landscape)
-#    fig, axs = plt.subplots(2,sharex=True,constrained_layout=True)
-#    plt.figure(dpi=300)
+#  print(i_min,tab_p[i_min],tab_kinetic_energy[i_min],i_max,tab_p[i_max-1],tab_kinetic_energy[i_max-1],delta_p)
+  number_of_levels = 10
+  level_max = 0.5*p_max**2+2*V0
+  raw_levels = np.linspace(level_max/number_of_levels,level_max,num=number_of_levels)
+  if plot_individuals:
+    for i in range(number_of_energy_levels):
+      if np.amax(tab_wfc[:,i])<-np.amin(tab_wfc[:,i]):
+        tab_wfc[:,i]=-tab_wfc[:,i]
+      np.savetxt('wigner'+str(i+1)+'.dat',tab_wigner[:,:,i])
+  #    np.savetxt('wigner'+str(i)+'_x.dat',np.column_stack([initial_state.position,np.sum(tab_wigner[:,:,i],axis=0)/dim_x]))
+   #   print(i,np.sum(np.abs(tab_wfc[:,i])**2)*delta_x,np.sum(tab_wigner[:,:,i])*delta_x*delta_p)
+  #    np.savetxt('pipo.dat',tab_wigner[:,100,i])
+  #    np.savetxt('pipo2.dat',tab_wigner[:,600,i])
+  #    x_wfc = np.sum(np.abs(tab_wfc[:,i])**2*initial_state.position*delta_x)
+  #    x_wigner = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*initial_state.position*delta_x/dim_x)
+  #    print(i,x_wfc,x_wigner)
+      energy_potential = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*(H.disorder-2.0*H.tunneling)*delta_x*delta_p)
+      energy_kinetic = energy[i]-energy_potential
+      energy_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*landscape*delta_x*delta_p)
+      energy_kinetic_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=1)*delta_x*delta_p*tab_kinetic_energy)
+      if abs(energy_kinetic_landscape/energy_kinetic-1.0)>0.01:
+        print('Warning, problem with kinetic energy!')
+        print('Kinetic energy from potential = ',energy_kinetic)
+        print('Kinetic energy from Wigner    = ',energy_kinetic_landscape)
+  #    print(i,energy_landscape,energy_kinetic_landscape,energy_landscape+energy_kinetic_landscape)
+  #    fig, axs = plt.subplots(2,sharex=True,constrained_layout=True)
+  #    plt.figure(dpi=300)
+      fig, axs = plt.subplots(2,sharex=True)
+  #    fig.subplots_adjust(hspace=0.5)
+      axs[0].plot(initial_state.position,landscape,color='blue')
+      axs[0].plot(initial_state.position,energy[i]+multiplicative_factor_for_wfc*tab_wfc[:,i],color='red')
+      axs[0].plot(initial_state.position,H.disorder-2.0*H.tunneling,color='grey',linewidth=0.5)
+      axs[0].text(-0.7*system_size,v_min,'Landscape',color='blue',rotation='vertical')
+      axs[0].text(-0.75*system_size,v_min,'Wavefunction',color='red',rotation='vertical')
+      axs[0].text(-0.65*system_size,v_min,'Potential',color='grey',rotation='vertical')
+      axs[0].axis([-0.5*system_size,0.5*system_size,v_min,v_max])
+      my_string='From true potential: E='+"{:.4f}".format(energy[i])+' E_pot='+"{:.4f}".format(energy_potential)+' E_kin='+"{:.4f}".format(energy_kinetic)
+      axs[0].text(-0.5*system_size,1.3*v_max-0.3*v_min,my_string)
+      my_string='From landscape:                       E_pot='+"{:.4f}".format(energy_landscape)+' E_kin='+"{:.4f}".format(energy[i]-energy_landscape)
+      axs[0].text(-0.5*system_size,1.1*v_max-0.1*v_min,my_string,color='blue')
+      w_max = np.amax(tab_wigner[i_min:i_max,:,i])
+  #    print('w_max=',w_max)
+      xlist = initial_state.position
+      ylist = tab_p[i_min:i_max]
+      Z = np.zeros((ylist.size,xlist.size))
+      for j in range(xlist.size):
+        Z[:,j] = tab_kinetic_energy[i_min:i_max]+landscape[j]
+      insert_position = np.argmax(raw_levels>energy[i])
+  #    print(raw_levels)
+  #    print(insert_position)
+      levels = np.insert(raw_levels,insert_position,energy[i])
+  #    print(levels)
+      linewidths=0.4*np.ones(number_of_levels+1)
+      linewidths[insert_position]=1.0
+      linestyles=["dotted" for j in range(number_of_levels+1)]
+      linestyles[insert_position]="solid"
+  #    print(linestyles)
+      axs[1].contour(xlist,ylist,Z,colors='black',linewidths=linewidths,linestyles=linestyles,levels=levels)
+      im=axs[1].imshow(tab_wigner[i_min:i_max,:,i],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
+      axs[1].set_xlabel('Position')
+      axs[1].set_ylabel('Momentum')
+      plt.title('Wigner function and contours of landscape+p**2/2')
+      cbaxes = fig.add_axes([0.87, 0.12, 0.03, 0.32])
+      cb = plt.colorbar(im, cax = cbaxes)
+  #    fig.colorbar(im)
+      fig.subplots_adjust(hspace=0.4)
+      fig.subplots_adjust(bottom=0.12, left=0.18, right=0.85, top=0.85)
+      """
+      plt.subplot(221)
+      plt.plot(initial_state.position,landscape,color='blue')
+      plt.plot(initial_state.position,energy[i]+multiplicative_factor_for_wfc*tab_wfc[:,i],color='red')
+      plt.text(-0.6*system_size,v_min,'Landscape',color='blue',rotation='vertical')
+      plt.text(-0.65*system_size,v_min,'Wavefunction',color='red',rotation='vertical')
+      plt.axis([-0.5*system_size,0.5*system_size,v_min,v_max])
+      w_max = np.amax(tab_wigner[i_min:i_max,:,i])
+      print('w_max=',w_max)
+      plt.subplot(223)
+      im=plt.imshow(tab_wigner[i_min:i_max,:,i],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
+      plt.subplots_adjust(bottom=0.0, left=0.0, right=1.0, top=1.0)
+      plt.xlabel('Position')
+      plt.ylabel('Momentum')
+      plt.subplot(224)
+      plt.colorbar()
+      """
+
+      plt.savefig('figure'+str(i+1)+'.png', dpi=300)
+      plt.show()
+  if plot_global:
+# Sum all Wigner functions
+    global_wigner = np.sum(tab_wigner,axis=2)/number_of_energy_levels
+    global_density = np.sum(tab_wfc**2,axis=1)/number_of_energy_levels
+    np.savetxt('global_wigner.dat',global_wigner)
     fig, axs = plt.subplots(2,sharex=True)
 #    fig.subplots_adjust(hspace=0.5)
     axs[0].plot(initial_state.position,landscape,color='blue')
-    axs[0].plot(initial_state.position,energy[i]+multiplicative_factor_for_wfc*tab_wfc[:,i],color='red')
+    axs[0].plot(initial_state.position,targeted_energy+multiplicative_factor_for_density*global_density,color='red')
     axs[0].plot(initial_state.position,H.disorder-2.0*H.tunneling,color='grey',linewidth=0.5)
     axs[0].text(-0.7*system_size,v_min,'Landscape',color='blue',rotation='vertical')
-    axs[0].text(-0.75*system_size,v_min,'Wavefunction',color='red',rotation='vertical')
+    axs[0].text(-0.75*system_size,v_min,'Density',color='red',rotation='vertical')
     axs[0].text(-0.65*system_size,v_min,'Potential',color='grey',rotation='vertical')
+    my_string="Targeted energy = {:.4f}  V0 = {:.4f}".format(targeted_energy,V0)
+    axs[0].text(-0.25*system_size,1.3*v_max-0.3*v_min,my_string)
+    my_string="Number of energy levels = {}".format(number_of_energy_levels)
+    axs[0].text(-0.25*system_size,1.1*v_max-0.1*v_min,my_string)
     axs[0].axis([-0.5*system_size,0.5*system_size,v_min,v_max])
-    my_string='From true potential: E='+"{:.4f}".format(energy[i])+' E_pot='+"{:.4f}".format(energy_potential)+' E_kin='+"{:.4f}".format(energy_kinetic)
-    axs[0].text(-0.5*system_size,1.3*v_max-0.3*v_min,my_string)
-    my_string='From landscape:                       E_pot='+"{:.4f}".format(energy_landscape)+' E_kin='+"{:.4f}".format(energy[i]-energy_landscape)
-    axs[0].text(-0.5*system_size,1.1*v_max-0.1*v_min,my_string,color='blue')
-    w_max = np.amax(tab_wigner[i_min:i_max,:,i])
+    w_max = np.amax(global_wigner[i_min:i_max,:])
 #    print('w_max=',w_max)
-    im=axs[1].imshow(tab_wigner[i_min:i_max,:,i],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
+    xlist = initial_state.position
+    ylist = tab_p[i_min:i_max]
+    Z = np.zeros((ylist.size,xlist.size))
+
+    for j in range(xlist.size):
+      Z[:,j] = tab_kinetic_energy[i_min:i_max]+landscape[j]
+    insert_position = np.argmax(raw_levels>targeted_energy)
+#    print(raw_levels)
+#    print(insert_position)
+    levels = np.insert(raw_levels,insert_position,targeted_energy)
+#    print(levels)
+    linewidths=0.4*np.ones(number_of_levels+1)
+    linewidths[insert_position]=1.0
+    linestyles=["dotted" for j in range(number_of_levels+1)]
+    linestyles[insert_position]="solid"
+#    print(linestyles)
+    axs[1].contour(xlist,ylist,Z,colors='black',linewidths=linewidths,linestyles=linestyles,levels=levels)
+    im=axs[1].imshow(global_wigner[i_min:i_max,:],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
     axs[1].set_xlabel('Position')
     axs[1].set_ylabel('Momentum')
-    plt.title('Wigner function')
+    plt.title('Average Wigner function and contours of landscape+p**2/2',fontsize=10)
     cbaxes = fig.add_axes([0.87, 0.12, 0.03, 0.32])
     cb = plt.colorbar(im, cax = cbaxes)
- #   fig.colorbar(im)
+#    fig.colorbar(im)
     fig.subplots_adjust(hspace=0.4)
     fig.subplots_adjust(bottom=0.12, left=0.18, right=0.85, top=0.85)
-    """
-    plt.subplot(221)
-    plt.plot(initial_state.position,landscape,color='blue')
-    plt.plot(initial_state.position,energy[i]+multiplicative_factor_for_wfc*tab_wfc[:,i],color='red')
-    plt.text(-0.6*system_size,v_min,'Landscape',color='blue',rotation='vertical')
-    plt.text(-0.65*system_size,v_min,'Wavefunction',color='red',rotation='vertical')
-    plt.axis([-0.5*system_size,0.5*system_size,v_min,v_max])
-    w_max = np.amax(tab_wigner[i_min:i_max,:,i])
-    print('w_max=',w_max)
-    plt.subplot(223)
-    im=plt.imshow(tab_wigner[i_min:i_max,:,i],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
-    plt.subplots_adjust(bottom=0.0, left=0.0, right=1.0, top=1.0)
-    plt.xlabel('Position')
-    plt.ylabel('Momentum')
-    plt.subplot(224)
-    plt.colorbar()
-    """
-
-    plt.savefig('figure'+str(i+1)+'.png', dpi=300)
+    plt.savefig('global_landscape_figure.png', dpi=300)
     plt.show()
-#  tab_IPR = np.zeros(n_config)
-#  tab_energy = np.zeros(n_config)
-  # Here starts the loop over disorder configurations
-#  for i in range(n_config):
-#    tab_energy[i], tab_IPR[i] = diagonalization.compute_IPR(i+rank*n_config, H)
-#    print(IPR)
-  #  pool.apply_async(gpe_evolution, args)
-  #  print(str(i), file=final_pf)
-#  anderson.io.output_density('IPR'+str(rank)+'.dat',tab_IPR,tab_energy,header_string,print_type='IPR')
 
-#  if mpi_version:
-#    start_mpi_time = timeit.default_timer()
-#    tab_energy_glob = np.zeros(n_config*nprocs)
-#    tab_IPR_glob = np.zeros(n_config*nprocs)
-#    comm.Gather(tab_energy,tab_energy_glob)
-#    comm.Gather(tab_IPR,tab_IPR_glob)
-#    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
-#  else:
-#    tab_energy_glob = tab_energy
-#    tab_IPR_glob = tab_IPR
+    fig, axs = plt.subplots(2,sharex=True)
+#    fig.subplots_adjust(hspace=0.5)
+    axs[0].plot(initial_state.position,landscape,color='blue')
+    axs[0].plot(initial_state.position,targeted_energy+multiplicative_factor_for_density*global_density,color='red')
+    axs[0].plot(initial_state.position,H.disorder-2.0*H.tunneling,color='grey',linewidth=0.5)
+    axs[0].text(-0.7*system_size,v_min,'Landscape',color='blue',rotation='vertical')
+    axs[0].text(-0.75*system_size,v_min,'Density',color='red',rotation='vertical')
+    axs[0].text(-0.65*system_size,v_min,'Potential',color='grey',rotation='vertical')
+    my_string="Targeted energy = {:.4f}  V0 = {:.4f}".format(targeted_energy,V0)
+    axs[0].text(-0.25*system_size,1.3*v_max-0.3*v_min,my_string)
+    my_string="Number of energy levels = {}".format(number_of_energy_levels)
+    axs[0].text(-0.25*system_size,1.1*v_max-0.1*v_min,my_string)
+    axs[0].axis([-0.5*system_size,0.5*system_size,v_min,v_max])
+    w_max = np.amax(global_wigner[i_min:i_max,:])
+#    print('w_max=',w_max)
+    xlist = initial_state.position
+    ylist = tab_p[i_min:i_max]
+    for j in range(xlist.size):
+      Z[:,j] = tab_kinetic_energy[i_min:i_max]+H.disorder[j]-2.0*H.tunneling
+    insert_position = np.argmax(raw_levels>targeted_energy)
+#    print(raw_levels)
+#    print(insert_position)
+    levels = np.insert(raw_levels,insert_position,targeted_energy)
+#    print(levels)
+    linewidths=0.4*np.ones(number_of_levels+1)
+    linewidths[insert_position]=1.0
+    linestyles=["dotted" for j in range(number_of_levels+1)]
+    linestyles[insert_position]="solid"
+#    print(linestyles)
+    axs[1].contour(xlist,ylist,Z,colors='black',linewidths=linewidths,linestyles=linestyles,levels=levels)
+    im=axs[1].imshow(global_wigner[i_min:i_max,:],origin='lower',interpolation='nearest',aspect='auto',extent=[-0.5*system_size,0.5*system_size,-p_max,p_max],cmap='seismic',vmin=-w_max,vmax=w_max)
+    axs[1].set_xlabel('Position')
+    axs[1].set_ylabel('Momentum')
+    plt.title('Average Wigner function and contours of potential+p**2/2',fontsize=10)
+    cbaxes = fig.add_axes([0.87, 0.12, 0.03, 0.32])
+    cb = plt.colorbar(im, cax = cbaxes)
+#    fig.colorbar(im)
+    fig.subplots_adjust(hspace=0.4)
+    fig.subplots_adjust(bottom=0.12, left=0.18, right=0.85, top=0.85)
+    plt.savefig('global_potential_figure.png', dpi=300)
+    plt.show()
+
+
   t2=time.perf_counter()
   timing.TOTAL_TIME = t2-t1
 #  if mpi_version:
