@@ -770,7 +770,7 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
 #  print('start gen disorder',timeit.default_timer())
   H.generate_disorder(seed=i_seed+1234)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-  if H.dimension>1:
+  if H.dimension>2:
     H.generate_sparse_matrix()
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
   if propagation.data_layout=='real':
@@ -862,7 +862,7 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
 #      print(timing.MAX_NONLINEAR_PHASE)
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
-      timing.NUMBER_OF_OPS+=(14.0+4.0*H.dimension)*ntot*propagation.tab_coef.size
+      timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*ntot*propagation.tab_coef.size
     if i_prop==measurement.tab_i_measurement[i_tab]:
       start_dummy_time=timeit.default_timer()
       if (propagation.method == 'ode'): y=solver.y
