@@ -283,11 +283,11 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     if propagation.data_layout=='real':
       psi_old = np.zeros(2*ntot)
       psi     = np.zeros(2*ntot)
-      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
     else:
       psi_old = np.zeros(ntot,dtype=np.complex128)
       psi     = np.zeros(ntot,dtype=np.complex128)
-      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
 
     """
 #      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_complex_1d
@@ -800,14 +800,18 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
     accuracy = 1.e-6
     propagation.compute_chebyshev_coefficients(accuracy,timing)
     if propagation.want_cffi:
+#      print('I want CFFI')
       try:
         from anderson._chebyshev import ffi,lib
         if propagation.data_layout == 'real':
 #        print('chebyshev_clenshaw_real_'+str(H.dimension)+'d')
-          propagation.use_cffi =  hasattr(lib,'chebyshev_real') and hasattr(lib,'elementary_clenshaw_step_real_real_coef_'+str(H.dimension)+'d')
+          propagation.use_cffi =  hasattr(lib,'chebyshev_real') and hasattr(lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
         if propagation.data_layout == 'complex':
-          propagation.use_cffi =  hasattr(lib,'chebyshev_complex') and hasattr(lib,'elementary_clenshaw_step_complex_real_coef_'+str(H.dimension)+'d')
+#          print(hasattr(lib,'chebyshev_complex'))
+#          print(hasattr(lib,'elementary_clenshaw_step_complex_real_coef_'+str(H.dimension)+'d'))
+          propagation.use_cffi =  hasattr(lib,'chebyshev_complex') and hasattr(lib,'elementary_clenshaw_step_complex_'+str(H.dimension)+'d')
       except ImportError:
+#        print('Could not import ffi')
         propagation.use_cffi = False
         ffi = None
         lib = None

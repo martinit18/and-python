@@ -48,8 +48,8 @@ sigma_0_2 = 10.0
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
-data_layout = real
-#data_layout = complex
+#data_layout = real
+data_layout = complex
 # Total duration of the propagation
 t_max = 200.0
 # Elementary time step
