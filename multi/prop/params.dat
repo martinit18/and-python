@@ -2,7 +2,7 @@
 dimension = 1
 # System size in natural units
 size_1 = 20000.
-size_2 = 20.
+size_2 = 100.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
@@ -51,13 +51,13 @@ method = che
 data_layout = real
 #data_layout = complex
 # Total duration of the propagation
-t_max = 2000.0
+t_max = 200.0
 # Elementary time step
 delta_t = 1.0
 #want_cffi = False
 
 [Averaging]
-n_config = 8
+n_config = 1
 
 [Measurement]
 delta_t_measurement = 1.0
@@ -66,9 +66,9 @@ delta_t_measurement = 1.0
 #density_momentum = True
 #dispersion_position = True
 #dispersion_position2 = True
-dispersion_momentum = True
-dispersion_energy = True
-dispersion_variance = True
+#dispersion_momentum = True
+#dispersion_energy = True
+#dispersion_variance = True
 #wavefunction = True
 #wavefunction_momentum = True
 autocorrelation = True

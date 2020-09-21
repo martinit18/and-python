@@ -75,81 +75,33 @@ def apply_minus_i_h_gpe_real(wfc, H, rhs):
     rhs[ntot:2*ntot]=-H.sparse_matrix.dot(wfc[0:ntot])-non_linear_phase*wfc[0:ntot]
   return
 
-"""
-def apply_minus_i_h_gpe_complex(wfc, H, rhs):
-  dim_x = H.dim_x
-  if (H.interaction == 0.0):
-    H.diagonal_term=H.disorder
-  else:
-    H.diagonal_term=H.disorder+H.interaction*(np.abs(wfc)**2)
-  if H.boundary_condition=='periodic':
-    rhs[0]       = 1j * (H.tunneling * (wfc[dim_x-1] + wfc[1]) - H.diagonal_term[0] * wfc[0])
-    rhs[dim_x-1] = 1j * (H.tunneling * (wfc[dim_x-2] + wfc[0]) - H.diagonal_term[dim_x-1] * wfc[dim_x-1])
-  else:
-    rhs[0]       = 1j * (H.tunneling * wfc[1]       - H.diagonal_term[0]       * wfc[0])
-    rhs[dim_x-1] = 1j * (H.tunneling * wfc[dim_x-2] - H.diagonal_term[dim_x-1] * wfc[dim_x-1])
-  rhs[1:dim_x-1] = 1j * (H.tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) - H.diagonal_term[1:dim_x-1] * wfc[1:dim_x-1])
-  return rhs
-
-def apply_minus_i_h_gpe_real(wfc, H, rhs):
-  dim_x = H.dim_x
-  if (H.interaction == 0.0):
-    H.diagonal_term=H.disorder
-  else:
-    H.diagonal_term=H.disorder+H.interaction*(wfc[0:dim_x]**2+wfc[dim_x:2*dim_x]**2)
-  if H.boundary_condition=='periodic':
-    rhs[0]         = -H.tunneling * (wfc[2*dim_x-1] + wfc[dim_x+1]) + H.diagonal_term[0]       * wfc[dim_x]
-    rhs[dim_x]     =  H.tunneling * (wfc[dim_x-1]   + wfc[1])       - H.diagonal_term[0]       * wfc[0]
-    rhs[dim_x-1]   = -H.tunneling * (wfc[2*dim_x-2] + wfc[dim_x])   + H.diagonal_term[dim_x-1] * wfc[2*dim_x-1]
-    rhs[2*dim_x-1] =  H.tunneling * (wfc[dim_x-2]   + wfc[0])       - H.diagonal_term[dim_x-1] * wfc[dim_x-1]
-  else:
-    rhs[0]         = -H.tunneling *  wfc[dim_x+1]   + H.diagonal_term[0]       * wfc[dim_x]
-    rhs[dim_x]     =  H.tunneling *  wfc[1]         - H.diagonal_term[0]       * wfc[0]
-    rhs[dim_x-1]   = -H.tunneling *  wfc[2*dim_x-2] + H.diagonal_term[dim_x-1] * wfc[2*dim_x-1]
-    rhs[2*dim_x-1] =  H.tunneling *  wfc[dim_x-2]   - H.diagonal_term[dim_x-1] * wfc[dim_x-1]
-  rhs[1:dim_x-1]         = -H.tunneling * (wfc[dim_x:2*dim_x-2] + wfc[dim_x+2:2*dim_x]) + H.diagonal_term[1:dim_x-1]*wfc[dim_x+1:2*dim_x-1]
-  rhs[dim_x+1:2*dim_x-1] =  H.tunneling * (wfc[0:dim_x-2]       + wfc[2:dim_x])         - H.diagonal_term[1:dim_x-1]*wfc[1:dim_x-1]
-  return rhs
-"""
 
 
-def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, c3):
 #  print('wfc',wfc.shape,wfc.dtype)
 #  print('psi',psi.shape,psi.dtype)
 #  print('psi_old',psi_old.shape,psi_old.dtype)
 #  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  if not(add_real):
+    c_coef*=1j
   use_sparse = False
   if H.dimension > 1:
     use_sparse = True
 #  print(use_sparse)
   if use_sparse:
-    if add_real:
-      psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[:])-H.two_e0_over_delta_e*psi[:])+c_coef*wfc[:]-psi_old[:]
-    else:
-      psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[:])-H.two_e0_over_delta_e*psi[:])+1j*c_coef*wfc[:]-psi_old[:]
+    psi_old[:] = c1*H.sparse_matrix.dot(psi[:])-c2*psi[:]+c_coef*wfc[:]-psi_old[:]
   else:
     dim_x = H.tab_dim[0]
-    if add_real:
-      if H.tab_boundary_condition[0]=='periodic':
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      else:
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-
-      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+    if H.tab_boundary_condition[0]=='periodic':
+      psi_old[0]       = (c1*H.disorder[0]-c2)      *psi[0]      -c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]      -psi_old[0]
+      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
     else:
-      if H.tab_boundary_condition[0]=='periodic':
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+1j*c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      else:
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+1j*c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+1j*c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-#  print('out',wfc[0],psi[0],psi_old[0])
+      psi_old[0]       = (c1*H.disorder[0]-c2)      *psi[0]      -c3*(psi[1])      +c_coef*wfc[0]      -psi_old[0]
+      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+    psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
   return
 
-def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, c3):
 #  print('wfc',wfc.shape,wfc.dtype)
 #  print('psi',psi.shape,psi.dtype)
 #  print('psi_old',psi_old.shape,psi_old.dtype)
@@ -160,45 +112,46 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, one_or_two, add_
   if use_sparse:
     ntot = H.ntot
     if add_real:
-      psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])+c_coef*wfc[0:ntot]-psi_old[0:ntot]
-      psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
+      psi_old[0:ntot] = c1*H.sparse_matrix.dot(psi[0:ntot])-c2*psi[0:ntot]+c_coef*wfc[0:ntot]-psi_old[0:ntot]
+      psi_old[ntot:2*ntot] = c1*H.sparse_matrix.dot(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
     else:
-      psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
-      psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
+      psi_old[0:ntot] = c1*H.sparse_matrix.dot(psi[0:ntot])-c2*psi[0:ntot]-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
+      psi_old[ntot:2*ntot] = c1*H.sparse_matrix.dot(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
   else:
     dim_x = H.tab_dim[0]
     if add_real:
       if H.tab_boundary_condition[0]=='periodic':
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[dim_x]-psi_old[dim_x]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[dim_x]-psi_old[dim_x]
+        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
       else:
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]))+c_coef*wfc[dim_x]-psi_old[dim_x]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
-      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-      psi_old[dim_x+1:2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x+1:2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])+c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x]
+        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+      psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+      psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
     else:
       if H.tab_boundary_condition[0]=='periodic':
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))-c_coef*wfc[dim_x]-psi_old[0]
-        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[0]-psi_old[dim_x]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])-c_coef*wfc[dim_x]-psi_old[0]
+        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[0]-psi_old[dim_x]
+        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
       else:
-        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))-c_coef*wfc[dim_x]-psi_old[0]
-        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]))+c_coef*wfc[0]-psi_old[dim_x]
-        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
-      psi_old[dim_x+1:2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x+1:2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])-c_coef*wfc[dim_x]-psi_old[0]
+        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x]
+        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+      psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
+      psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
 #  print('no_cffi psi_old',psi_old[dim_x],psi_old[dim_x+1],psi_old[2*dim_x-2],psi_old[2*dim_x-1])
 #  print('no_cffi psi    ',psi[dim_x],psi[dim_x+1],psi[2*dim_x-2],psi[2*dim_x-1])
 #  print('no_cffi wfc    ',wfc[dim_x],wfc[dim_x+1],wfc[2*dim_x-2],wfc[2*dim_x-1])
 #  print('no_cffi wfc_dec',wfc[0],wfc[1],wfc[dim_x-2],wfc[dim_x-1])
 # ,H.two_over_delta_e,H.two_e0_over_delta_e,H.tab_tunneling[0],c_coef,one_or_two,add_real)
   return
+
 
 def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
   if propagation.use_cffi:
@@ -210,7 +163,7 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     if propagation.data_layout=='real':
       psi_old = np.zeros(2*ntot)
       psi     = np.zeros(2*ntot)
-      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)#      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_real_1d
+      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
     else:
       psi_old = np.zeros(ntot,dtype=np.complex128)
       psi     = np.zeros(ntot,dtype=np.complex128)
@@ -246,12 +199,39 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
       elementary_clenshaw_step_routine = elementary_clenshaw_step_complex
       psi_old = np.zeros(ntot,dtype=np.complex128)
     psi = propagation.tab_coef[-1] * local_wfc
-    elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
+    c1 = 2.0*H.two_over_delta_e
+    c2 = 2.0*H.two_e0_over_delta_e
+    c3 = 2.0*H.tab_tunneling[0]*H.two_over_delta_e
+    elementary_clenshaw_step_routine(local_wfc,H,psi,psi_old,propagation.tab_coef[-2],False,c1,c2,c3)
     for order in range(propagation.tab_coef.size-3,0,-2):
 #      print(order,psi[0])
-      elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
-      elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
-    elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
+      elementary_clenshaw_step_routine(local_wfc,H,psi_old,psi,propagation.tab_coef[order],True,c1,c2,c3)
+      elementary_clenshaw_step_routine(local_wfc,H,psi,psi_old,propagation.tab_coef[order-1],False,c1,c2,c3)
+    c1 = H.two_over_delta_e
+    c2 = H.two_e0_over_delta_e
+    c3 = H.tab_tunneling[0]*H.two_over_delta_e
+    elementary_clenshaw_step_routine(local_wfc,H,psi_old,psi,propagation.tab_coef[0],True,c1,c2,c3)
+
+# old method inspired from old C code, slightly less efficient
+    """
+    method='old'
+    if method=='old':
+      if propagation.data_layout == 'real':
+        elementary_clenshaw_step_routine = elementary_clenshaw_step_real_old
+        psi_old = np.zeros(2*ntot)
+      else:
+        elementary_clenshaw_step_routine = elementary_clenshaw_step_complex_old
+        psi_old = np.zeros(ntot,dtype=np.complex128)
+      psi = propagation.tab_coef[-1] * local_wfc
+      elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[-2], 2.0, 0)
+      for order in range(propagation.tab_coef.size-3,0,-2):
+#      print(order,psi[0])
+        elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[order], 2.0, 1)
+        elementary_clenshaw_step_routine(local_wfc, H, psi, psi_old, propagation.tab_coef[order-1], 2.0, 0)
+      elementary_clenshaw_step_routine(local_wfc, H, psi_old, psi, propagation.tab_coef[0], 1.0, 1)
+    else:
+    """
+
 #    print('end_no_cffi',psi[100],psi_old[100],wfc[100])
 #    local_wfc[:]=psi[:]
   #  print(H.medium_energy)
@@ -626,32 +606,7 @@ class Measurement:
             self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
       return
 
-  """
-  def output_string(self, H, propagation,initial_state,n_config):
-#    environment_string='Script '+os.path.basename(__file__)+' ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
-#                      +datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+'\n'
-    params_string='Disorder type                   = '+H.disorder_type+'\n'\
-                 +'Lx                              = '+str(H.dim_x*H.delta_x)+'\n'\
-                 +'dx                              = '+str(H.delta_x)+'\n'\
-                 +'Nx                              = '+str(H.dim_x)+'\n'\
-                 +'V0                              = '+str(H.disorder_strength)+'\n'\
-                 +'g                               = '+str(H.interaction)+'\n'\
-                 +'Boundary Condition              = '+H.boundary_condition+'\n'\
-                 +'Initial state                   = '+initial_state.type+'\n'\
-                 +'k_0                             = '+str(initial_state.k_0)+'\n'\
-                 +'sigma_0                         = '+str(initial_state.sigma_0)+'\n'\
-                 +'Integration Method              = '+str(propagation.method)+'\n'\
-                 +'time step                       = '+str(propagation.delta_t)+'\n'\
-                 +'time step for measurement       = '+str(self.delta_t_measurement)+'\n'\
-                 +'total time                      = '+str(propagation.t_max)+'\n'\
-                 +'Number of disorder realizations = '+str(n_config)+'\n'\
-                 +'\n'
-#    print(params_string)
-#                 +'first measurement step          = '+str(first_measurement_autocorr)+'\n'\
-#                  +'total measurement time          = '+str(t_max-first_measurement_autocorr*delta_t_measurement)+'\n'\
 
-    return params_string
-  """
 
 class Spectral_function:
   def __init__(self,e_range,e_resolution):
@@ -783,7 +738,7 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
 #      print(timing.MAX_NONLINEAR_PHASE)
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
-      timing.NUMBER_OF_OPS+=16.0*ntot*propagation.tab_coef.size
+      timing.NUMBER_OF_OPS+=(14.0+4.0*H.dimension)*ntot*propagation.tab_coef.size
     if i_prop==measurement.tab_i_measurement[i_tab]:
       start_dummy_time=timeit.default_timer()
       if (propagation.method == 'ode'): y=solver.y
@@ -806,3 +761,159 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
       i_tab+=1
 #    print('3',initial_state.wfc[0],initial_state.wfc[1])
   return
+
+
+"""
+ def output_string(self, H, propagation,initial_state,n_config):
+#    environment_string='Script '+os.path.basename(__file__)+' ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
+#                      +datetime.datetime.now().strftime("%Y-%m-%d %H:%M")+'\n'
+    params_string='Disorder type                   = '+H.disorder_type+'\n'\
+                 +'Lx                              = '+str(H.dim_x*H.delta_x)+'\n'\
+                 +'dx                              = '+str(H.delta_x)+'\n'\
+                 +'Nx                              = '+str(H.dim_x)+'\n'\
+                 +'V0                              = '+str(H.disorder_strength)+'\n'\
+                 +'g                               = '+str(H.interaction)+'\n'\
+                 +'Boundary Condition              = '+H.boundary_condition+'\n'\
+                 +'Initial state                   = '+initial_state.type+'\n'\
+                 +'k_0                             = '+str(initial_state.k_0)+'\n'\
+                 +'sigma_0                         = '+str(initial_state.sigma_0)+'\n'\
+                 +'Integration Method              = '+str(propagation.method)+'\n'\
+                 +'time step                       = '+str(propagation.delta_t)+'\n'\
+                 +'time step for measurement       = '+str(self.delta_t_measurement)+'\n'\
+                 +'total time                      = '+str(propagation.t_max)+'\n'\
+                 +'Number of disorder realizations = '+str(n_config)+'\n'\
+                 +'\n'
+#    print(params_string)
+#                 +'first measurement step          = '+str(first_measurement_autocorr)+'\n'\
+#                  +'total measurement time          = '+str(t_max-first_measurement_autocorr*delta_t_measurement)+'\n'\
+
+  return params_string
+"""
+
+
+"""
+def apply_minus_i_h_gpe_complex(wfc, H, rhs):
+  dim_x = H.dim_x
+  if (H.interaction == 0.0):
+    H.diagonal_term=H.disorder
+  else:
+    H.diagonal_term=H.disorder+H.interaction*(np.abs(wfc)**2)
+  if H.boundary_condition=='periodic':
+    rhs[0]       = 1j * (H.tunneling * (wfc[dim_x-1] + wfc[1]) - H.diagonal_term[0] * wfc[0])
+    rhs[dim_x-1] = 1j * (H.tunneling * (wfc[dim_x-2] + wfc[0]) - H.diagonal_term[dim_x-1] * wfc[dim_x-1])
+  else:
+    rhs[0]       = 1j * (H.tunneling * wfc[1]       - H.diagonal_term[0]       * wfc[0])
+    rhs[dim_x-1] = 1j * (H.tunneling * wfc[dim_x-2] - H.diagonal_term[dim_x-1] * wfc[dim_x-1])
+  rhs[1:dim_x-1] = 1j * (H.tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) - H.diagonal_term[1:dim_x-1] * wfc[1:dim_x-1])
+  return rhs
+
+def apply_minus_i_h_gpe_real(wfc, H, rhs):
+  dim_x = H.dim_x
+  if (H.interaction == 0.0):
+    H.diagonal_term=H.disorder
+  else:
+    H.diagonal_term=H.disorder+H.interaction*(wfc[0:dim_x]**2+wfc[dim_x:2*dim_x]**2)
+  if H.boundary_condition=='periodic':
+    rhs[0]         = -H.tunneling * (wfc[2*dim_x-1] + wfc[dim_x+1]) + H.diagonal_term[0]       * wfc[dim_x]
+    rhs[dim_x]     =  H.tunneling * (wfc[dim_x-1]   + wfc[1])       - H.diagonal_term[0]       * wfc[0]
+    rhs[dim_x-1]   = -H.tunneling * (wfc[2*dim_x-2] + wfc[dim_x])   + H.diagonal_term[dim_x-1] * wfc[2*dim_x-1]
+    rhs[2*dim_x-1] =  H.tunneling * (wfc[dim_x-2]   + wfc[0])       - H.diagonal_term[dim_x-1] * wfc[dim_x-1]
+  else:
+    rhs[0]         = -H.tunneling *  wfc[dim_x+1]   + H.diagonal_term[0]       * wfc[dim_x]
+    rhs[dim_x]     =  H.tunneling *  wfc[1]         - H.diagonal_term[0]       * wfc[0]
+    rhs[dim_x-1]   = -H.tunneling *  wfc[2*dim_x-2] + H.diagonal_term[dim_x-1] * wfc[2*dim_x-1]
+    rhs[2*dim_x-1] =  H.tunneling *  wfc[dim_x-2]   - H.diagonal_term[dim_x-1] * wfc[dim_x-1]
+  rhs[1:dim_x-1]         = -H.tunneling * (wfc[dim_x:2*dim_x-2] + wfc[dim_x+2:2*dim_x]) + H.diagonal_term[1:dim_x-1]*wfc[dim_x+1:2*dim_x-1]
+  rhs[dim_x+1:2*dim_x-1] =  H.tunneling * (wfc[0:dim_x-2]       + wfc[2:dim_x])         - H.diagonal_term[1:dim_x-1]*wfc[1:dim_x-1]
+  return rhs
+"""
+
+"""
+def elementary_clenshaw_step_complex_old(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+#  print('wfc',wfc.shape,wfc.dtype)
+#  print('psi',psi.shape,psi.dtype)
+#  print('psi_old',psi_old.shape,psi_old.dtype)
+#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  use_sparse = False
+  if H.dimension > 1:
+    use_sparse = True
+#  print(use_sparse)
+  if use_sparse:
+    if add_real:
+      psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[:])-H.two_e0_over_delta_e*psi[:])+c_coef*wfc[:]-psi_old[:]
+    else:
+      psi_old[:] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[:])-H.two_e0_over_delta_e*psi[:])+1j*c_coef*wfc[:]-psi_old[:]
+  else:
+    dim_x = H.tab_dim[0]
+    if add_real:
+      if H.tab_boundary_condition[0]=='periodic':
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      else:
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+
+      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+    else:
+      if H.tab_boundary_condition[0]=='periodic':
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+1j*c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      else:
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+1j*c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+1j*c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+1j*c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+#  print('out',wfc[0],psi[0],psi_old[0])
+  return
+
+def elementary_clenshaw_step_real_old(wfc, H, psi, psi_old, c_coef, one_or_two, add_real):
+#  print('wfc',wfc.shape,wfc.dtype)
+#  print('psi',psi.shape,psi.dtype)
+#  print('psi_old',psi_old.shape,psi_old.dtype)
+#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  use_sparse = False
+  if H.dimension > 1:
+    use_sparse = True
+  if use_sparse:
+    ntot = H.ntot
+    if add_real:
+      psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])+c_coef*wfc[0:ntot]-psi_old[0:ntot]
+      psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
+    else:
+      psi_old[0:ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[0:ntot])-H.two_e0_over_delta_e*psi[0:ntot])-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
+      psi_old[ntot:2*ntot] = one_or_two*(H.two_over_delta_e*H.sparse_matrix.dot(psi[ntot:2*ntot])-H.two_e0_over_delta_e*psi[ntot:2*ntot])+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
+  else:
+    dim_x = H.tab_dim[0]
+    if add_real:
+      if H.tab_boundary_condition[0]=='periodic':
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))+c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[dim_x]-psi_old[dim_x]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+      else:
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))+c_coef*wfc[0]-psi_old[0]
+        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]))+c_coef*wfc[dim_x]-psi_old[dim_x]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2*dim_x-2]))+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+      psi_old[dim_x+1:2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x+1:2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+    else:
+      if H.tab_boundary_condition[0]=='periodic':
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]+psi[dim_x-1]))-c_coef*wfc[dim_x]-psi_old[0]
+        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]+psi[2*dim_x-1]))+c_coef*wfc[0]-psi_old[dim_x]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[0]+psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x]+psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+      else:
+        psi_old[0] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[0]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[1]))-c_coef*wfc[dim_x]-psi_old[0]
+        psi_old[dim_x] = one_or_two*((H.two_over_delta_e*H.disorder[0]-H.two_e0_over_delta_e)*psi[dim_x]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+1]))+c_coef*wfc[0]-psi_old[dim_x]
+        psi_old[dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x-2]))-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+        psi_old[2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[dim_x-1]-H.two_e0_over_delta_e)*psi[2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2*dim_x-2]))+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+      psi_old[1:dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[1:dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[2:dim_x]+psi[0:dim_x-2]))-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
+      psi_old[dim_x+1:2*dim_x-1] = one_or_two*((H.two_over_delta_e*H.disorder[1:dim_x-1]-H.two_e0_over_delta_e)*psi[dim_x+1:2*dim_x-1]-H.two_over_delta_e*H.tab_tunneling[0]*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2]))+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+#  print('no_cffi psi_old',psi_old[dim_x],psi_old[dim_x+1],psi_old[2*dim_x-2],psi_old[2*dim_x-1])
+#  print('no_cffi psi    ',psi[dim_x],psi[dim_x+1],psi[2*dim_x-2],psi[2*dim_x-1])
+#  print('no_cffi wfc    ',wfc[dim_x],wfc[dim_x+1],wfc[2*dim_x-2],wfc[2*dim_x-1])
+#  print('no_cffi wfc_dec',wfc[0],wfc[1],wfc[dim_x-2],wfc[dim_x-1])
+# ,H.two_over_delta_e,H.two_e0_over_delta_e,H.tab_tunneling[0],c_coef,one_or_two,add_real)
+  return
+"""
+
