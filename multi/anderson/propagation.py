@@ -77,37 +77,92 @@ def apply_minus_i_h_gpe_real(wfc, H, rhs):
 
 
 
-def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, c3):
+def elementary_clenshaw_step_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('wfc',wfc.shape,wfc.dtype)
 #  print('psi',psi.shape,psi.dtype)
 #  print('psi_old',psi_old.shape,psi_old.dtype)
+#  print('disorder',H.disorder.shape)
 #  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
   if not(add_real):
     c_coef*=1j
+# Generic code uses the sparse multiplication
+# In low dimensions, one may use an optimized specific code
   use_sparse = False
-  if H.dimension > 1:
+  if H.dimension > 2:
     use_sparse = True
 #  print(use_sparse)
   if use_sparse:
     psi_old[:] = c1*H.sparse_matrix.dot(psi[:])-c2*psi[:]+c_coef*wfc[:]-psi_old[:]
   else:
-    dim_x = H.tab_dim[0]
-    if H.tab_boundary_condition[0]=='periodic':
-      psi_old[0]       = (c1*H.disorder[0]-c2)      *psi[0]      -c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]      -psi_old[0]
-      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    else:
-      psi_old[0]       = (c1*H.disorder[0]-c2)      *psi[0]      -c3*(psi[1])      +c_coef*wfc[0]      -psi_old[0]
-      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-    psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+# Specific code for dimension 1
+    if H.dimension==1:
+      c3=tab_c3[0]
+      dim_x = H.tab_dim[0]
+      if H.tab_boundary_condition[0]=='periodic':
+        psi_old[0]       = (c1*H.disorder[0]-c2)      *psi[0]      -c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]      -psi_old[0]
+        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      else:
+        psi_old[0]       = (c1*H.disorder[0]-c2)      *psi[0]      -c3*(psi[1])      +c_coef*wfc[0]      -psi_old[0]
+        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+# Specific code for dimension 2
+    if H.dimension==2:
+      c3_x=tab_c3[0]
+      c3_y=tab_c3[1]
+      dim_x = H.tab_dim[0]
+      dim_y = H.tab_dim[1]
+      b_x = H.tab_boundary_condition[0]
+      b_y = H.tab_boundary_condition[1]
+# The code propagates along the x axis, computing one vector (along y) at each iteration
+# To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
+# To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
+# Create the 3 temporary vectors
+      p_old=np.zeros(dim_y+2,dtype=np.complex128)
+      p_current=np.zeros(dim_y+2,dtype=np.complex128)
+      p_new=np.zeros(dim_y+2,dtype=np.complex128)
+# If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
+      if b_x=='periodic':
+        p_current[1:dim_y+1]=psi[(dim_x-1)*dim_y:dim_x*dim_y]
+# Initialize the next row, which will become the current row in the first iteration of the loop
+      p_new[1:dim_y+1]=psi[0:dim_y]
+# If periodic boundary condition along y, copy the first and last components
+      if b_y=='periodic':
+        p_new[0]=p_new[dim_y]
+        p_new[dim_y+1]=p_new[1]
+      for i in range(dim_x):
+        p_temp=p_old
+        p_old=p_current
+        p_current=p_new
+        p_new=p_temp
+        if i<dim_x-1:
+# The generic row
+          p_new[1:dim_y+1]=psi[(i+1)*dim_y:(i+2)*dim_y]
+        else:
+# If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+          if b_x=='periodic':
+            p_new[1:dim_y+1]=psi[0:dim_y]
+          else:
+            p_new[1:dim_y+1]=0.0
+# If periodic boundary condition along y, copy the first and last components
+        if b_y=='periodic':
+          p_new[0]=p_new[dim_y]
+          p_new[dim_y+1]=p_new[1]
+        i_low=i*dim_y
+        i_high=i_low+dim_y
+# Ready to treat the current row
+#        psi_old[i*dim_y:(i+1)*dim_y] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i*dim_y:(i+1)*dim_y] - psi_old[i*dim_y:(i+1)*dim_y]
+        psi_old[i_low:i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
+
+
   return
 
-def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, c3):
+def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('wfc',wfc.shape,wfc.dtype)
 #  print('psi',psi.shape,psi.dtype)
 #  print('psi_old',psi_old.shape,psi_old.dtype)
 #  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
   use_sparse = False
-  if H.dimension > 1:
+  if H.dimension > 2:
     use_sparse = True
   if use_sparse:
     ntot = H.ntot
@@ -118,33 +173,98 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2
       psi_old[0:ntot] = c1*H.sparse_matrix.dot(psi[0:ntot])-c2*psi[0:ntot]-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
       psi_old[ntot:2*ntot] = c1*H.sparse_matrix.dot(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
   else:
-    dim_x = H.tab_dim[0]
-    if add_real:
-      if H.tab_boundary_condition[0]=='periodic':
-        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[dim_x]-psi_old[dim_x]
-        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+# Specific code for dimension 1
+    if H.dimension==1:
+      c3=tab_c3[0]
+      dim_x = H.tab_dim[0]
+      if add_real:
+        if H.tab_boundary_condition[0]=='periodic':
+          psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]-psi_old[0]
+          psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[dim_x]-psi_old[dim_x]
+          psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+          psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+        else:
+          psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])+c_coef*wfc[0]-psi_old[0]
+          psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x]
+          psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+          psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+        psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+        psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
       else:
-        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])+c_coef*wfc[0]-psi_old[0]
-        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x]
-        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
-      psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-      psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
-    else:
-      if H.tab_boundary_condition[0]=='periodic':
-        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])-c_coef*wfc[dim_x]-psi_old[0]
-        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[0]-psi_old[dim_x]
-        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-      else:
-        psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])-c_coef*wfc[dim_x]-psi_old[0]
-        psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x]
-        psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-        psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-      psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
-      psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+        if H.tab_boundary_condition[0]=='periodic':
+          psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])-c_coef*wfc[dim_x]-psi_old[0]
+          psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[0]-psi_old[dim_x]
+          psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+          psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+        else:
+          psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])-c_coef*wfc[dim_x]-psi_old[0]
+          psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x]
+          psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+          psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+        psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
+        psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+# Specific code for dimension 2
+    if H.dimension==2:
+      c3_x=tab_c3[0]
+      c3_y=tab_c3[1]
+      dim_x = H.tab_dim[0]
+      dim_y = H.tab_dim[1]
+      ntot = dim_x*dim_y
+      b_x = H.tab_boundary_condition[0]
+      b_y = H.tab_boundary_condition[1]
+# The code propagates along the x axis, computing one vector (along y) at each iteration
+# To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
+# To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
+# Create the 3 temporary vectors
+      p_old=np.zeros(2*dim_y+4)
+      p_current=np.zeros(2*dim_y+4)
+      p_new=np.zeros(2*dim_y+4)
+# If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
+      if b_x=='periodic':
+        p_current[1:dim_y+1]=psi[(dim_x-1)*dim_y:dim_x*dim_y]
+        p_current[dim_y+3:2*dim_y+3]=psi[ntot+(dim_x-1)*dim_y:ntot+dim_x*dim_y]
+# Initialize the next row, which will become the current row in the first iteration of the loop
+      p_new[1:dim_y+1]=psi[0:dim_y]
+      p_new[dim_y+3:2*dim_y+3]=psi[ntot:ntot+dim_y]
+# If periodic boundary condition along y, copy the first and last components
+      if b_y=='periodic':
+        p_new[0]=p_new[dim_y]
+        p_new[dim_y+1]=p_new[1]
+        p_new[dim_y+2]=p_new[2*dim_y+2]
+        p_new[2*dim_y+3]=p_new[dim_y+3]
+      for i in range(dim_x):
+        p_temp=p_old
+        p_old=p_current
+        p_current=p_new
+        p_new=p_temp
+        if i<dim_x-1:
+# The generic row
+          p_new[1:dim_y+1]=psi[(i+1)*dim_y:(i+2)*dim_y]
+          p_new[dim_y+3:2*dim_y+3]=psi[ntot+(i+1)*dim_y:ntot+(i+2)*dim_y]
+        else:
+# If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+          if b_x=='periodic':
+            p_new[1:dim_y+1]=psi[0:dim_y]
+            p_new[dim_y+3:2*dim_y+3]=psi[ntot:ntot+dim_y]
+          else:
+            p_new[1:2*dim_y+3]=0.0
+# If periodic boundary condition along y, copy the first and last components
+        if b_y=='periodic':
+          p_new[0]=p_new[dim_y]
+          p_new[dim_y+1]=p_new[1]
+          p_new[dim_y+2]=p_new[2*dim_y+2]
+          p_new[2*dim_y+3]=p_new[dim_y+3]
+        i_low=i*dim_y
+        i_high=i_low+dim_y
+# Ready to treat the current row
+#        psi_old[i*dim_y:(i+1)*dim_y] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i*dim_y:(i+1)*dim_y] - psi_old[i*dim_y:(i+1)*dim_y]
+        if add_real:
+          psi_old[i_low:i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
+          psi_old[ntot+i_low:ntot+i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[dim_y+3:2*dim_y+3] - c3_y*(p_current[dim_y+4:2*dim_y+4]+ p_current[dim_y+2:2*dim_y+2]) - c3_x*(p_old[dim_y+3:2*dim_y+3]+p_new[dim_y+3:2*dim_y+3]) + c_coef*wfc[ntot+i_low:ntot+i_high] - psi_old[ntot+i_low:ntot+i_high]
+        else:
+          psi_old[i_low:i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) - c_coef*wfc[ntot+i_low:ntot+i_high] - psi_old[i_low:i_high]
+          psi_old[ntot+i_low:ntot+i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[dim_y+3:2*dim_y+3] - c3_y*(p_current[dim_y+4:2*dim_y+4]+ p_current[dim_y+2:2*dim_y+2]) - c3_x*(p_old[dim_y+3:2*dim_y+3]+p_new[dim_y+3:2*dim_y+3]) + c_coef*wfc[i_low:i_high] - psi_old[ntot+i_low:ntot+i_high]
+
 #  print('no_cffi psi_old',psi_old[dim_x],psi_old[dim_x+1],psi_old[2*dim_x-2],psi_old[2*dim_x-1])
 #  print('no_cffi psi    ',psi[dim_x],psi[dim_x+1],psi[2*dim_x-2],psi[2*dim_x-1])
 #  print('no_cffi wfc    ',wfc[dim_x],wfc[dim_x+1],wfc[2*dim_x-2],wfc[2*dim_x-1])
@@ -201,16 +321,16 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     psi = propagation.tab_coef[-1] * local_wfc
     c1 = 2.0*H.two_over_delta_e
     c2 = 2.0*H.two_e0_over_delta_e
-    c3 = 2.0*H.tab_tunneling[0]*H.two_over_delta_e
-    elementary_clenshaw_step_routine(local_wfc,H,psi,psi_old,propagation.tab_coef[-2],False,c1,c2,c3)
+    tab_c3 = 2.0*np.asarray(H.tab_tunneling)*H.two_over_delta_e
+    elementary_clenshaw_step_routine(local_wfc,H,psi,psi_old,propagation.tab_coef[-2],False,c1,c2,tab_c3)
     for order in range(propagation.tab_coef.size-3,0,-2):
 #      print(order,psi[0])
-      elementary_clenshaw_step_routine(local_wfc,H,psi_old,psi,propagation.tab_coef[order],True,c1,c2,c3)
-      elementary_clenshaw_step_routine(local_wfc,H,psi,psi_old,propagation.tab_coef[order-1],False,c1,c2,c3)
+      elementary_clenshaw_step_routine(local_wfc,H,psi_old,psi,propagation.tab_coef[order],True,c1,c2,tab_c3)
+      elementary_clenshaw_step_routine(local_wfc,H,psi,psi_old,propagation.tab_coef[order-1],False,c1,c2,tab_c3)
     c1 = H.two_over_delta_e
     c2 = H.two_e0_over_delta_e
-    c3 = H.tab_tunneling[0]*H.two_over_delta_e
-    elementary_clenshaw_step_routine(local_wfc,H,psi_old,psi,propagation.tab_coef[0],True,c1,c2,c3)
+    tab_c3 = np.asarray(H.tab_tunneling)*H.two_over_delta_e
+    elementary_clenshaw_step_routine(local_wfc,H,psi_old,psi,propagation.tab_coef[0],True,c1,c2,tab_c3)
 
 # old method inspired from old C code, slightly less efficient
     """

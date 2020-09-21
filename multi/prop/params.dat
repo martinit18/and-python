@@ -1,7 +1,7 @@
 [System]
-dimension = 1
+dimension = 2
 # System size in natural units
-size_1 = 20000.
+size_1 = 100.
 size_2 = 100.
 size_3 = 5.
 size_4 = 1.
