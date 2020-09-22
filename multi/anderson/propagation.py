@@ -14,7 +14,7 @@ import anderson
 import timeit
 
 class Temporal_Propagation:
-  def __init__(self, t_max, delta_t, method='che', data_layout='real', want_cffi=True):
+  def __init__(self, t_max, delta_t, method='che', accuracy=1.e-6, accurate_bounds=False, data_layout='real', want_cffi=True):
     self.t_max = t_max
     self.method = method
     self.want_cffi = want_cffi
@@ -22,7 +22,8 @@ class Temporal_Propagation:
     self.data_layout = data_layout
     self.delta_t = delta_t
     self.script_delta_t = 0.
-    self.accuracy = 0.0
+    self.accuracy = accuracy
+    self.accurate_bounds = accurate_bounds
     return
 
   def compute_chebyshev_coefficients(self,accuracy,timing):
@@ -770,8 +771,9 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
 #  print('start gen disorder',timeit.default_timer())
   H.generate_disorder(seed=i_seed+1234)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-  if H.dimension>2:
+  if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che'):
     H.generate_sparse_matrix()
+
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
@@ -791,13 +793,13 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
     solver.set_solout(solout)
     solver.set_initial_value(y)
   if propagation.method=='che':
-    H.energy_range()
-#    H.medium_energy = 0.5*(e_min+e_max)
-#    print(e_min,e_max)
+    H.energy_range(accurate=propagation.accurate_bounds)
+##    H.medium_energy = 0.5*(e_min+e_max)
+#    print(H.e_min,H.e_max)
     #H.script_tunneling, H.script_disorder =
 #    H.script_h(e_min,e_max)
     propagation.script_delta_t = 0.5*propagation.delta_t*(H.e_max-H.e_min)
-    accuracy = 1.e-6
+    accuracy = propagation.accuracy
     propagation.compute_chebyshev_coefficients(accuracy,timing)
     if propagation.want_cffi:
 #      print('I want CFFI')

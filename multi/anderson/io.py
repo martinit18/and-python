@@ -8,7 +8,7 @@ Created on Wed Apr 15 11:22:51 2020
 
 import numpy as np
 
-def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None):
+def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
   params_string = 'Disorder type                   = '+H.disorder_type+'\n'\
                  +'Correlation length              = '+str(H.correlation_length)+'\n'\
                  +'Dimension                       = '+str(H.dimension)+'\n'\
@@ -43,12 +43,19 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not propagation == None:
     params_string += \
                   'Integration Method              = '+propagation.method+'\n'\
-                 +'data layout                     = '+propagation.data_layout+'\n'\
-                 +'time step                       = '+str(propagation.delta_t)+'\n'\
-                 +'total time                      = '+str(propagation.t_max)+'\n'
+                 +'accuracy                        = '+str(propagation.accuracy)+'\n'
     if propagation.method=='che':
       params_string += \
-                  'use CFFI implementation         = '+str(propagation.use_cffi)+'\n'
+                  'accurate spectrum bounds        = '+str(propagation.accurate_bounds)+'\n'\
+                 +'use CFFI implementation         = '+str(propagation.use_cffi)+'\n'
+      if not timing==None:
+        params_string += \
+                  'maximum Chebyshev order         = '+str(timing.MAX_CHE_ORDER)+'\n'\
+                 +'maximum non-linear phase        = '+str(timing.MAX_NONLINEAR_PHASE)+'\n'
+    params_string += \
+                  'data layout                     = '+propagation.data_layout+'\n'\
+                 +'time step                       = '+str(propagation.delta_t)+'\n'\
+                 +'total time                      = '+str(propagation.t_max)+'\n'
   if not measurement == None:
     params_string += \
                   'time step for measurement       = '+str(measurement.delta_t_measurement)+'\n'

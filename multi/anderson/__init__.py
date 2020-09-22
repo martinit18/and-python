@@ -438,7 +438,7 @@ class Hamiltonian(Potential):
   This is needed for the temporal propagation using the Chebyshev method
   """
   def energy_range(self, accurate=False):
-# The accurate determination should be used for starong disorder
+# The accurate determination should be used for strong disorder
     if (accurate):
   # rough estimate of the maximum energy (no disorder taken into account)
       e_max_0=0.0
@@ -451,15 +451,19 @@ class Hamiltonian(Potential):
   # First determine the lower bound
   # Start with plane wave k=0 (minimum energy state)
       psic = Wavefunction(self.tab_dim, self.tab_delta)
-      psic.plane_wave(0.0)
+      tab_k= []
+      for i in range(self.dimension):
+        tab_k.append(0.0)
+      psic.plane_wave(tab_k)
+  #    print(psic.wfc.shape)
   #    psic2 = np.empty(self.dim_x,dtype=np.complex128)
       finished = False
       estimated_bound = 0.0
       while not finished:
         for i in range(n_iterations_hamiltonian_bounds-1):
-          psic.wfc = self.apply_h(psic.wfc)-e_max_0*psic.wfc
+          psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_max_0*psic.wfc
         norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
-        psic.wfc = self.apply_h(psic.wfc)-e_max_0*psic.wfc
+        psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_max_0*psic.wfc
         new_norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
         new_estimated_bound = np.sqrt(new_norm/norm)
         norm = new_norm
@@ -471,6 +475,7 @@ class Hamiltonian(Potential):
           finished = True
         estimated_bound=new_estimated_bound
       e_max = e_min_0 + 1.01 * estimated_bound
+  #    print(e_max)
   # Then determine the lower bound
   # Start with plane wave k=pi (maximum energy state)
       tab_k= []
@@ -481,10 +486,10 @@ class Hamiltonian(Potential):
       estimated_bound = 0.0
       while not finished:
         for i in range(n_iterations_hamiltonian_bounds-1):
-          psic.wfc = self.apply_h(psic.wfc)-e_min_0*psic.wfc
-        norm = np.linalg.norm(psic.wfc)**2*self.delta_x
-        psic.wfc = self.apply_h(psic.wfc)-e_min_0*psic.wfc
-        new_norm = np.linalg.norm(psic.wfc)**2*self.delta_x
+          psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_min_0*psic.wfc
+        norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
+        psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_min_0*psic.wfc
+        new_norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
         new_estimated_bound = np.sqrt(new_norm/norm)
         norm = new_norm
         if (norm>1.e100):

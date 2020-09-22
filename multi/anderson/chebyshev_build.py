@@ -34,6 +34,7 @@ r"""
 #endif
 #include <complex.h>
 
+#define SIZE 64
 // DO NOT TRY to inline the static routines as it badly fails with the Intel 20 compiler for unknown reason
 
 static void elementary_clenshaw_step_real_1d(const int dim_x, const int boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3)
@@ -117,22 +118,49 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
   int i,j,i_low;
   int ntot = dim_x*dim_y;
   double *p_old,*p_current,*p_new,*p_temp;
-  p_old = (double *) calloc ((size_t) 2*dim_y+4, sizeof(double));
-  p_current = (double *) calloc ((size_t) 2*dim_y+4, sizeof(double));
-  p_new = (double *) calloc ((size_t) 2*dim_y+4, sizeof(double));
+#ifdef __ICC
+  p_old = (double *) _mm_malloc ((2*dim_y+4)*sizeof(double),SIZE);
+  p_current = (double *) _mm_malloc ((2*dim_y+4)*sizeof(double),SIZE);
+  p_new = (double *) _mm_malloc ((2*dim_y+4)*sizeof(double),SIZE);
+#else
+  p_old = (double *) malloc ((2*dim_y+4)*sizeof(double));
+  p_current = (double *) malloc ((2*dim_y+4)*sizeof(double));
+  p_new = (double *) malloc ((2*dim_y+4)*sizeof(double));
+#endif
+
 // If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
   if (b_x) {
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
     for (i=0;i<dim_y;i++) {
       p_current[i+1] = psi[i+(dim_x-1)*dim_y];
     }
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
     for (i=0;i<dim_y;i++) {
       p_current[dim_y+i+3] = psi[ntot+i+(dim_x-1)*dim_y];
     }
-  }
+  } else {
+    for (i=0;i<dim_y+4;i++) {
+      p_current[i] = 0.0;
+    }
+ }
 // Initialize the next row, which will become the current row in the first iteration of the loop
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
   for (i=0;i<dim_y;i++) {
     p_new[i+1] = psi[i];
   }
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
   for (i=0;i<dim_y;i++) {
     p_new[dim_y+i+3] = psi[ntot+i];
   }
@@ -142,6 +170,11 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
     p_new[dim_y+1]=p_new[1];
     p_new[dim_y+2]=p_new[2*dim_y+2];
     p_new[2*dim_y+3]=p_new[dim_y+3];
+  } else {
+    p_new[0]=0.0;
+    p_new[dim_y+1]=0.0;
+    p_new[dim_y+2]=0.0;
+    p_new[2*dim_y+3]=0.0;
   }
 // Starts iteration along the rows
   for (i=0; i<dim_x; i++) {
@@ -155,13 +188,14 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
       for (j=0; j<dim_y; j++) {
         p_new[j+1]=psi[j+(i+1)*dim_y];
       }
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
       for (j=0; j<dim_y; j++) {
         p_new[j+dim_y+3]=psi[ntot+j+(i+1)*dim_y];
       }
@@ -171,9 +205,6 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
         for (j=0;j<dim_y;j++) {
           p_new[j+1] = psi[j];
@@ -181,9 +212,6 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
         for (j=0;j<dim_y;j++) {
           p_new[j+dim_y+3] = psi[ntot+j];
@@ -192,9 +220,6 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
         for (j=0;j<dim_y;j++) {
           p_new[j+1] = 0.0;
@@ -202,9 +227,6 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
         for (j=0;j<dim_y;j++) {
           p_new[j+dim_y+3] = 0.0;
@@ -224,50 +246,54 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
+//#pragma vector aligned
 #endif
       for (j=0; j<dim_y; j++) {
-        psi_old[j+i_low] = (c1*disorder[j+i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + c_coef*wfc[j+i_low] - psi_old[j+i_low];
+        psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + c_coef*wfc[i_low] - psi_old[i_low];
+        i_low++;
       }
+      i_low=ntot+i*dim_y;
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
+//#pragma vector aligned
 #endif
       for (j=0; j<dim_y; j++) {
-        psi_old[ntot+j+i_low] = (c1*disorder[j+i_low]-c2)*p_current[j+dim_y+3] - c3_y*(p_current[j+dim_y+4]+ p_current[j+dim_y+2]) - c3_x*(p_old[j+dim_y+3]+p_new[j+dim_y+3]) + c_coef*wfc[ntot+j+i_low] - psi_old[ntot+j+i_low];
+        psi_old[i_low] = (c1*disorder[i_low-ntot]-c2)*p_current[j+dim_y+3] - c3_y*(p_current[j+dim_y+4]+ p_current[j+dim_y+2]) - c3_x*(p_old[j+dim_y+3]+p_new[j+dim_y+3]) + c_coef*wfc[i_low] - psi_old[i_low];
+        i_low++;
       }
-     } else {
+    } else {
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
+//#pragma vector aligned
 #endif
       for (j=0; j<dim_y; j++) {
-        psi_old[j+i_low] = (c1*disorder[j+i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) - c_coef*wfc[ntot+j+i_low] - psi_old[j+i_low];
+        psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) - c_coef*wfc[ntot+i_low] - psi_old[i_low];
+        i_low++;
       }
+      i_low=ntot+i*dim_y;
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
+//#pragma vector aligned
 #endif
       for (j=0; j<dim_y; j++) {
-        psi_old[ntot+j+i_low] = (c1*disorder[j+i_low]-c2)*p_current[j+dim_y+3] - c3_y*(p_current[j+dim_y+4]+ p_current[j+dim_y+2]) - c3_x*(p_old[j+dim_y+3]+p_new[j+dim_y+3]) + c_coef*wfc[j+i_low] - psi_old[ntot+j+i_low];
+        psi_old[i_low] = (c1*disorder[i_low-ntot]-c2)*p_current[j+dim_y+3] - c3_y*(p_current[j+dim_y+4]+ p_current[j+dim_y+2]) - c3_x*(p_old[j+dim_y+3]+p_new[j+dim_y+3]) + c_coef*wfc[i_low-ntot] - psi_old[i_low];
+        i_low++;
       }
     }
   }
 //  printf("out %f %f %f %f %f %f\n",creal(psi[0]),cimag(psi[0]),creal(psi_old[0]),cimag(psi_old[0]),creal(wfc[0]), cimag(wfc[0]));
+#ifdef __ICC
+  _mm_free(p_new);
+  _mm_free(p_current);
+  _mm_free(p_old);
+#else
   free(p_new);
   free(p_current);
   free(p_old);
+#endif
   return;
 }
 
@@ -413,16 +439,39 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
 //  printf("in  %f %f %f %f %f %f\n",creal(psi[0]),cimag(psi[0]),creal(psi_old[0]),cimag(psi_old[0]),creal(wfc[0]), cimag(wfc[0]));
 //  int ntot = dim_x*dim_y;
   double complex *p_old,*p_current,*p_new,*p_temp;
-  p_old = (double complex *) calloc ((size_t) dim_y+2, sizeof(double complex));
-  p_current = (double complex *) calloc ((size_t) dim_y+2, sizeof(double complex));
-  p_new = (double complex *) calloc ((size_t) dim_y+2, sizeof(double complex));
+#ifdef __ICC
+  p_old = (double complex *) _mm_malloc ((dim_y+2)*sizeof(double complex),SIZE);
+  p_current = (double complex *) _mm_malloc ((dim_y+2)*sizeof(double complex),SIZE);
+  p_new = (double complex *) _mm_malloc ((dim_y+2)*sizeof(double complex),SIZE);
+#else
+  p_old = (double complex *) malloc ((dim_y+2)*sizeof(double complex));
+  p_current = (double complex *) malloc ((dim_y+2)*sizeof(double complex));
+  p_new = (double complex *) malloc ((dim_y+2)*sizeof(double complex));
+#endif
+
 // If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
   if (b_x) {
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
     for (i=0;i<dim_y;i++) {
       p_current[i+1] = psi[i+(dim_x-1)*dim_y];
     }
+  } else {
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
+    for (i=0;i<dim_y+2;i++) {
+      p_current[i] =0.0;
+    }
   }
 // Initialize the next row, which will become the current row in the first iteration of the loop
+#ifdef __clang__
+#else
+#pragma GCC ivdep
+#endif
   for (i=0;i<dim_y;i++) {
     p_new[i+1] = psi[i];
   }
@@ -430,6 +479,9 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
   if (b_y) {
     p_new[0]=p_new[dim_y];
     p_new[dim_y+1]=p_new[1];
+  } else {
+    p_new[0]=0.0;
+    p_new[dim_y+1]=0.0;
   }
 // Starts iteration along the rows
   for (i=0; i<dim_x; i++) {
@@ -443,9 +495,6 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
       for (j=0; j<dim_y; j++) {
         p_new[j+1]=psi[j+(i+1)*dim_y];
@@ -456,9 +505,6 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
         for (j=0;j<dim_y;j++) {
           p_new[j+1] = psi[j];
@@ -467,9 +513,6 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
 #endif
         for (j=0;j<dim_y;j++) {
           p_new[j+1] = 0.0;
@@ -487,30 +530,34 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
+//#pragma vector aligned
 #endif
       for (j=0; j<dim_y; j++) {
-        psi_old[j+i_low] = (c1*disorder[j+i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + c_coef*wfc[j+i_low] - psi_old[j+i_low];
+        psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + c_coef*wfc[i_low] - psi_old[i_low];
+        i_low++;
       }
     } else {
 #ifdef __clang__
 #else
 #pragma GCC ivdep
-#ifdef __ICC
-#pragma distribute_point
-#endif
+//#pragma vector aligned
 #endif
       for (j=0; j<dim_y; j++) {
-        psi_old[j+i_low] = (c1*disorder[j+i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + I*c_coef*wfc[j+i_low] - psi_old[j+i_low];
+        psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + I*c_coef*wfc[i_low] - psi_old[i_low];
+        i_low++;
       }
     }
   }
 //  printf("out %f %f %f %f %f %f\n",creal(psi[0]),cimag(psi[0]),creal(psi_old[0]),cimag(psi_old[0]),creal(wfc[0]), cimag(wfc[0]));
+#ifdef __ICC
+  _mm_free(p_new);
+  _mm_free(p_current);
+  _mm_free(p_old);
+#else
   free(p_new);
   free(p_current);
   free(p_old);
+#endif
   return;
 }
 

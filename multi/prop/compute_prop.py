@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/opt/anaconda3/bin/python
 # -*- coding: utf-8 -*-
 __author__ = "Dominique Delande"
 __copyright__ = "Copyright (C) 2020 Dominique Delande"
@@ -66,14 +66,21 @@ import getpass
 import copy
 import configparser
 import sys
+import socket
+import argparse
 #sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
-if __name__ == "__main__":
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
-             +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
-             +'Started on: {}'.format(time.asctime())+'\n'
+
+def main():
+  parser = argparse.ArgumentParser(description='Compute propagation using the Gross-Pitaevskii or Schoedinger equation')
+  parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
+  args = parser.parse_args()
+  parameter_file = args.filename.name
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
+             +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
+             +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n\n'
   try:
 # First try to detect if the python script is launched by mpiexec/mpirun
 # It can be done by looking at an environment variable
@@ -93,33 +100,35 @@ if __name__ == "__main__":
     rank = comm.Get_rank()
     nprocs = comm.Get_size()
     mpi_version = True
-    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
+    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n'
   except KeyError:
 # Not launched by MPI, use sequential code
     mpi_version = False
     nprocs = 1
     rank = 0
-    environment_string += 'Single processor version\n\n'
+    environment_string += 'Single processor version\n'
   except ImportError:
 # Launched by MPI, but no mpi4py module available. Abort the calculation.
     exit('mpi4py module not available! I stop!')
-
+  environment_string+='Calculation started on: {}'.format(time.asctime())+'\n'
   if rank==0:
     initial_time=time.asctime()
-    hostname = os.uname()[1].split('.')[0]
+#    hostname = os.uname()[1].split('.')[0]
+    print("Python script runs on machine : "+socket.getfqdn())
+    print("Name of python script:  {}".format(os.path.abspath( __file__ )))
+    print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
+    print()
     print("Python script started on: {}".format(initial_time))
-    print("{:>24}: {}".format('from',hostname))
-    print("Name of python script: {}".format(os.path.abspath( __file__ )))
-
+    print()
     config = configparser.ConfigParser()
-    config.read('params.dat')
+    config.read(parameter_file)
 
     Averaging = config['Averaging']
     n_config = Averaging.getint('n_config',1)
     n_config = (n_config+nprocs-1)//nprocs
     print("Total number of disorder realizations: {}".format(n_config*nprocs))
     print("Number of processes: {}".format(nprocs))
-
+    print()
     System = config['System']
     dimension = System.getint('dimension', 1)
     tab_size = list()
@@ -160,6 +169,8 @@ if __name__ == "__main__":
 
     Propagation = config['Propagation']
     method = Propagation.get('method','che')
+    accuracy = Propagation.getfloat('accuracy',1.e-6)
+    accurate_bounds = Propagation.getboolean('accurate_bounds',False)
     want_cffi = Propagation.getboolean('want_cffi',True)
     data_layout = Propagation.get('data_layout','real')
     t_max = Propagation.getfloat('t_max')
@@ -195,6 +206,8 @@ if __name__ == "__main__":
     tab_k_0 = None
     tab_sigma_0 = None
     method = None
+    accuracy = None
+    accurate_bounds = None
     want_cffi = None
     data_layout = None
     t_max = None
@@ -218,7 +231,7 @@ if __name__ == "__main__":
     n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
-    method, want_cffi, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, want_cffi, data_layout, t_max, delta_t, i_tab_0))
+    method, accuracy, accurate_bounds, want_cffi, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_cffi, data_layout, t_max, delta_t, i_tab_0))
     delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, use_mkl_fft))
 
 
@@ -257,7 +270,7 @@ if __name__ == "__main__":
 #  print(initial_state.overlap(initial_state))
 
 # Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method,data_layout=data_layout,want_cffi=want_cffi)
+  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_cffi=want_cffi)
   # When computing an autocorrelation <psi(0)|psi(t)>, one can skip the first time steps, i.e. initialize
   # psi(0) with the wavefunction at some time tau. tau must be an integer multiple of delta_t_measurement.
   # args.first_step_autocorr is the integer tau/delta_t_measurement
@@ -288,7 +301,7 @@ if __name__ == "__main__":
     if (measurement_global.measure_wavefunction_momentum):
       anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
 
-  pot_correl=np.zeros(tab_dim)
+#  pot_correl=np.zeros(tab_dim)
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagate from 0 to t_max
@@ -335,7 +348,8 @@ if __name__ == "__main__":
 #    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
 # After the calculation, whether the CFFI implementation has been used is known, hence recompute the header string
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
+    environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=timing)
     tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
     if (measurement_global.measure_density):
       anderson.io.output_density('density_final.dat',measurement_global.density_final,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='density')
@@ -381,4 +395,8 @@ if __name__ == "__main__":
     print("Dummy time           = {0:.3f}".format(timing.DUMMY_TIME))
     print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
     print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+
+if __name__ == "__main__":
+  main()
+
 

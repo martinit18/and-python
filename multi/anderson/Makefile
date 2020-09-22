@@ -3,13 +3,16 @@ COMPILER?=intel
 ifeq ($(COMPILER),intel)
 export CC=icc
 #export CFLAGS=-Ofast -xHost -ftz -fno-alias -qopt-prefetch=4 -qopt-report=4 -qopt-report-phase=vec -no-prec-div -IPF-fp-relaxed -fp-model fast=2 
-# Do not put -ip, -ipo or -ipo2
-export CFLAGS=-Ofast -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range -qopt-mem-layout-trans=3
-#export CFLAGS= -O3 -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range -qopt-mem-layout-trans=3
-#-axCORE-AVX512 
-#export CFLAGS=-Ofast -xHost -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -qopt-prefetch=5 -fargument-noalias-global -complex-limited-range -qopt-mem-layout-trans=3
+# Do not put -ip, -ipo or -ipo2 as they semm useless
+export CFLAGS=-Ofast -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range -qopt-calloc
+# -qopt-mem-layout-trans=3
+# -qopt-prefetch=2
+#export CFLAGS= -O3 -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range  
+#export CFLAGS=-Ofast -xHost -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range
+#-qopt-prefetch=2
+#-qopt-mem-layout-trans=3 
+# Option to print vectorization status -qopt-report-phase=vec -qopt-report=5 -qopt-report-file=stdout
 #-qopt-streaming-stores=auto
-#-qopt-mem-layout-trans=3
 #-funroll-loops
 export LDSHARED=icc
 endif
