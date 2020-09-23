@@ -17,7 +17,7 @@ type = konstanz
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 0.1
+V0 = 2.0
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -63,7 +63,7 @@ extended = True
 [Diagonalization]
 #method = lapack
 method = sparse
-targeted_energy = 0.2
+targeted_energy = 1.0
 number_of_energy_levels = 4
 pivot_real = 0.0
 pivot_imag = 0.0

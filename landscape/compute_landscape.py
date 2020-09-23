@@ -254,14 +254,42 @@ if __name__ == "__main__":
   #    x_wfc = np.sum(np.abs(tab_wfc[:,i])**2*initial_state.position*delta_x)
   #    x_wigner = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*initial_state.position*delta_x/dim_x)
   #    print(i,x_wfc,x_wigner)
-      energy_potential = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*(H.disorder-2.0*H.tunneling)*delta_x*delta_p)
-      energy_kinetic = energy[i]-energy_potential
-      energy_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*landscape*delta_x*delta_p)
-      energy_kinetic_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=1)*delta_x*delta_p*tab_kinetic_energy)
-      if abs(energy_kinetic_landscape/energy_kinetic-1.0)>0.01:
-        print('Warning, problem with kinetic energy!')
-        print('Kinetic energy from potential = ',energy_kinetic)
-        print('Kinetic energy from Wigner    = ',energy_kinetic_landscape)
+      energy_potential = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*(H.disorder-2.0*H.tunneling))*delta_x*delta_p
+ #     energy_kinetic = energy[i]-energy_potential
+      energy_landscape = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*landscape)*delta_x*delta_p
+      energy_kinetic   = np.sum(np.sum(tab_wigner[:,:,i],axis=1)*tab_kinetic_energy)*delta_x*delta_p     
+      wigner_times_kinetic = (tab_wigner[:,:,i].T*tab_kinetic_energy).T
+#      toto_kinetic=np.sum(wigner_times_kinetic)*delta_x*delta_p
+ #     wigner_times_potential = tab_wigner[:,:,i]*(H.disorder-2.0*H.tunneling)
+#      toto_potential=np.sum(wigner_times_potential)*delta_x*delta_p
+ #     wigner_times_landscape = tab_wigner[:,:,i]*landscape
+ #     toto_landscape=np.sum(wigner_times_landscape)*delta_x*delta_p
+      crossed_landscape=np.sum(np.sum(wigner_times_kinetic[:,:],axis=0)*landscape)*delta_x*delta_p 
+      crossed_potential=np.sum(np.sum(wigner_times_kinetic[:,:],axis=0)*(H.disorder-2.0*H.tunneling))*delta_x*delta_p 
+ #     crossed_2=np.sum(np.sum(wigner_times_landscape[:,:],axis=1)*tab_kinetic_energy*delta_x*delta_p) 
+      kinetic_square = np.sum(np.sum(wigner_times_kinetic[:,:],axis=1)*tab_kinetic_energy)*delta_x*delta_p 
+ #     kinetic_square_2 = np.sum(np.sum(tab_wigner[:,:,i],axis=1)*delta_x*delta_p*tab_kinetic_energy**2) 
+ #     potential_square = np.sum(np.sum(wigner_times_potential[:,:],axis=0)*(H.disorder-2.0*H.tunneling)*delta_x*delta_p) 
+      potential_square = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*(H.disorder-2.0*H.tunneling)**2)*delta_x*delta_p
+ #     landscape_square = np.sum(np.sum(wigner_times_landscape[:,:],axis=0)*landscape*delta_x*delta_p) 
+      landscape_square = np.sum(np.sum(tab_wigner[:,:,i],axis=0)*landscape**2)*delta_x*delta_p
+ #     print('energies',energy_kinetic,energy_kinetic_landscape,energy_potential,energy_landscape)
+ #     print('toto',toto_kinetic,toto_potential,toto_landscape)
+ #     print('kinetic_square',kinetic_square,kinetic_square_2)
+ #     print('potential_square',potential_square,potential_square_2)
+ #     print('landscape_square',landscape_square,landscape_square_2)
+ #     print('crossed',crossed_1,crossed_2)
+      average_extension_potential = energy_kinetic+energy_potential-energy[i]
+      average_extension_landscape = energy_kinetic+energy_landscape-energy[i]
+      average_dispersion_potential =  kinetic_square+potential_square+energy[i]**2-2.0*energy[i]*energy_potential-2.0*energy[i]*energy_kinetic+2.0*crossed_potential
+      average_dispersion_landscape =  kinetic_square+landscape_square+energy[i]**2-2.0*energy[i]*energy_landscape-2.0*energy[i]*energy_kinetic+2.0*crossed_landscape
+      print('average extension',average_extension_potential,average_extension_landscape)
+      print('average dispersion',average_dispersion_potential,average_dispersion_landscape)
+      
+  #    if abs(energy_kinetic_landscape/energy_kinetic-1.0)>0.01:
+  #      print('Warning, problem with kinetic energy!')
+  #      print('Kinetic energy from potential = ',energy_kinetic)
+  #      print('Kinetic energy from Wigner    = ',energy_kinetic_landscape)
   #    print(i,energy_landscape,energy_kinetic_landscape,energy_landscape+energy_kinetic_landscape)
   #    fig, axs = plt.subplots(2,sharex=True,constrained_layout=True)
   #    plt.figure(dpi=300)

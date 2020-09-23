@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 500.
-size_2 = 500.
+size_1 = 200.
+size_2 = 200.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
@@ -48,21 +48,21 @@ sigma_0_2 = 10.0
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
-accuracy = 1.e-8
+#accuracy = 1.e-8
 #accurate_bounds = True
 data_layout = real
 #data_layout = complex
 # Total duration of the propagation
-t_max = 2000.0
+t_max = 281.4
 # Elementary time step
-delta_t = 20.0
+delta_t = 0.6
 #want_cffi = False
 
 [Averaging]
 n_config = 1
 
 [Measurement]
-delta_t_measurement = 200.0
+delta_t_measurement = 40.2
 #first_measurement = 0
 #density = True
 density_momentum = True
