@@ -34,7 +34,14 @@ r"""
 #endif
 #include <complex.h>
 
+#undef TIMING
 #define SIZE 64
+
+uint64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
+{
+  return ((timeA_p->tv_sec * 1000000000) + timeA_p->tv_nsec) -
+           ((timeB_p->tv_sec * 1000000000) + timeB_p->tv_nsec);
+}
 // DO NOT TRY to inline the static routines as it badly fails with the Intel 20 compiler for unknown reason
 
 static void elementary_clenshaw_step_real_1d(const int dim_x, const int boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3)
@@ -306,6 +313,10 @@ void chebyshev_real(const int dimension, const int * restrict tab_dim, const int
   double cos_phase;
   double sin_phase;
   double c1, c2, c3;
+#ifdef TIMING
+  struct timespec start, end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
   int ntot=1;
   for (i=0;i<dimension;i++) {
     ntot *= tab_dim[i];
@@ -379,6 +390,10 @@ void chebyshev_real(const int dimension, const int * restrict tab_dim, const int
     }
   }
 //  printf("done\n");
+#ifdef TIMING
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  printf("time in ns %ld\n",timespecDiff(&end, &start));
+#endif
   return;
 }
 
