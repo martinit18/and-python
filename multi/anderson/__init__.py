@@ -205,6 +205,7 @@ class Hamiltonian(Potential):
       return
     if self.disorder_type=='anderson_gaussian':
       self.disorder = self.diagonal + self.disorder_strength*my_random_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+#      print(self.disorder.shape,self.disorder.dtype)
       return
     if self.generate=='simple mask':
       self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(self.ntot).reshape(self.tab_dim))))
@@ -218,6 +219,7 @@ class Hamiltonian(Potential):
 # Alternatively (slower)
 #      self.disorder =  self.diagonal + 0.5*self.disorder_strength*np.abs(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))))**2
 #      self.print_potential()
+#      print(self.disorder.shape,self.disorder.dtype)
       return
     sys.exit('Disorder '+self.disorder_type+' not yet implemented!')
     return
@@ -648,8 +650,13 @@ class Wavefunction:
 #  x = np.sum(density*local_operator)
 #  return x/norm
 
-def compute_correlation(x,y):
-  return np.fft.ifftn(np.fft.fftn(x)*np.conj(np.fft.fftn(y)))/x.size
+def compute_correlation(x,y,shift_center=False):
+  z = np.fft.ifftn(np.fft.fftn(x)*np.conj(np.fft.fftn(y)))/x.size
+  if shift_center:
+    return np.fft.fftshift(z)
+  else:
+    return z
+
 
 def determine_unique_postfix(fn):
   if not os.path.exists(fn):

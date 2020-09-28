@@ -284,12 +284,18 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     if propagation.data_layout=='real':
       psi_old = np.zeros(2*ntot)
       psi     = np.zeros(2*ntot)
-      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+#      print('local_wfc',local_wfc.shape,local_wfc.dtype)
+#      print('psi',psi.shape,psi.dtype)
+#      print('psi_old',psi_old.shape,psi_old.dtype)
+#      print('disorder',H.disorder.shape,H.disorder.dtype)
+#      print('tab_coef',propagation.tab_coef.shape,propagation.tab_coef.dtype)
+      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",local_wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder.ravel()),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
     else:
       psi_old = np.zeros(ntot,dtype=np.complex128)
       psi     = np.zeros(ntot,dtype=np.complex128)
-      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
-
+      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",local_wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder.ravel()),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+#    print(nonlinear_phase[0])
+    timing.MAX_NONLINEAR_PHASE = nonlinear_phase[0]
     """
 #      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_complex_1d
     psi = propagation.tab_coef[-1] * local_wfc
@@ -404,7 +410,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     return rhs
 
 class Measurement:
-  def __init__(self, delta_t_measurement, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False,use_mkl_fft=True):
+  def __init__(self, delta_t_measurement, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, use_mkl_fft=True):
     self.delta_t_measurement = delta_t_measurement
     self.i_tab_0 = i_tab_0
     self.measure_density = measure_density
@@ -417,6 +423,7 @@ class Measurement:
     self.measure_wavefunction = measure_wavefunction
     self.measure_wavefunction_momentum = measure_wavefunction_momentum
     self.extended = measure_extended
+    self.measure_g1 = measure_g1
     self.use_mkl_fft = use_mkl_fft
     return
 
@@ -459,6 +466,8 @@ class Measurement:
       self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
     if self.measure_wavefunction_momentum:
       self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
+    if self.measure_g1:
+      self.g1 =  np.zeros(tab_dim,dtype=np.complex128)
     return
 
   def prepare_measurement_global(self,propagation,tab_delta,tab_dim):
@@ -511,6 +520,8 @@ class Measurement:
       self.wfc =  np.zeros(tab_dim,dtype=np.complex128)
     if self.measure_wavefunction_momentum:
       self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
+    if self.measure_g1:
+      self.g1 =  np.zeros(tab_dim,dtype=np.complex128)
     return
 
   def merge_measurement(self,measurement):
@@ -548,6 +559,8 @@ class Measurement:
       self.wfc += measurement.wfc
     if self.measure_wavefunction_momentum:
       self.wfc_momentum += measurement.wfc_momentum
+    if self.measure_g1:
+      self.g1 +=  measurement.g1
     return
 
   def mpi_merge_measurement(self,comm,timing):
@@ -595,6 +608,10 @@ class Measurement:
       toto = np.empty_like(self.wfc_momentum)
       comm.Reduce(self.wfc_momentum,toto)
       self.wfc_momentum = np.copy(toto)
+    if self.measure_g1:
+      toto = np.empty_like(self.g1)
+      comm.Reduce(self.wfc_momentum,toto)
+      self.g1 = np.copy(toto)
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 
@@ -673,6 +690,8 @@ class Measurement:
       self.wfc /= n_config
     if self.measure_wavefunction_momentum:
       self.wfc_momentum /= n_config
+    if self.measure_g1:
+      self.g1 /= n_config
 #    print(tab_strings)
 #    print(list_of_columns)
 
@@ -725,6 +744,8 @@ class Measurement:
           else:
             psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
             self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
+      if self.measure_g1:
+        self.g1 = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*H.delta_vol
       return
 
 
@@ -771,7 +792,7 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
 #  print('start gen disorder',timeit.default_timer())
   H.generate_disorder(seed=i_seed+1234)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-  if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che'):
+  if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy):
     H.generate_sparse_matrix()
 
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)

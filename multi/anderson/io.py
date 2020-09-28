@@ -155,7 +155,7 @@ def output_density(file,position,density,general_string,print_type='density'):
   return
 """
 
-def output_density(file,data,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
+def output_density(file,data,H,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
 #  print(data.shape)
 #  print(tab_abscissa)
   if file_type=='savetxt':
@@ -188,24 +188,33 @@ def output_density(file,data,header_string='Origin of data not specified',data_t
       column_1='Energy'
       column_2='Spectral function'
       specific_string='Spectral function\n'
+    if data_type=='g1':
+      column_1='Relative position'
+      column_2='Re(g1)'
+      column_3='Im(g1)'
+      specific_string='g1 correlation function\n'
     list_of_columns = []
     tab_strings = []
     next_column = 1
+    dimension = H.dimension
     if data_type in ['density','density_momentum']:
+#      print(data.ndim,data.shape)
 # The simple case where there is only 1d data
-      if data.ndim==1:
-        if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
-          list_of_columns.append(tab_abscissa[0])
-          tab_strings.append('Column '+str(next_column)+': '+column_1)
+      if dimension==1:
+        if data_type=='density':
+          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'+header_string
+        if data_type=='density_momentum':
+          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'+header_string
+        if data.ndim==1:
+          if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
+            list_of_columns.append(tab_abscissa[0])
+            tab_strings.append('Column '+str(next_column)+': '+column_1)
+            next_column += 1
+          list_of_columns.append(data)
+          tab_strings.append('Column '+str(next_column)+': '+column_2)
           next_column += 1
-        list_of_columns.append(data)
-        tab_strings.append('Column '+str(next_column)+': '+column_2)
-        next_column += 1
-        array_to_print=np.column_stack(list_of_columns)
-# 2d data : can be either true 2d data or 1d data with error bars
-      if data.ndim==2:
-# This is for 1d data with optionally error bars in the second row
-        if data.shape[0]<3 :
+          array_to_print=np.column_stack(list_of_columns)
+        if data.ndim==2:
           if tab_abscissa!=[] and data.shape[1]==tab_abscissa[0].size:
             list_of_columns.append(tab_abscissa[0])
             tab_strings.append('Column '+str(next_column)+': '+column_1)
@@ -213,22 +222,37 @@ def output_density(file,data,header_string='Origin of data not specified',data_t
           list_of_columns.append(data[0,:])
           tab_strings.append('Column '+str(next_column)+': '+column_2)
           next_column += 1
-# If there is a second row, it contains error bars
-          if data.shape[0]==2 :
+          if data.shape[0]==2:
             list_of_columns.append(data[1,:])
             tab_strings.append('Column '+str(next_column)+': '+column_3)
             next_column += 1
           array_to_print=np.column_stack(list_of_columns)
-# This is for true 2d data; tab_abscissa is ignored as numpy.savetxt is limited to a single 1d or 2d array
-        else:
+      if dimension==2:
+ # Add at the beginning of the file minimal info describing the data
+        if data_type=='density':
+          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'\
+                       +str(H.tab_dim[1])+' '+str(H.tab_delta[1])+'\n'\
+                       +header_string
+        if data_type=='density_momentum':
+          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'\
+                       +str(H.tab_dim[1])+' '+str(2.0*np.pi/(H.tab_dim[1]*H.tab_delta[1]))+'\n'\
+                       +header_string
+        if data.ndim==2:
           array_to_print = data[:,:]
-      if data.ndim==3 and data.shape[0]<3:
-        array_to_print=data[0,:,:]
-    if data_type in ['wavefunction','wavefunction_momentum']:
-      if data.ndim==1:
+        if data.ndim==3:
+          array_to_print=data[0,:,:]
+    if data_type in ['wavefunction','wavefunction_momentum','g1']:
+      if dimension==1:
+        if data_type=='wavefunction' or data_type=='g1':
+          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'+header_string
+        if data_type=='wavefunction_momentum':
+          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'+header_string
 #        print(data.size,tab_abscissa[0].size)
         if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
-          list_of_columns.append(tab_abscissa[0])
+          if data_type=='g1':
+            list_of_columns.append(tab_abscissa[0]-0.5*H.tab_delta[0])
+          else:
+            list_of_columns.append(tab_abscissa[0])
           tab_strings.append('Column '+str(next_column)+': '+column_1)
           next_column += 1
         list_of_columns.append(np.real(data))
@@ -238,7 +262,15 @@ def output_density(file,data,header_string='Origin of data not specified',data_t
         tab_strings.append('Column '+str(next_column)+': '+column_3)
         next_column += 1
         array_to_print=np.column_stack(list_of_columns)
-      if data.ndim==2:
+      if dimension==2:
+        if data_type=='wavefunction' or data_type=='g1':
+          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'\
+                       +str(H.tab_dim[1])+' '+str(H.tab_delta[1])+'\n'\
+                       +header_string
+        if data_type=='wavefunction_momentum':
+          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'\
+                       +str(H.tab_dim[1])+' '+str(2.0*np.pi/(H.tab_dim[1]*H.tab_delta[1]))+'\n'\
+                       +header_string
         array_to_print=data[:,:]
     if data_type in ['autocorrelation']:
       list_of_columns.append(tab_abscissa)

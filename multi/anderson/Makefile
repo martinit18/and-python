@@ -4,8 +4,9 @@ ifeq ($(COMPILER),intel)
 export CC=icc
 #export CFLAGS=-Ofast -xHost -ftz -fno-alias -qopt-prefetch=4 -qopt-report=4 -qopt-report-phase=vec -no-prec-div -IPF-fp-relaxed -fp-model fast=2 
 # Do not put -ip, -ipo or -ipo2 as they semm useless
-export CFLAGS=-Ofast -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range -qopt-calloc
-# -qopt-mem-layout-trans=3
+export CFLAGS=-Ofast -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range -qopt-calloc 
+export CFLAGS_C=-Ofast -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range -qopt-calloc -fPIC
+# -qopt-mem-layout-trans=3 
 # -qopt-prefetch=2
 #export CFLAGS= -O3 -xAVX -axCORE-AVX2,CORE-AVX512 -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range  
 #export CFLAGS=-Ofast -xHost -ftz -finline -fno-alias -IPF-fp-relaxed -restrict -fargument-noalias-global -complex-limited-range
@@ -20,24 +21,28 @@ endif
 ifeq ($(COMPILER),gnu)
 export CC=gcc
 export CFLAGS=-Ofast -march=native
+export CFLAGS_C=-Ofast -march=native -DNDEBUG
 export LDSHARED=gcc
 endif
 
 ifeq ($(COMPILER),llvm)
 export CC=clang
 export CFLAGS=-Ofast -march=native
+export CFLAGS_C=-Ofast -march=native -DNDEBUG
 export LDSHARED=clang
 endif
 
 #LDFLAGS=-lgsl -lgslcblas -lm
 export LDFLAGS = -pthread -shared -B /opt/anaconda3/compiler_compat -L/opt/anaconda3/lib -Wl,-rpath=/opt/anaconda3/lib -Wl,--no-as-needed -Wl,--sysroot=/
+export LDFLAGS_C = 
+
 %: %.c
 
 %: %.o
-	$(CC) ${CFLAGS} $^ -o $@ $(LDFLAGS)
+	$(CC) ${CFLAGS_C} $^ -o $@ $(LDFLAGS_C)
 
 %.o : %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS_C) -c $< -o $@
 	
 %.so : %_build.py
 	python $^
@@ -45,5 +50,5 @@ export LDFLAGS = -pthread -shared -B /opt/anaconda3/compiler_compat -L/opt/anaco
 all: chebyshev.so lyapounov.so
 
 clean :
-	rm *.o *.so
+	rm *.o *.so pipo
 	

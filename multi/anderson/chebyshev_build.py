@@ -34,7 +34,7 @@ r"""
 #endif
 #include <complex.h>
 
-#undef TIMING
+#define TIMING
 #define SIZE 64
 
 uint64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
@@ -383,7 +383,8 @@ void chebyshev_real(const int dimension, const int * restrict tab_dim, const int
 #endif
     for (i=0;i<ntot;i++) {
       phase = g_times_delta_t*(psi[i]*psi[i]+psi[i+ntot]*psi[i+ntot]);
-      *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
+//      phase=0.0;
+     *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
       argument =  e0_times_delta_t+phase;
       wfc[i] = psi[i]*cos(argument)+psi[i+ntot]*sin(argument);
       wfc[i+ntot] = psi[i+ntot]*cos(argument)-psi[i]*sin(argument);
@@ -583,6 +584,10 @@ void chebyshev_complex(const int dimension, const int * restrict tab_dim, const 
   double complex complex_argument;
   double phase;
   double c1, c2, c3;
+#ifdef TIMING
+  struct timespec start, end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
   int ntot=1;
   for (i=0;i<dimension;i++) {
     ntot *= tab_dim[i];
@@ -656,6 +661,10 @@ void chebyshev_complex(const int dimension, const int * restrict tab_dim, const 
       wfc[i] = psi[i]*(cos(argument)-I*sin(argument));
     }
   }
+#ifdef TIMING
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  printf("time in ns %ld\n",timespecDiff(&end, &start));
+#endif
 //  printf("done\n");
 //  printf("wfc %f %f %f %f %f %f\n",wfc[0],wfc[1],wfc[ntot-1]);
   return;
