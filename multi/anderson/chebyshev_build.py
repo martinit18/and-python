@@ -34,7 +34,7 @@ r"""
 #endif
 #include <complex.h>
 
-#define TIMING
+#undef TIMING
 #define SIZE 64
 
 uint64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
