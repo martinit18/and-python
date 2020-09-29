@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 2000.
-size_2 = 2000.
+size_1 = 200.
+size_2 = 200.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
@@ -59,7 +59,7 @@ delta_t = 0.6
 #want_cffi = False
 
 [Averaging]
-n_config = 1
+n_config = 10
 
 [Measurement]
 delta_t_measurement = 40.2
