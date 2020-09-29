@@ -12,6 +12,8 @@ from scipy.integrate import ode
 import scipy.special as sp
 import anderson
 import timeit
+import ctypes 
+import numpy.ctypeslib as ctl
 
 class Temporal_Propagation:
   def __init__(self, t_max, delta_t, method='che', accuracy=1.e-6, accurate_bounds=False, data_layout='real', want_cffi=True):
@@ -279,8 +281,15 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
     local_wfc = wfc.ravel()
     ntot = H.ntot
     max_order = propagation.tab_coef.size-1
-    nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
+#    nonlinear_phase = ffi.new("double *", timing.MAX_NONLINEAR_PHASE)
+    nonlinear_phase=0.0
     assert max_order%2==0,"Max order {} must be an even number".format(max_order)
+    my_lib=ctypes.CDLL("../anderson/ctypes/chebyshev.so")
+    my_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+      ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
+      ctypes.c_double,  ctypes.c_double, ctypes.c_double,  ctypes.c_double, ctypes.c_double]
+    my_lib.chebyshev_real.restype = None
+
     if propagation.data_layout=='real':
       psi_old = np.zeros(2*ntot)
       psi     = np.zeros(2*ntot)
@@ -289,13 +298,15 @@ def chebyshev_step(wfc, H, propagation,timing,ffi,lib):
 #      print('psi_old',psi_old.shape,psi_old.dtype)
 #      print('disorder',H.disorder.shape,H.disorder.dtype)
 #      print('tab_coef',propagation.tab_coef.shape,propagation.tab_coef.dtype)
-      lib.chebyshev_real(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double *",local_wfc),ffi.from_buffer("double *",psi),ffi.from_buffer('double *',psi_old),ffi.from_buffer('double *',H.disorder.ravel()),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+      my_lib.chebyshev_real(H.dimension, np.asarray(H.tab_dim,dtype=np.intc), max_order, H.array_boundary_condition,\
+        local_wfc, psi, psi_old, H.disorder.ravel(), propagation.tab_coef, np.asarray(H.tab_tunneling),\
+        H.two_over_delta_e, H.two_e0_over_delta_e, H.interaction*propagation.delta_t, H.medium_energy*propagation.delta_t, nonlinear_phase)
     else:
       psi_old = np.zeros(ntot,dtype=np.complex128)
       psi     = np.zeros(ntot,dtype=np.complex128)
-      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",local_wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder.ravel()),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
+#      lib.chebyshev_complex(H.dimension,ffi.from_buffer("int *",np.asarray(H.tab_dim,dtype=np.intc)),max_order,ffi.from_buffer("int *",H.array_boundary_condition),ffi.from_buffer("double _Complex *",local_wfc),ffi.from_buffer("double _Complex *",psi),ffi.from_buffer('double _Complex *',psi_old),ffi.from_buffer('double *',H.disorder.ravel()),ffi.from_buffer('double *',propagation.tab_coef),ffi.from_buffer("double *",np.asarray(H.tab_tunneling)),H.two_over_delta_e,H.two_e0_over_delta_e,H.interaction*propagation.delta_t,H.medium_energy*propagation.delta_t,nonlinear_phase)
 #    print(nonlinear_phase[0])
-    timing.MAX_NONLINEAR_PHASE = nonlinear_phase[0]
+#    timing.MAX_NONLINEAR_PHASE = nonlinear_phase[0]
     """
 #      elementary_clenshaw_step_routine = lib.elementary_clenshaw_step_complex_1d
     psi = propagation.tab_coef[-1] * local_wfc

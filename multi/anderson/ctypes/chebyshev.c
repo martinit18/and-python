@@ -10,7 +10,7 @@
 #include <complex.h>
 #include <time.h>
 
-#define TIMING
+#undef TIMING
 #define SIZE 64
 
 uint64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
@@ -360,7 +360,7 @@ void chebyshev_real(const int dimension, const int * restrict tab_dim, const int
     for (i=0;i<ntot;i++) {
       phase = g_times_delta_t*(psi[i]*psi[i]+psi[i+ntot]*psi[i+ntot]);
 //      phase=0.0;
-     *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
+//     *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
       argument =  e0_times_delta_t+phase;
       wfc[i] = psi[i]*cos(argument)+psi[i+ntot]*sin(argument);
       wfc[i+ntot] = psi[i+ntot]*cos(argument)-psi[i]*sin(argument);
@@ -645,45 +645,3 @@ void chebyshev_complex(const int dimension, const int * restrict tab_dim, const 
 //  printf("wfc %f %f %f %f %f %f\n",wfc[0],wfc[1],wfc[ntot-1]);
   return;
 }
-
-void main()
-{
-  int i;
-  int j;
-  int dimension=2;
-  int max_order=8;
-  int dim =2000;
-  int dimtot = dim*dim;
-  int *tab_dim;
-  int *tab_boundary_condition;
-  double *disorder;
-  double complex *psi;
-  double complex *psi_old;
-  double complex *wfc;
-  double *tab_coef;
-  double *tab_tunneling;
-  double two_over_delta_e=1.0;
-  double two_e0_over_delta_e=1.0;
-  double g_times_delta_t=1.0;
-  double e0_times_delta_t=1.0;
-  double nonlinear_phase=0.0;
-  disorder = (double *) calloc(dimtot,sizeof(double));
-  psi = (double complex *) calloc(dimtot,sizeof(double complex));
-  psi_old = (double complex *) calloc(dimtot,sizeof(double complex));
-  wfc = (double complex *) calloc(dimtot,sizeof(double complex));
-  tab_coef = (double *) calloc(max_order+1,sizeof(double));
-  tab_tunneling = (double *) calloc(dimension,sizeof(double));
-  tab_boundary_condition = (int *) calloc(dimension,sizeof(int));
-  tab_dim = (int *) calloc(dimension,sizeof(int));
-  for (i=0;i<max_order;i++) {
-    tab_coef[i]=1.0;
-  }
-  for (i=0;i<dimension;i++) {
-    tab_dim[i]=dim;
-    tab_boundary_condition[i]=1;
-  }  
-  for (j=0;j<100;j++) {
-    chebyshev_complex(dimension, tab_dim, max_order, tab_boundary_condition, wfc, psi, psi_old, disorder,  tab_coef, tab_tunneling, two_over_delta_e, two_e0_over_delta_e,  g_times_delta_t, e0_times_delta_t, &nonlinear_phase);
-  }  
-  return;
-}  
