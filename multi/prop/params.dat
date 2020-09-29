@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 2000.
-size_2 = 2000.
+size_1 = 200.
+size_2 = 200.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
@@ -39,7 +39,7 @@ g = 0.0
 initial_state = plane_wave
 #initial_state = gaussian_wave_packet
 # make sure that k_0_over_2_pi_i*size_i is an integer
-k_0_over_2_pi_1 = 0.1
+k_0_over_2_pi_1 = 0.0
 k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
 sigma_0_1 = 10.0
@@ -50,8 +50,8 @@ sigma_0_2 = 10.0
 method = che
 #accuracy = 1.e-8
 #accurate_bounds = True
-#data_layout = real
-data_layout = complex
+data_layout = real
+#data_layout = complex
 # Total duration of the propagation
 t_max = 281.4
 # Elementary time step
@@ -59,7 +59,7 @@ delta_t = 0.6
 #want_cffi = False
 
 [Averaging]
-n_config = 1
+n_config = 10
 
 [Measurement]
 delta_t_measurement = 40.2
