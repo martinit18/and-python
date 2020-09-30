@@ -610,7 +610,7 @@ class Measurement:
       self.wfc_momentum = np.copy(toto)
     if self.measure_g1:
       toto = np.empty_like(self.g1)
-      comm.Reduce(self.wfc_momentum,toto)
+      comm.Reduce(self.g1,toto)
       self.g1 = np.copy(toto)
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
