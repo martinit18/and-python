@@ -20,7 +20,7 @@ uint64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
 }
 // DO NOT TRY to inline the static routines as it badly fails with the Intel 20 compiler for unknown reason
 
-static void elementary_clenshaw_step_real_1d(const int dim_x, const int boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3)
+void elementary_clenshaw_step_real_1d(const int dim_x, const int boundary_condition, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3)
 {
   int i;
 // boundary_condition=1 is periodic
@@ -96,7 +96,7 @@ static void elementary_clenshaw_step_real_1d(const int dim_x, const int boundary
   return;
 }
 
-static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, const int b_x, const int b_y, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3_x, const double c3_y)
+void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, const int b_x, const int b_y, const double * restrict wfc, const double * restrict psi, double * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3_x, const double c3_y)
 {
   int i,j,i_low;
   int ntot = dim_x*dim_y;
@@ -280,7 +280,7 @@ static void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
   return;
 }
 
-void chebyshev_real(const int dimension, const int * restrict tab_dim, const int max_order,  const int * restrict tab_boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old,  const double * restrict disorder, const double * restrict tab_coef, const double * tab_tunneling, const double two_over_delta_e, const double two_e0_over_delta_e, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
+double chebyshev_real(const int dimension, const int * restrict tab_dim, const int max_order,  const int * restrict tab_boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old,  const double * restrict disorder, const double * restrict tab_coef, const double * tab_tunneling, const double two_over_delta_e, const double two_e0_over_delta_e, const double g_times_delta_t, const double e0_times_delta_t)
 {
   int i, order;
   double argument;
@@ -289,6 +289,7 @@ void chebyshev_real(const int dimension, const int * restrict tab_dim, const int
   double cos_phase;
   double sin_phase;
   double c1, c2, c3;
+  double nonlinear_phase=0.0;
 #ifdef TIMING
   struct timespec start, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
@@ -360,21 +361,22 @@ void chebyshev_real(const int dimension, const int * restrict tab_dim, const int
     for (i=0;i<ntot;i++) {
       phase = g_times_delta_t*(psi[i]*psi[i]+psi[i+ntot]*psi[i+ntot]);
 //      phase=0.0;
-//     *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
+      nonlinear_phase = (nonlinear_phase > fabs(phase)) ? nonlinear_phase : fabs(phase);
       argument =  e0_times_delta_t+phase;
       wfc[i] = psi[i]*cos(argument)+psi[i+ntot]*sin(argument);
       wfc[i+ntot] = psi[i+ntot]*cos(argument)-psi[i]*sin(argument);
     }
   }
 //  printf("done\n");
+//  printf("nonlinear phase = %lf\n",*nonlinear_phase);
 #ifdef TIMING
   clock_gettime(CLOCK_MONOTONIC, &end);
   printf("time in ns %ld\n",timespecDiff(&end, &start));
 #endif
-  return;
+  return(nonlinear_phase);
 }
 
-static void elementary_clenshaw_step_complex_1d(const int dim_x, const int boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3)
+void elementary_clenshaw_step_complex_1d(const int dim_x, const int boundary_condition, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3)
 {
   int i;
 //  printf("c_coef %f\n",c_coef);
@@ -425,7 +427,7 @@ static void elementary_clenshaw_step_complex_1d(const int dim_x, const int bound
   return;
 }
 
-static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y, const int b_x, const int b_y, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3_x, const double c3_y)
+void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y, const int b_x, const int b_y, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3_x, const double c3_y)
 {
   int i,j,i_low;
 //  printf("in  %f %f %f %f %f %f\n",creal(psi[0]),cimag(psi[0]),creal(psi_old[0]),cimag(psi_old[0]),creal(wfc[0]), cimag(wfc[0]));
@@ -553,13 +555,14 @@ static void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
   return;
 }
 
-void chebyshev_complex(const int dimension, const int * restrict tab_dim, const int max_order,  const int * restrict tab_boundary_condition, double complex * restrict wfc, double complex * restrict psi, double complex * restrict psi_old,  const double * restrict disorder, const double * restrict tab_coef, const double * tab_tunneling, const double two_over_delta_e, const double two_e0_over_delta_e, const double g_times_delta_t, const double e0_times_delta_t, double * restrict nonlinear_phase)
+double chebyshev_complex(const int dimension, const int * restrict tab_dim, const int max_order,  const int * restrict tab_boundary_condition, double complex * restrict wfc, double complex * restrict psi, double complex * restrict psi_old,  const double * restrict disorder, const double * restrict tab_coef, const double * tab_tunneling, const double two_over_delta_e, const double two_e0_over_delta_e, const double g_times_delta_t, const double e0_times_delta_t)
 {
   int i, order;
   double argument;
   double complex complex_argument;
   double phase;
   double c1, c2, c3;
+  double nonlinear_phase=0.;
 #ifdef TIMING
   struct timespec start, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
@@ -632,7 +635,7 @@ void chebyshev_complex(const int dimension, const int * restrict tab_dim, const 
 #endif
     for (i=0;i<ntot;i++) {
       phase = g_times_delta_t*(creal(psi[i])*creal(psi[i])+cimag(psi[i])*cimag(psi[i]));
-      *nonlinear_phase = (*nonlinear_phase > fabs(phase)) ? *nonlinear_phase : fabs(phase);
+      nonlinear_phase = (nonlinear_phase > fabs(phase)) ? nonlinear_phase : fabs(phase);
       argument =  e0_times_delta_t+phase;
       wfc[i] = psi[i]*(cos(argument)-I*sin(argument));
     }
@@ -643,5 +646,5 @@ void chebyshev_complex(const int dimension, const int * restrict tab_dim, const 
 #endif
 //  printf("done\n");
 //  printf("wfc %f %f %f %f %f %f\n",wfc[0],wfc[1],wfc[ntot-1]);
-  return;
+  return(nonlinear_phase);
 }

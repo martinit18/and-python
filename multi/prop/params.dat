@@ -32,7 +32,7 @@ V0 = 0.135
 
 [Nonlinearity]
 # g is the nonlinear interaction
-g = 0.0
+g = 0.
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet

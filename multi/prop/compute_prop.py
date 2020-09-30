@@ -171,7 +171,7 @@ def main():
     method = Propagation.get('method','che')
     accuracy = Propagation.getfloat('accuracy',1.e-6)
     accurate_bounds = Propagation.getboolean('accurate_bounds',False)
-    want_cffi = Propagation.getboolean('want_cffi',True)
+    want_ctypes = Propagation.getboolean('want_ctypes',True)
     data_layout = Propagation.get('data_layout','real')
     t_max = Propagation.getfloat('t_max')
     delta_t = Propagation.getfloat('delta_t')
@@ -209,7 +209,7 @@ def main():
     method = None
     accuracy = None
     accurate_bounds = None
-    want_cffi = None
+    want_ctypes = None
     data_layout = None
     t_max = None
     delta_t = None
@@ -233,9 +233,10 @@ def main():
     n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
-    method, accuracy, accurate_bounds, want_cffi, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_cffi, data_layout, t_max, delta_t, i_tab_0))
+    method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
     delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, use_mkl_fft))
 
+# print(rank,measure_wavefunction_momentum)
 
   t1=time.perf_counter()
   timing=anderson.Timing()
@@ -272,7 +273,7 @@ def main():
 #  print(initial_state.overlap(initial_state))
 
 # Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_cffi=want_cffi)
+  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
   # When computing an autocorrelation <psi(0)|psi(t)>, one can skip the first time steps, i.e. initialize
   # psi(0) with the wavefunction at some time tau. tau must be an integer multiple of delta_t_measurement.
   # args.first_step_autocorr is the integer tau/delta_t_measurement
@@ -280,6 +281,7 @@ def main():
 
   measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1,use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
+
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
   measurement.prepare_measurement(propagation,tab_delta,tab_dim)
 #  print(measurement.density_final.shape)

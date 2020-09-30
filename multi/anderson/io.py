@@ -47,7 +47,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if propagation.method=='che':
       params_string += \
                   'accurate spectrum bounds        = '+str(propagation.accurate_bounds)+'\n'\
-                 +'use CFFI implementation         = '+str(propagation.use_cffi)+'\n'
+                 +'use ctypes implementation       = '+str(propagation.use_ctypes)+'\n'
       if not timing==None:
         params_string += \
                   'maximum Chebyshev order         = '+str(timing.MAX_CHE_ORDER)+'\n'\
