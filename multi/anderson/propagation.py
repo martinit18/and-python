@@ -790,9 +790,9 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
     if propagation.want_ctypes:
 #      print('I want ctypes')
       try:
-        chebyshev_ctypes_lib=ctypes.CDLL("../anderson/ctypes/chebyshev.so")
+        chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
         if propagation.data_layout=='real':
-          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_real') and hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
+          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_real') and    hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
           chebyshev_ctypes_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
             ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
             ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
@@ -803,12 +803,15 @@ def gpe_evolution(i_seed, initial_state, H, propagation, measurement, timing, de
             ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
             ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
           chebyshev_ctypes_lib.chebyshev_complex.restype = ctypes.c_double
+        if propagation.use_ctypes == False:
+          chebyshev_ctypes_lib = None
+          if H.seed == 1234:
+            print("\nWarning, chebyshev C library found, but without routines for dimension "+str(H.dimension)+", this uses the slow Python version!\n")
       except:
         propagation.use_ctypes = False
         chebyshev_ctypes_lib = None
-      if not propagation.use_ctypes and H.seed == 1234:
-        print("\nWarning, no C version found, this uses the slow Python version!\n")
-        chebyshev_ctypes_lib = None
+        if H.seed == 1234:
+          print("\nWarning, no chebyshev C library found, this uses the slow Python version!\n")
     else:
       propagation.use_ctypes = False
       chebyshev_ctypes_lib = None
