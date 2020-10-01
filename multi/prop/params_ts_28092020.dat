@@ -56,7 +56,7 @@ data_layout = real
 t_max = 110.
 # Elementary time step
 delta_t = 0.5
-#want_cffi = False
+#want_ctypes = False
 
 [Averaging]
 n_config = 8
