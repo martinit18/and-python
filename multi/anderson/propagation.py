@@ -375,7 +375,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     return rhs
 
 class Measurement:
-  def __init__(self, delta_t_measurement, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, use_mkl_fft=True):
+  def __init__(self, delta_t_measurement, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, use_mkl_fft=True):
     self.delta_t_measurement = delta_t_measurement
     self.i_tab_0 = i_tab_0
     self.measure_density = measure_density
@@ -389,6 +389,7 @@ class Measurement:
     self.measure_wavefunction_momentum = measure_wavefunction_momentum
     self.extended = measure_extended
     self.measure_g1 = measure_g1
+    self.measure_overlap = measure_overlap
     self.use_mkl_fft = use_mkl_fft
     return
 
@@ -433,6 +434,8 @@ class Measurement:
       self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if self.measure_g1:
       self.g1 =  np.zeros(tab_dim,dtype=np.complex128)
+    if self.measure_overlap:
+      self.overlap = 0.0
     return
 
   def prepare_measurement_global(self,propagation,tab_delta,tab_dim):
@@ -487,6 +490,8 @@ class Measurement:
       self.wfc_momentum =  np.zeros(tab_dim,dtype=np.complex128)
     if self.measure_g1:
       self.g1 =  np.zeros(tab_dim,dtype=np.complex128)
+    if self.measure_overlap:
+      self.overlap = 0.0
     return
 
   def merge_measurement(self,measurement):
@@ -526,6 +531,8 @@ class Measurement:
       self.wfc_momentum += measurement.wfc_momentum
     if self.measure_g1:
       self.g1 +=  measurement.g1
+    if self.measure_overlap:
+      self.overlap += measurement.overlap
     return
 
   def mpi_merge_measurement(self,comm,timing):
@@ -577,6 +584,10 @@ class Measurement:
       toto = np.empty_like(self.g1)
       comm.Reduce(self.g1,toto)
       self.g1 = np.copy(toto)
+    if self.measure_overlap:
+      toto = 0.0
+      comm.Reduce(self.overlap,toto)
+      self.g1 = toto
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 
@@ -657,6 +668,8 @@ class Measurement:
       self.wfc_momentum /= n_config
     if self.measure_g1:
       self.g1 /= n_config
+    if self.measure_overlap:
+      self.overlap /= n_config
 #    print(tab_strings)
 #    print(list_of_columns)
 
@@ -711,6 +724,8 @@ class Measurement:
             self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
       if self.measure_g1:
         self.g1 = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*H.delta_vol
+      if self.measure_overlap:
+        self.overlap = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
       return
 
 

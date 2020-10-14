@@ -191,6 +191,7 @@ def main():
     measure_wavefunction_momentum = Measurement.getboolean('wavefunction_momentum',False)
     measure_extended = Measurement.getboolean('dispersion_variance',False)
     measure_g1 = Measurement.getboolean('g1',False)
+    measure_overlap = Measurement.getboolean('overlap',False)
     use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
   else:
     dimension = None
@@ -227,6 +228,7 @@ def main():
     measure_wavefunction_momentum = None
     measure_extended = None
     measure_g1 = None
+    measure_overlap = None
     use_mkl_fft = None
 
   if mpi_version:
@@ -234,7 +236,7 @@ def main():
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
     method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
-    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, use_mkl_fft))
+    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft))
 
 # print(rank,measure_wavefunction_momentum)
 
@@ -279,7 +281,7 @@ def main():
   # args.first_step_autocorr is the integer tau/delta_t_measurement
   # In other words, the measurement of the autocorrelation function starts as time tau=delta_t_measurement*first_mmeasurement_autocorr
 
-  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1,use_mkl_fft=use_mkl_fft)
+  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
 
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
@@ -372,6 +374,8 @@ def main():
     if (measurement_global.measure_g1):
 #      g1 = anderson.compute_correlation(measurement_global.wfc,measurement_global.wfc,shift_center=True)*measurement_global.wfc.size*H.delta_vol
       anderson.io.output_density('g1_final.dat',measurement_global.g1,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='g1')
+#    if (measurement_global.measure_overlap):
+#      print("Squared overlap with initial state = ",abs(measurement_global.overlap)**2)
 
     """
   i_tab_0 = propagation.first_measurement_autocorr

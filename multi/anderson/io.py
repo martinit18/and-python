@@ -59,6 +59,9 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not measurement == None:
     params_string += \
                   'time step for measurement       = '+str(measurement.delta_t_measurement)+'\n'
+    if measurement.overlap:
+      params_string += \
+                  '|overlap|**2 with initial state = '+str(abs(measurement.overlap)**2)+'\n'
   if not spectral_function == None:
     params_string += \
                   'energy range                    = '+str(spectral_function.e_range)+'\n'\
