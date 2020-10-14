@@ -15,7 +15,7 @@ endif
 
 ifeq ($(COMPILER),llvm)
 CC=clang
-CFLAGS=-Ofast -march=native -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
+CFLAGS=-Ofast -march=znver2 -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
 endif
 
 all: chebyshev.so

@@ -1,4 +1,4 @@
-#!/opt/anaconda3/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 __author__ = "Dominique Delande"
 __copyright__ = "Copyright (C) 2020 Dominique Delande"
@@ -28,11 +28,11 @@ Created on Fri Aug 16 17:05:10 2019
 
 @author: delande
 
-Disordered one-dimensional system
+Disordered system in any dimension
 Discretization in configuration space
-3-point discretization of the Laplace operator
+3-point discretization of the Laplace operator along each direction
 
-This program computes either the potential correlaction function or the spectral function (using Fourier transform of the temporal propagation)
+This program computes the temporal propagation of any initial state
 
 V0 (=disorder_strength) is the square root of the variance of the disorder
 sigma (=correlation_length) is the correlation length of the disorder
@@ -72,15 +72,7 @@ import argparse
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
-
-def main():
-  parser = argparse.ArgumentParser(description='Compute propagation using the Gross-Pitaevskii or Schoedinger equation')
-  parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
-  args = parser.parse_args()
-  parameter_file = args.filename.name
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
-             +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
-             +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n\n'
+def determine_if_launched_by_mpi():
   try:
 # First try to detect if the python script is launched by mpiexec/mpirun
 # It can be done by looking at an environment variable
@@ -100,26 +92,23 @@ def main():
     rank = comm.Get_rank()
     nprocs = comm.Get_size()
     mpi_version = True
-    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n'
+    mpi_string = 'MPI version ran on '+str(nprocs)+' processes\n'
   except KeyError:
 # Not launched by MPI, use sequential code
     mpi_version = False
+    comm = None
     nprocs = 1
     rank = 0
-    environment_string += 'Single processor version\n'
+    mpi_string = 'Single processor version\n'
   except ImportError:
 # Launched by MPI, but no mpi4py module available. Abort the calculation.
     exit('mpi4py module not available! I stop!')
-  environment_string+='Calculation started on: {}'.format(time.asctime())+'\n'
+  mpi_string += '\nCalculation started on: {}'.format(time.asctime())
+#  print("inside",mpi_string)
+  return (mpi_version,comm,nprocs,rank,mpi_string)
+
+def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
   if rank==0:
-    initial_time=time.asctime()
-#    hostname = os.uname()[1].split('.')[0]
-    print("Python script runs on machine : "+socket.getfqdn())
-    print("Name of python script:  {}".format(os.path.abspath( __file__ )))
-    print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
-    print()
-    print("Python script started on: {}".format(initial_time))
-    print()
     config = configparser.ConfigParser()
     config.read(parameter_file)
 
@@ -139,6 +128,15 @@ def main():
       tab_delta.append(System.getfloat('delta_'+str(i+1)))
       tab_boundary_condition.append(System.get('boundary_condition_'+str(i+1),'periodic'))
 #    print(dimension,tab_size,tab_delta,tab_boundary_condition)
+# Number of sites
+    tab_dim = list()
+    for i in range(dimension):
+      tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
+# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
+      tab_delta[i] = tab_size[i]/tab_dim[i]
+#  print(tab_dim)
+    for i in range(dimension):
+      assert tab_boundary_condition[i] in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
 
     Disorder = config['Disorder']
     disorder_type = Disorder.get('type','anderson gaussian')
@@ -161,6 +159,7 @@ def main():
 
     Wavefunction = config['Wavefunction']
     initial_state_type = Wavefunction.get('initial_state')
+    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
     tab_k_0 = list()
     tab_sigma_0 = list()
     for i in range(dimension):
@@ -198,6 +197,7 @@ def main():
     n_config = None
     tab_size = None
     tab_delta = None
+    tab_dim = None
     tab_boundary_condition = None
     disorder_type = None
     correlation_length = None
@@ -232,68 +232,69 @@ def main():
     use_mkl_fft = None
 
   if mpi_version:
-    n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
+    n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
     initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
     method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
     delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft))
-
-# print(rank,measure_wavefunction_momentum)
-
-  t1=time.perf_counter()
-  timing=anderson.Timing()
-
-# Number of sites
-  tab_dim = list()
-  for i in range(dimension):
-    tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
-# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
-    tab_delta[i] = tab_size[i]/tab_dim[i]
-#  print(tab_dim)
-
+# Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
+  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+# Define an initial state
+  initial_state = anderson.Wavefunction(tab_dim,tab_delta)
+  initial_state.type = initial_state_type
+  if (initial_state.type=='plane_wave'):
+    anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
+  if (initial_state.type=='gaussian_wave_packet'):
+    anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
+# Define the structure of the temporal integration
+  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
+# Define the structure of measurements  
+  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
+  measurement_global = copy.deepcopy(measurement)
+#  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
+  measurement.prepare_measurement(propagation,tab_delta,tab_dim)
+#  print(measurement.density_final.shape)
+  measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
+  
+#  return (H, initial_state, propagation, measurement, measurement_global, dimension, n_config, tab_size, tab_delta, tab_dim, tab_boundary_condition, disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength, initial_state_type, tab_k_0, tab_sigma_0, method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0, delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft) 
+  return (H, initial_state, propagation, measurement, measurement_global, n_config) 
+ 
+def main():
+  parser = argparse.ArgumentParser(description='Compute propagation using the Gross-Pitaevskii or Schoedinger equation')
+  parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
+  args = parser.parse_args()
+  parameter_file = args.filename.name
+  mpi_version, comm, nprocs, rank, mpi_string = determine_if_launched_by_mpi()
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
+             +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
+             +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
+             +mpi_string+'\n'
   try:
     import mkl
     mkl.set_num_threads(1)
     os.environ["MKL_NUM_THREADS"] = "1"
   except:
     pass
-
-  for i in range(dimension):
-    assert tab_boundary_condition[i] in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
-
-# Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
-# Define an initial state
-  initial_state = anderson.Wavefunction(tab_dim,tab_delta)
-  initial_state.type = initial_state_type
-  assert initial_state.type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
-  if (initial_state.type=='plane_wave'):
-    anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
-  if (initial_state.type=='gaussian_wave_packet'):
-    anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
-#  np.savetxt('wfc.dat',initial_state.wfc)
-#  print(initial_state.overlap(initial_state))
-
-# Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
-  # When computing an autocorrelation <psi(0)|psi(t)>, one can skip the first time steps, i.e. initialize
-  # psi(0) with the wavefunction at some time tau. tau must be an integer multiple of delta_t_measurement.
-  # args.first_step_autocorr is the integer tau/delta_t_measurement
-  # In other words, the measurement of the autocorrelation function starts as time tau=delta_t_measurement*first_mmeasurement_autocorr
-
-  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
-  measurement_global = copy.deepcopy(measurement)
-
-#  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
-  measurement.prepare_measurement(propagation,tab_delta,tab_dim)
-#  print(measurement.density_final.shape)
-  measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
-#  print(measurement_global.density_final.shape)
-#  print(measurement.frequencies)
-#  print(measurement.measure_density,measurement_global.measure_density)
-#  print(measurement.density_final)
+  
   if rank==0:
-# At this point, it it not yet known whether there is a CFFI implementation available
+    initial_time=time.asctime()
+#    hostname = os.uname()[1].split('.')[0]
+    print("Python script runs on machine : "+socket.getfqdn())
+    print("Name of python script:  {}".format(os.path.abspath( __file__ )))
+    print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
+    print()
+    print("Python script started on: {}".format(initial_time))
+    print()
+
+#  H, initial_state, propagation, measurement, measurement_global, dimension, n_config, tab_size, tab_delta, tab_dim, tab_boundary_condition, disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength, initial_state_type, tab_k_0, tab_sigma_0, method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0, delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
+  H, initial_state, propagation, measurement, measurement_global, n_config = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
+
+  t1=time.perf_counter()
+  timing=anderson.Timing()
+  i_tab_0 = 0
+
+  if rank==0:
+# At this point, it it not yet known whether there is a C implementation available
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
 #  print(header_string)
 # Print the initial density in configuration space
@@ -307,36 +308,23 @@ def main():
     if (measurement_global.measure_wavefunction_momentum):
       anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
 
-#  pot_correl=np.zeros(tab_dim)
+# pot_correl=np.zeros(H.tab_dim)
+
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-# Propagate from 0 to t_max
-#    print('1',measurement.density_final.shape)
+# Propagation for one realization of disorder    
     anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
-#    H.generate_disorder(i+rank*n_config+1234)
-#   print(H.disorder)
-#    np.savetxt('potential.dat',H.disorder-H.diagonal)
-#    pot_correl += np.real(anderson.compute_correlation(H.disorder-H.diagonal,H.disorder-H.diagonal))
-#  pot_correl /= n_config
-#  np.savetxt('potential_correlation.dat',np.fft.fftshift(pot_correl))
-#    H.generate_disorder(i+rank*n_config)
-#    matrix=H.generate_full_matrix()
-#    vector = matrix.dot(initial_state.wfc)
-#    H.generate_sparse_matrix()
-#    print(H.sparse_matrix)
-#    print(initial_state.wfc.shape)
-#    print(initial_state.wfc)
-#    vector = H.sparse_matrix.dot(np.real(initial_state.wfc).reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
-#+1j*H.sparse_matrix.dot(np.imag(initial_state.wfc).reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
-#    print(vector)
-#    vector = H.sparse_matrix.dot(initial_state.wfc.reshape(H.tab_dim_cumulative[0])).reshape(H.tab_dim)
-#    print(vector)
-#    print('vector',vector.shape)
-#    print(np.vdot(initial_state.wfc,vector)*H.delta_vol)
-#    anderson.io.output_density('wavefunction.dat',initial_state.wfc,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
-#    anderson.io.output_density('wavefunction2.dat',vector,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
+# Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
-#  print(measurement_global.tab_position)
+# The following lines just for generating and printing a single realization of disorder    
+#   H.generate_disorder(i+rank*n_config+1234)
+#   print(H.disorder)
+#   np.savetxt('potential.dat',H.disorder-H.diagonal)
+# The following lines for computing the potential correlation function
+#   pot_correl += np.real(anderson.compute_correlation(H.disorder-H.diagonal,H.disorder-H.diagonal))
+# pot_correl /= n_config
+# np.savetxt('potential_correlation.dat',np.fft.fftshift(pot_correl))
+
 #
   if mpi_version:
     measurement_global.mpi_merge_measurement(comm,timing)
@@ -344,21 +332,14 @@ def main():
   timing.TOTAL_TIME = t2-t1
   if mpi_version:
     timing.mpi_merge(comm)
-#    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
-#    toto = np.empty_like(measurement_global.tab_autocorrelation)
-#    comm.Reduce(measurement_global.tab_autocorrelation,toto,op=MPI.SUM)
-#    measurement_global.tab_autocorrelation = toto
-#    timing.CHE_TIME = comm.reduce(timing.CHE_TIME)
-#    global_timing=comm.reduce(timing)
-#    print(rank,global_timing.CHE_TIME)
-#    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
+
   if rank==0:
-# After the calculation, whether the CFFI implementation has been used is known, hence recompute the header string
+# After the calculation, whether the C implementation has been used is known, hence recompute the header string
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=timing)
+#    print('header',header_string)
     tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
     if (measurement_global.measure_density):
-#      print('header',header_string)
       anderson.io.output_density('density_final.dat',measurement_global.density_final,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='density')
     if (measurement_global.measure_density_momentum):
       anderson.io.output_density('density_momentum_final.dat',measurement_global.density_momentum_final,H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
@@ -368,11 +349,9 @@ def main():
       anderson.io.output_density('wavefunction_momentum_final.dat',measurement_global.wfc_momentum,H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
     if (measurement_global.measure_autocorrelation):
       anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_autocorrelation,H,tab_abscissa=measurement.tab_t_measurement[i_tab_0:]-measurement.tab_t_measurement[i_tab_0],header_string=header_string,data_type='autocorrelation')
-#    print(tab_dispersion)
     if (measurement_global.measure_dispersion_position or measurement_global.measure_dispersion_momentum or measurement_global.measure_dispersion_energy):
       anderson.io.output_dispersion('dispersion.dat',tab_dispersion,tab_strings,header_string)
     if (measurement_global.measure_g1):
-#      g1 = anderson.compute_correlation(measurement_global.wfc,measurement_global.wfc,shift_center=True)*measurement_global.wfc.size*H.delta_vol
       anderson.io.output_density('g1_final.dat',measurement_global.g1,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='g1')
 #    if (measurement_global.measure_overlap):
 #      print("Squared overlap with initial state = ",abs(measurement_global.overlap)**2)

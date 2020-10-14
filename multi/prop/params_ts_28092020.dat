@@ -59,7 +59,7 @@ delta_t = 0.5
 #want_ctypes = False
 
 [Averaging]
-n_config = 8
+n_config = 1
 
 [Measurement]
 delta_t_measurement = 27.5

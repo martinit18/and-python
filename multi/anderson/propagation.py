@@ -585,9 +585,10 @@ class Measurement:
       comm.Reduce(self.g1,toto)
       self.g1 = np.copy(toto)
     if self.measure_overlap:
-      toto = 0.0
+#      print(self.overlap)
+      toto = np.zeros(1,dtype=np.complex128)
       comm.Reduce(self.overlap,toto)
-      self.g1 = toto
+      self.overlap = toto[0]
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 
