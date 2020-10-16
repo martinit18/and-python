@@ -72,40 +72,7 @@ import argparse
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
-def determine_if_launched_by_mpi():
-  try:
-# First try to detect if the python script is launched by mpiexec/mpirun
-# It can be done by looking at an environment variable
-# Unfortunaltely, this variable depends on the MPI implementation
-# For MPICH and IntelMPI, MPI_LOCALNRANKS can be checked for existence
-#   os.environ['MPI_LOCALNRANKS']
-# For OpenMPI, it is OMPI_COMM_WORLD_SIZE
-#   os.environ['OMPI_COMM_WORLD_SIZE']
-# In any case, when importing the module mpi4py, the MPI implementation for which
-# the module was created is unknown. Thus, no portable way...
-# The following line is for OpenMPI
-    os.environ['OMPI_COMM_WORLD_SIZE']
-# If no KeyError raised, the script has been launched by MPI,
-# I must thus import the mpi4py module
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    nprocs = comm.Get_size()
-    mpi_version = True
-    mpi_string = 'MPI version ran on '+str(nprocs)+' processes\n'
-  except KeyError:
-# Not launched by MPI, use sequential code
-    mpi_version = False
-    comm = None
-    nprocs = 1
-    rank = 0
-    mpi_string = 'Single processor version\n'
-  except ImportError:
-# Launched by MPI, but no mpi4py module available. Abort the calculation.
-    exit('mpi4py module not available! I stop!')
-  mpi_string += '\nCalculation started on: {}'.format(time.asctime())
-#  print("inside",mpi_string)
-  return (mpi_version,comm,nprocs,rank,mpi_string)
+
 
 def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
   if rank==0:
@@ -248,34 +215,33 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
     anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
 # Define the structure of the temporal integration
   propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
-# Define the structure of measurements  
+# Define the structure of measurements
   measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
   measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
   measurement.prepare_measurement(propagation,tab_delta,tab_dim)
 #  print(measurement.density_final.shape)
   measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
-  
-#  return (H, initial_state, propagation, measurement, measurement_global, dimension, n_config, tab_size, tab_delta, tab_dim, tab_boundary_condition, disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength, initial_state_type, tab_k_0, tab_sigma_0, method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0, delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft) 
-  return (H, initial_state, propagation, measurement, measurement_global, n_config) 
- 
+
+  return (H, initial_state, propagation, measurement, measurement_global, n_config)
+
 def main():
-  parser = argparse.ArgumentParser(description='Compute propagation using the Gross-Pitaevskii or Schoedinger equation')
+  parser = argparse.ArgumentParser(description='Compute temporal propagation using the Gross-Pitaevskii or Schoedinger equation')
   parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
   args = parser.parse_args()
   parameter_file = args.filename.name
-  mpi_version, comm, nprocs, rank, mpi_string = determine_if_launched_by_mpi()
+
+# Determine is the script is ran inside MPI
+# If yes, set the mpi_version to True, the  MPI communicator to comm, the number of
+# MPI processes to nprocs, the rank of the current process to rank, and
+# set mpi_string to something containing minimal MPI information
+# If not run inside MPI, nprocs=1 and rank=0
+  mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
   environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
              +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
              +mpi_string+'\n'
-  try:
-    import mkl
-    mkl.set_num_threads(1)
-    os.environ["MKL_NUM_THREADS"] = "1"
-  except:
-    pass
-  
+
   if rank==0:
     initial_time=time.asctime()
 #    hostname = os.uname()[1].split('.')[0]
@@ -286,37 +252,47 @@ def main():
     print("Python script started on: {}".format(initial_time))
     print()
 
-#  H, initial_state, propagation, measurement, measurement_global, dimension, n_config, tab_size, tab_delta, tab_dim, tab_boundary_condition, disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength, initial_state_type, tab_k_0, tab_sigma_0, method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0, delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
+# Parse parameter file and prepare the useful objects:
+# H for the Hamiltonian of the system
+# propagation for the propagation scheme
+# measurement for the measurement scheme
+# measurement_global is used to gather (average) the results for several disorder configurations
   H, initial_state, propagation, measurement, measurement_global, n_config = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
 
   t1=time.perf_counter()
   timing=anderson.Timing()
+# The following line is a temporary fix
   i_tab_0 = 0
 
   if rank==0:
+
+# Print various things for the initial state
 # At this point, it it not yet known whether there is a C implementation available
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
 #  print(header_string)
 # Print the initial density in configuration space
     if measurement_global.measure_density:
       anderson.io.output_density('density_initial.dat',np.abs(initial_state.wfc)**2,H,tab_abscissa=initial_state.tab_position,header_string=header_string,data_type='density',file_type='savetxt')
- # Print the initial density in momentum space
+# Print the initial density in momentum space
     if (measurement_global.measure_density_momentum):
       anderson.io.output_density('density_momentum_initial.dat',np.abs(initial_state.convert_to_momentum_space())**2,H,tab_abscissa=measurement.frequencies,header_string=header_string,data_type='density_momentum',file_type='savetxt')
+# The initial wavefunction in configuration space
     if (measurement_global.measure_wavefunction):
       anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
+# The initial wavefunction in momentum space
     if (measurement_global.measure_wavefunction_momentum):
       anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
 
+# Next line useful only if one wants to compute the potential correlation function
 # pot_correl=np.zeros(H.tab_dim)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-# Propagation for one realization of disorder    
+# Propagation for one realization of disorder
     anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
-# The following lines just for generating and printing a single realization of disorder    
+# The following lines just for generating and printing a single realization of disorder
 #   H.generate_disorder(i+rank*n_config+1234)
 #   print(H.disorder)
 #   np.savetxt('potential.dat',H.disorder-H.diagonal)
@@ -325,9 +301,12 @@ def main():
 # pot_correl /= n_config
 # np.savetxt('potential_correlation.dat',np.fft.fftshift(pot_correl))
 
-#
+# Merge measured quantities in the various MPI processes
   if mpi_version:
     measurement_global.mpi_merge_measurement(comm,timing)
+
+# Calculation is essentially finished
+# It remains to output the results
   t2 = time.perf_counter()
   timing.TOTAL_TIME = t2-t1
   if mpi_version:
