@@ -1,13 +1,13 @@
 [System]
-dimension = 3
+dimension = 2
 # System size in natural units
-size_1 = 5.
-size_2 = 5.
+size_1 = 40.
+size_2 = 40.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
-delta_1 = 0.25
-delta_2 = 0.25
+delta_1 = 1.0
+delta_2 = 1.0
 delta_3 = 0.25
 delta_4 = 0.25
 # either periodic or open
@@ -18,61 +18,71 @@ boundary_condition_4 = periodic
 
 [Disorder]
 #  Various disorder types can be used
-type = anderson_gaussian
-# type = 'regensburg'
-# type = 'konstanz'
-# type = 'singapore'
-# type = 'speckle'
+type = anderson_uniform
+#type = anderson_gaussian
+# type = regensburg
+#type = konstanz
+# type = singapore
 # type = speckle
+use_mkl_random = True
 # Correlation length of disorder
-sigma = 1.0
+sigma = 2.0
 # Disorder strength
-V0 = 5.0
+V0 = 2.0
 
 [Nonlinearity]
 # g is the nonlinear interaction
-g = 0.0
+g = 0.
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
-# make sure that k_0_over_2_pi*my_system_size is an integer
-k_0_over_2_pi_1 = 0.16
-#0.16
+#initial_state = gaussian_wave_packet
+# make sure that k_0_over_2_pi_i*size_i is an integer
+k_0_over_2_pi_1 = 0.0
+k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
 sigma_0_1 = 10.0
+sigma_0_2 = 10.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
+#accuracy = 1.e-8
+#accurate_bounds = True
 data_layout = real
+#data_layout = complex
 # Total duration of the propagation
-t_max = 2000.
+t_max = 281.4
 # Elementary time step
-delta_t = 2.
+delta_t = 0.6
+#want_cffi = False
+
+[Averaging]
+n_config = 1000
+
+[Measurement]
+delta_t_measurement = 40.2
+#first_measurement = 0
+#density = True
+density_momentum = True
+#dispersion_position = True
+#dispersion_position2 = True
+#dispersion_momentum = True
+#dispersion_energy = True
+#dispersion_variance = True
+#wavefunction = True
+#wavefunction_momentum = True
+#autocorrelation = True
+use_mkl_fft = True
 
 [Spectral]
 range = 20.0
-resolution = 0.02
-
-[Averaging]
-n_config = 1
-
-[Measurement]
-delta_t_measurement = 2.
-#first_measurement = 0
-density = True
-density_momentum = True
-dispersion = True
-dispersion_momentum = True
-wavefunction_final = True
-autocorrelation = True
-extended = True
+resolution = 0.01
 
 [Diagonalization]
-method = sparse
-#method = lapack
-targeted_energy = 0.6
+method = lapack
+targeted_energy = 0.1
 IPR_min = 0.0
-IPR_max = 0.5
+IPR_max = 0.04
 number_of_bins = 50

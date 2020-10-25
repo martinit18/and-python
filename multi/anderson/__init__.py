@@ -400,7 +400,7 @@ class Hamiltonian(Potential):
 #    print(diagonals)
 #    print(offsets)
     self.sparse_matrix = ssparse.diags(diagonals,offsets,format='csr')
-#    print('Sparse matrix computed')
+#    print('Sparse matrix computed',self.sparse_matrix.dtype)
 #    print(matrix.toarray())
     return
 

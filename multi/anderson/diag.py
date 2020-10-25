@@ -11,9 +11,12 @@ import scipy.sparse.linalg as sparse_linalg
 # import scipy.sparse
 
 class Diagonalization:
-  def __init__(self,targeted_energy,method='sparse'):
+  def __init__(self,targeted_energy,method='sparse',IPR_min=0.0,IPR_max=1.0,number_of_bins=1):
     self.targeted_energy = targeted_energy
     self.method = method
+    self.IPR_min = IPR_min
+    self.IPR_max = IPR_max
+    self.number_of_bins = number_of_bins
 
   def compute_IPR(self, i, H):
     H.generate_disorder(seed=i+1234)
@@ -24,14 +27,28 @@ class Diagonalization:
 #    print(w)
       index = np.abs(w-self.targeted_energy).argmin()
     if self.method=='sparse':
-      matrix = H.generate_sparse_matrix()
+      H.generate_sparse_matrix()
+#      print(H.sparse_matrix.dtype)
 #      matrix2 = H.generate_sparse_complex_matrix(1j)
-      w, v = sparse_linalg.eigsh(matrix,k=1,sigma=self.targeted_energy,mode='normal')
+      w, v = sparse_linalg.eigsh(H.sparse_matrix,k=1,sigma=self.targeted_energy,mode='normal')
       index = 0
 # The normalization (division by delta_vol) ensures that IPR is roughly the inverse of the localization length
     IPR = np.sum(v[:,index]**4)/(H.delta_vol)
 #  print('Energy=',w[index])
     return (w[index],IPR)
+
+  def compute_rbar(self, i, H):
+    H.generate_disorder(seed=i+1234)
+    if self.method=='lapack':
+      matrix = H.generate_full_matrix()
+#    print(matrix)
+      w = np.linalg.eigvalsh(matrix)
+      tab_r = np.zeros(H.ntot-2)
+      for j in range(H.ntot-2):
+        r = (w[j+2]-w[j+1])/(w[j+1]-w[j])
+        if r>1.0: r=1.0/r
+        tab_r[j] = r
+    return (w[1:H.ntot-1],tab_r)
 
   def compute_wavefunction(self,i,H,k=4):
     H.generate_disorder(seed=i+1234)

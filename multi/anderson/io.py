@@ -196,6 +196,19 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
       column_2='Re(g1)'
       column_3='Im(g1)'
       specific_string='g1 correlation function\n'
+    if data_type=='IPR':
+      column_1='IPR'
+      specific_string='Inverse participation ratio for the eigenstate closer to the targeted energy\n'\
+                   +'Average IPR           = '+str(np.mean(data))+'\n'\
+                   +'Std. deviation of IPR = '+str(np.std(data))+'\n'
+    if data_type=='histogram_IPR':
+      column_1 = 'Right bin edge'
+      column_2 = 'Normalized distribution'
+      specific_string='Distribution of the inverse participation ratio for the eigenstate closer to the targeted energy\n'
+    if data_type=='rbar':
+      column_1 = 'Energy'
+      column_2 = 'rbar value'
+      specific_string='rbar value\n'
     list_of_columns = []
     tab_strings = []
     next_column = 1
@@ -286,14 +299,22 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
       tab_strings.append('Column '+str(next_column)+': '+column_3)
       next_column += 1
       array_to_print=np.column_stack(list_of_columns)
-    if data_type in ['spectral_function']:
+    if data_type in ['spectral_function','histogram_IPR','rbar']:
       list_of_columns.append(tab_abscissa)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
       list_of_columns.append(data)
       tab_strings.append('Column '+str(next_column)+': '+column_2)
       next_column += 1
-      array_to_print=np.column_stack(list_of_columns)
+    if data_type in ['IPR']:
+      list_of_columns.append(data)
+      tab_strings.append('Column '+str(next_column)+': '+column_1)
+      next_column += 1
+#   print(list_of_columns,len(list_of_columns))
+ #   if len(list_of_columns) == 1:
+ #     array_to_print = list_of_columns
+ #   else:
+    array_to_print=np.column_stack(list_of_columns)
 #    print(list_of_columns)
 #    print(tab_strings)
     np.savetxt(file,array_to_print,header=header_string+specific_string+'\n'.join(tab_strings)+'\n')

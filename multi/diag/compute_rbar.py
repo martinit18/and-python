@@ -25,7 +25,7 @@ __version__ = "1.0"
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 # ____________________________________________________________________
 #
-# generate_disorder.py
+# compute_IPR.py
 # Author: Dominique Delande
 # Release date: April, 27, 2020
 # License: GPL2 or later
@@ -37,7 +37,7 @@ import numpy as np
 import copy
 import getpass
 import configparser
-#import timeit
+import timeit
 import sys
 import socket
 import argparse
@@ -87,8 +87,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
     diagonalization_method = Diagonalization.get('method','sparse')
     targeted_energy = Diagonalization.getfloat('targeted_energy')
     IPR_min = Diagonalization.getfloat('IPR_min',0.0)
-    IPR_max = Diagonalization.getfloat('IPR_max')
-    number_of_bins = Diagonalization.getint('number_of_bins')
+    IPR_max = Diagonalization.getfloat('IPR_max',1.0)
+    number_of_bins = Diagonalization.getint('number_of_bins',1)
 
   else:
     dimension = None
@@ -103,15 +103,18 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
     use_mkl_random = None
     diagonalization_method = None
     targeted_energy = None
+    IPR_min = None
+    IPR_max = None
+    number_of_bins = None
 
   if mpi_version:
     n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, use_mkl_random = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random))
-    diagonalization_method, targeted_energy = comm.bcast((diagonalization_method, targeted_energy))
+    diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins))
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random)
-
-  return (H, n_config)
+  diagonalization = anderson.diag.Diagonalization(targeted_energy,diagonalization_method, IPR_min, IPR_max, number_of_bins)
+  return (H, diagonalization, n_config)
 
 def main():
   parser = argparse.ArgumentParser(description='Generate random disorder')
@@ -145,7 +148,7 @@ def main():
 # propagation for the propagation scheme
 # measurement for the measurement scheme
 # measurement_global is used to gather (average) the results for several disorder configurations
-  H, n_config = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
+  H, diagonalization, n_config = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
 
   t1=time.perf_counter()
   timing=anderson.Timing()
@@ -156,33 +159,54 @@ def main():
 # At this point, it it not yet known whether there is a C implementation available
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs)
 
-# Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
+  tab_r = np.zeros(H.ntot-2)
+  tab_energy = np.zeros(H.ntot-2)
+  emin=0.0
+#  emax=2.0
+  emax=4.0
+  nsteps=50
+  estep = (emax-emin)/nsteps
+  tab_num = np.zeros(nsteps,dtype=int)
+  tab_hist_r = np.zeros(nsteps)
+  tab_middle_energy = np.arange(start=emin,stop=emax,step=estep)+0.5*estep
 
-
-#  header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
-
-#  tab_IPR = np.zeros(n_config)
-#  tab_energy = np.zeros(n_config)
   # Here starts the loop over disorder configurations
   for i in range(n_config):
-    H.generate_disorder(i+rank*n_config)
+    tab_energy, tab_r = diagonalization.compute_rbar(i+rank*n_config, H)
+# accumulate r values in an energy-dependent array
+    for j in range(H.ntot-2):
+      k = int((tab_energy[j]-emin)/estep)
+      k = max(k,0)
+      k = min(k,nsteps-1)
+      tab_num[k]+=1
+      tab_hist_r[k]+=tab_r[j]
+  for k in range(nsteps):
+    tab_hist_r[k]/=tab_num[k]
 #    H.generate_full_matrix()
 #    print(H.generate_full_complex_matrix(1.0j))
-  t2 = time.perf_counter()
+  if mpi_version:
+    start_mpi_time = timeit.default_timer()
+    tab_hist_r_glob = np.empty_like(tab_hist_r)
+    comm.Reduce(tab_hist_r,tab_hist_r_glob)
+    tab_hist_r_glob/=nprocs
+    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+  else:
+    tab_hist_r_glob = tab_hist_r
+  t2=time.perf_counter()
   timing.TOTAL_TIME = t2-t1
   if mpi_version:
     timing.mpi_merge(comm)
-#  print(H.disorder.shape)
-  np.savetxt('potential.dat',H.disorder-H.diagonal,header=header_string)
   if rank==0:
+#    print(tab_energy_glob)
+#    print(tab_IPR_glob)
+#    print(tab_IPR_glob.shape)
+    anderson.io.output_density('tab_rbar.dat',tab_hist_r_glob,H,header_string=header_string,tab_abscissa=tab_middle_energy,data_type='rbar')
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if mpi_version:
       print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-#    print("Dummy time           = {0:.3f}".format(timing.DUMMY_TIME))
-#    print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
     print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
 
 if __name__ == "__main__":
