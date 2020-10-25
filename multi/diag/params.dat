@@ -28,7 +28,7 @@ use_mkl_random = True
 # Correlation length of disorder
 sigma = 2.0
 # Disorder strength
-V0 = 2.0
+V0 = 1.0
 
 [Nonlinearity]
 # g is the nonlinear interaction
