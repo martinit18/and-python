@@ -45,79 +45,9 @@ sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
-def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
-  if rank==0:
-    config = configparser.ConfigParser()
-    config.read(parameter_file)
-
-    Averaging = config['Averaging']
-    n_config = Averaging.getint('n_config',1)
-    n_config = (n_config+nprocs-1)//nprocs
-    print("Total number of disorder realizations: {}".format(n_config*nprocs))
-    print("Number of processes: {}".format(nprocs))
-    print()
-    System = config['System']
-    dimension = System.getint('dimension', 1)
-    tab_size = list()
-    tab_delta = list()
-    tab_boundary_condition = list()
-    for i in range(dimension):
-      tab_size.append(System.getfloat('size_'+str(i+1)))
-      tab_delta.append(System.getfloat('delta_'+str(i+1)))
-      tab_boundary_condition.append(System.get('boundary_condition_'+str(i+1),'periodic'))
-#    print(dimension,tab_size,tab_delta,tab_boundary_condition)
-# Number of sites
-    tab_dim = list()
-    for i in range(dimension):
-      tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
-# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
-      tab_delta[i] = tab_size[i]/tab_dim[i]
-#  print(tab_dim)
-    for i in range(dimension):
-      assert tab_boundary_condition[i] in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
-
-    Disorder = config['Disorder']
-    disorder_type = Disorder.get('type','anderson gaussian')
-    correlation_length = Disorder.getfloat('sigma',0.0)
-    V0 = Disorder.getfloat('V0',0.0)
-    disorder_strength = V0
-    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
-
-    Diagonalization = config['Diagonalization']
-    diagonalization_method = Diagonalization.get('method','sparse')
-    targeted_energy = Diagonalization.getfloat('targeted_energy')
-    IPR_min = Diagonalization.getfloat('IPR_min',0.0)
-    IPR_max = Diagonalization.getfloat('IPR_max',1.0)
-    number_of_bins = Diagonalization.getint('number_of_bins',1)
-
-  else:
-    dimension = None
-    n_config = None
-    tab_size = None
-    tab_delta = None
-    tab_dim = None
-    tab_boundary_condition = None
-    disorder_type = None
-    correlation_length = None
-    disorder_strength = None
-    use_mkl_random = None
-    diagonalization_method = None
-    targeted_energy = None
-    IPR_min = None
-    IPR_max = None
-    number_of_bins = None
-
-  if mpi_version:
-    n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, correlation_length, disorder_strength, use_mkl_random = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random))
-    diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins))
-# Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random)
-  diagonalization = anderson.diag.Diagonalization(targeted_energy,diagonalization_method, IPR_min, IPR_max, number_of_bins)
-  return (H, diagonalization, n_config)
 
 def main():
-  parser = argparse.ArgumentParser(description='Generate random disorder')
+  parser = argparse.ArgumentParser(description='Compute rbar vs. energy')
   parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
   args = parser.parse_args()
   parameter_file = args.filename.name
@@ -148,8 +78,10 @@ def main():
 # propagation for the propagation scheme
 # measurement for the measurement scheme
 # measurement_global is used to gather (average) the results for several disorder configurations
-  H, diagonalization, n_config = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
-
+  H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization'])
+# Force lapack diagonalization
+  diagonalization.method = 'lapack'
+  diagonalization.number_of_eigenvalues = H.ntot
   t1=time.perf_counter()
   timing=anderson.Timing()
 
@@ -157,7 +89,7 @@ def main():
 
 # Print various things for the initial state
 # At this point, it it not yet known whether there is a C implementation available
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs)
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
 
   tab_r = np.zeros(H.ntot-2)
   tab_energy = np.zeros(H.ntot-2)
@@ -165,6 +97,7 @@ def main():
 #  emax=2.0
   emax=4.0
   nsteps=50
+  header_string += 'emin                            = '+str(emin)+'\nemax                            = '+str(emax)+'\nnumber of energy steps          = '+str(nsteps)+'\n\n'
   estep = (emax-emin)/nsteps
   tab_num = np.zeros(nsteps,dtype=int)
   tab_hist_r = np.zeros(nsteps)
@@ -172,7 +105,7 @@ def main():
 
   # Here starts the loop over disorder configurations
   for i in range(n_config):
-    tab_energy, tab_r = diagonalization.compute_rbar(i+rank*n_config, H)
+    tab_energy, tab_r = diagonalization.compute_tab_r(i+rank*n_config, H)
 # accumulate r values in an energy-dependent array
     for j in range(H.ntot-2):
       k = int((tab_energy[j]-emin)/estep)

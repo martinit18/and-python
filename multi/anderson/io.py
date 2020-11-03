@@ -106,7 +106,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       tab_sigma_0 = list()
       for i in range(dimension):
         if not config.has_option('Wavefunction','k_0_over_2_pi_'+str(i+1)): all_options_ok=False
-        tab_k_0.append(2.0*math.pi*Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1)))
+#        tab_k_0.append(2.0*math.pi*
+        k_0_over_2_pi=Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1))
+# k_0_over_2_pi*size must be an integer is all dimensions
+# Renormalize k_0_over_2_pi to ensure it
+        tab_k_0.append(2.0*math.pi*int(k_0_over_2_pi*tab_size[i]+0.5)/tab_size[i])
         if initial_state_type != "plane_wave":
           if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
           tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
@@ -153,6 +157,19 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       measure_g1 = Measurement.getboolean('g1',False)
       measure_overlap = Measurement.getboolean('overlap',False)
       use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
+
+# Optional Diagonalization section
+    if 'Diagonalization' in my_list_of_sections:
+      if not config.has_section('Diagonalization'):
+        my_abort(mpi_version,comm,'Parameter file does not have a Diagonalization section, I stop!\n')
+      Diagonalization = config['Diagonalization']
+      diagonalization_method = Diagonalization.get('method','sparse')
+      targeted_energy = Diagonalization.getfloat('targeted_energy')
+      IPR_min = Diagonalization.getfloat('IPR_min',0.0)
+      IPR_max = Diagonalization.getfloat('IPR_max',1.0)
+      number_of_bins = Diagonalization.getint('number_of_bins',1)
+      number_of_eigenvalues = Diagonalization.getint('number_of_eigenvalues',1)
+
   else:
     dimension = None
     n_config = None
@@ -191,6 +208,12 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     measure_g1 = None
     measure_overlap = None
     use_mkl_fft = None
+    diagonalization_method = None
+    targeted_energy = None
+    IPR_min = None
+    IPR_max = None
+    number_of_bins = None
+    number_of_eigenvalues = None
 
   if mpi_version:
     n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
@@ -201,6 +224,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
     if 'Measurement' in my_list_of_sections:
       delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft))
+    if 'Diagonalization' in my_list_of_sections:
+      diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
@@ -232,9 +257,17 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     return_list.append(measurement)
     return_list.append(measurement_global)
 
+# Define the structure of diagonalization
+  if 'Diagonalization' in my_list_of_sections:
+    diagonalization = anderson.diag.Diagonalization(targeted_energy,method=diagonalization_method, IPR_min= IPR_min, IPR_max=IPR_max, number_of_bins=number_of_bins, number_of_eigenvalues=number_of_eigenvalues)
+    return_list.append(diagonalization)
+
+
   return_list.append(n_config)
 #  print(return_list)
-  return (H, initial_state, propagation, measurement, measurement_global, n_config)
+#  return (H, initial_state, propagation, measurement, measurement_global, n_config)
+  return(return_list)
+
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
   params_string = 'Disorder type                   = '+H.disorder_type+'\n'\
                  +'Correlation length              = '+str(H.correlation_length)+'\n'\
@@ -296,7 +329,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not diagonalization == None:
     params_string += \
                   'targeted_energy                 = '+str(diagonalization.targeted_energy)+'\n'\
-                 +'diagonalization method          = '+diagonalization.method+'\n'
+                 +'diagonalization method          = '+diagonalization.method+'\n'\
+                 +'number of computed eigenvalues  = '+str(diagonalization.number_of_eigenvalues)+'\n'
   if not lyapounov == None:
     params_string += \
                   'minimum energy                  = '+str(lyapounov.e_min)+'\n'\
@@ -431,11 +465,15 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
     if data_type=='histogram_IPR':
       column_1 = 'Right bin edge'
       column_2 = 'Normalized distribution'
-      specific_string='Distribution of the inverse participation ratio for the eigenstate closer to the targeted energy\n'
+      specific_string='Distribution of the inverse participation ratio for the eigenstates closer to the targeted energy\n'
     if data_type=='rbar':
       column_1 = 'Energy'
       column_2 = 'rbar value'
       specific_string='rbar value\n'
+    if data_type=='histogram_r':
+      column_1 = 'Right bin edge'
+      column_2 = 'Normalized distribution'
+      specific_string='Distribution of the r value for the eigenstates closer to the targeted energy\n'
     list_of_columns = []
     tab_strings = []
 #    print(specific_string)
@@ -528,7 +566,7 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
       tab_strings.append('Column '+str(next_column)+': '+column_3)
       next_column += 1
       array_to_print=np.column_stack(list_of_columns)
-    if data_type in ['spectral_function','histogram_IPR','rbar']:
+    if data_type in ['spectral_function','histogram_IPR','rbar','histogram_r']:
       list_of_columns.append(tab_abscissa)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1

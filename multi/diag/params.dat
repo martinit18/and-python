@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 40.
-size_2 = 40.
+size_1 = 30.
+size_2 = 30.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
@@ -81,8 +81,10 @@ range = 20.0
 resolution = 0.01
 
 [Diagonalization]
-method = lapack
-targeted_energy = 0.1
+#method = lapack
+targeted_energy = 2.0
 IPR_min = 0.0
 IPR_max = 0.04
 number_of_bins = 50
+number_of_eigenvalues = 100
+
