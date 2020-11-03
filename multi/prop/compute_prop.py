@@ -74,157 +74,6 @@ import anderson
 
 
 
-def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file):
-  if rank==0:
-    config = configparser.ConfigParser()
-    config.read(parameter_file)
-
-    Averaging = config['Averaging']
-    n_config = Averaging.getint('n_config',1)
-    n_config = (n_config+nprocs-1)//nprocs
-    print("Total number of disorder realizations: {}".format(n_config*nprocs))
-    print("Number of processes: {}".format(nprocs))
-    print()
-    System = config['System']
-    dimension = System.getint('dimension', 1)
-    tab_size = list()
-    tab_delta = list()
-    tab_boundary_condition = list()
-    for i in range(dimension):
-      tab_size.append(System.getfloat('size_'+str(i+1)))
-      tab_delta.append(System.getfloat('delta_'+str(i+1)))
-      tab_boundary_condition.append(System.get('boundary_condition_'+str(i+1),'periodic'))
-#    print(dimension,tab_size,tab_delta,tab_boundary_condition)
-# Number of sites
-    tab_dim = list()
-    for i in range(dimension):
-      tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
-# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
-      tab_delta[i] = tab_size[i]/tab_dim[i]
-#  print(tab_dim)
-    for i in range(dimension):
-      assert tab_boundary_condition[i] in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
-
-    Disorder = config['Disorder']
-    disorder_type = Disorder.get('type','anderson gaussian')
-    correlation_length = Disorder.getfloat('sigma',0.0)
-    V0 = Disorder.getfloat('V0',0.0)
-    disorder_strength = V0
-    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
-
-    Nonlinearity = config['Nonlinearity']
-# First try to see if g_over_volume is defined
-    interaction_strength = Nonlinearity.getfloat('g_over_volume')
-# If not, try g
-    if interaction_strength==None:
-      interaction_strength = Nonlinearity.getfloat('g')
-    else:
- # Multiply g_over_V by the volume of the system
-      for i in range(dimension):
-        interaction_strength *= tab_size[i]
-#    print(interaction_strength)
-
-    Wavefunction = config['Wavefunction']
-    initial_state_type = Wavefunction.get('initial_state')
-    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
-    tab_k_0 = list()
-    tab_sigma_0 = list()
-    for i in range(dimension):
-      tab_k_0.append(2.0*math.pi*Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1)))
-      tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
-
-    Propagation = config['Propagation']
-    method = Propagation.get('method','che')
-    accuracy = Propagation.getfloat('accuracy',1.e-6)
-    accurate_bounds = Propagation.getboolean('accurate_bounds',False)
-    want_ctypes = Propagation.getboolean('want_ctypes',True)
-    data_layout = Propagation.get('data_layout','real')
-    t_max = Propagation.getfloat('t_max')
-    delta_t = Propagation.getfloat('delta_t')
-    i_tab_0 = 0
-
-    Measurement = config['Measurement']
-    delta_t_measurement = Measurement.getfloat('delta_t_measurement',delta_t)
-    first_measurement_autocorr = Measurement.getint('first_measurement_autocorr',0)
-    measure_density = Measurement.getboolean('density',False)
-    measure_density_momentum = Measurement.getboolean('density_momentum',False)
-    measure_autocorrelation = Measurement.getboolean('autocorrelation',False)
-    measure_dispersion_position = Measurement.getboolean('dispersion_position',False)
-    measure_dispersion_position2 = Measurement.getboolean('dispersion_position2',False)
-    measure_dispersion_momentum = Measurement.getboolean('dispersion_momentum',False)
-    measure_dispersion_energy = Measurement.getboolean('dispersion_energy',False)
-    measure_wavefunction = Measurement.getboolean('wavefunction',False)
-    measure_wavefunction_momentum = Measurement.getboolean('wavefunction_momentum',False)
-    measure_extended = Measurement.getboolean('dispersion_variance',False)
-    measure_g1 = Measurement.getboolean('g1',False)
-    measure_overlap = Measurement.getboolean('overlap',False)
-    use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
-  else:
-    dimension = None
-    n_config = None
-    tab_size = None
-    tab_delta = None
-    tab_dim = None
-    tab_boundary_condition = None
-    disorder_type = None
-    correlation_length = None
-    disorder_strength = None
-    use_mkl_random = None
-    interaction_strength = None
-    initial_state_type = None
-    tab_k_0 = None
-    tab_sigma_0 = None
-    method = None
-    accuracy = None
-    accurate_bounds = None
-    want_ctypes = None
-    data_layout = None
-    t_max = None
-    delta_t = None
-    i_tab_0 = None
-    delta_t_measurement = None
-    first_measurement_autocorr = None
-    measure_density = None
-    measure_density_momentum = None
-    measure_autocorrelation = None
-    measure_dispersion_position = None
-    measure_dispersion_position2 = None
-    measure_dispersion_momentum = None
-    measure_dispersion_energy = None
-    measure_wavefunction = None
-    measure_wavefunction_momentum = None
-    measure_extended = None
-    measure_g1 = None
-    measure_overlap = None
-    use_mkl_fft = None
-
-  if mpi_version:
-    n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
-    initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
-    method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
-    delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft))
-# Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
-# Define an initial state
-  initial_state = anderson.Wavefunction(tab_dim,tab_delta)
-  initial_state.type = initial_state_type
-  if (initial_state.type=='plane_wave'):
-    anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
-  if (initial_state.type=='gaussian_wave_packet'):
-    anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
-# Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
-# Define the structure of measurements
-  measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
-  measurement_global = copy.deepcopy(measurement)
-#  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
-  measurement.prepare_measurement(propagation,tab_delta,tab_dim)
-#  print(measurement.density_final.shape)
-  measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
-
-  return (H, initial_state, propagation, measurement, measurement_global, n_config)
-
 def main():
   parser = argparse.ArgumentParser(description='Compute temporal propagation using the Gross-Pitaevskii or Schoedinger equation')
   parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
@@ -254,10 +103,16 @@ def main():
 
 # Parse parameter file and prepare the useful objects:
 # H for the Hamiltonian of the system
+# initial_state for the initial state
 # propagation for the propagation scheme
 # measurement for the measurement scheme
 # measurement_global is used to gather (average) the results for several disorder configurations
-  H, initial_state, propagation, measurement, measurement_global, n_config = parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file)
+# my_list_of_sections is the list of sections needed for this particular calculation
+# Can be in any order
+# The list determines the various structures returned by the routine
+# Must be consistent otherwise disaster guaranted
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement']
+  H, initial_state, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
   timing=anderson.Timing()
