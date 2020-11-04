@@ -190,6 +190,19 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       if not config.has_section('Propagation'):
         my_abort(mpi_version,comm,'Parameter file does not have a Propagation section, I stop!\n')
 
+# Optional Lyapounov section
+    if 'Lyapounov' in my_list_of_sections:
+      if not config.has_section('Lyapounov'):
+        my_abort(mpi_version,comm,'Parameter file does not have a Lyapounov section, I stop!\n')
+    Lyapounov = config['Lyapounov']
+    e_min = Lyapounov.getfloat('e_min',0.0)
+    e_max = Lyapounov.getfloat('e_max',0.0)
+    number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
+    e_histogram = Lyapounov.getfloat('e_histogram',0.0)
+    lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
+    lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
+    number_of_bins = Lyapounov.getint('number_of_bins',0)
+    want_ctypes = Lyapounov.getboolean('want_ctypes',True)
 
   else:
     dimension = None
@@ -237,6 +250,13 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     number_of_eigenvalues = None
     e_range = None
     e_resolution = None
+    e_min = None
+    e_max = None
+    number_of_e_steps = None
+    e_histogram = None
+    lyapounov_min = None
+    lyapounov_max = None
+
 
   if mpi_version:
     n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
@@ -251,6 +271,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
       e_range, e_resolution  = comm.bcast((e_range,e_resolution))
+    if 'Lyapounov' in my_list_of_sections:
+      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
@@ -307,7 +329,10 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     diagonalization = anderson.diag.Diagonalization(targeted_energy,method=diagonalization_method, IPR_min= IPR_min, IPR_max=IPR_max, number_of_bins=number_of_bins, number_of_eigenvalues=number_of_eigenvalues)
     return_list.append(diagonalization)
 
-
+# Define the structure of lyapounov
+  if 'Lyapounov' in my_list_of_sections:
+    lyapounov = anderson.lyapounov.Lyapounov(e_min,e_max,number_of_e_steps,want_ctypes=want_ctypes)
+    return_list.append(lyapounov)
 
   return_list.append(n_config)
 #  print(return_list)
@@ -381,7 +406,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'minimum energy                  = '+str(lyapounov.e_min)+'\n'\
                  +'maximum energy                  = '+str(lyapounov.e_max)+'\n'\
                  +'energy step                     = '+str(lyapounov.e_step)+'\n'\
-                 +'number of energy steps          = '+str(lyapounov.number_of_e_steps)+'\n'
+                 +'number of energy steps          = '+str(lyapounov.number_of_e_steps)+'\n'\
+                 +'use ctypes implementation       = '+str(lyapounov.use_ctypes)+'\n'
   params_string += '\n'
 #  print(params_string)
 #                 +'first measurement step          = '+str(my_first_measurement_autocorr)+'\n'\
@@ -519,6 +545,13 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
       column_1 = 'Right bin edge'
       column_2 = 'Normalized distribution'
       specific_string='Distribution of the r value for the eigenstates closer to the targeted energy\n'
+    if data_type=='lyapounov':
+      column_1='Energy'
+      column_2='Lyapounov for the intensity (halve it for wavefunction)'
+      column_3='Std. deviation of Lyapounov'
+      column_4='Localization length for intensity (double it for wavefunction'
+      column_5='Std. deviation of localization length'
+      specific_string='Lyapounov and localization length vs. energy\n'
     list_of_columns = []
     tab_strings = []
 #    print(specific_string)
@@ -623,6 +656,24 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
       list_of_columns.append(data)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
+      array_to_print=np.column_stack(list_of_columns)
+    if data_type in ['lyapounov']:
+      list_of_columns.append(tab_abscissa)
+      tab_strings.append('Column '+str(next_column)+': '+column_1)
+      next_column += 1
+      list_of_columns.append(data[0])
+      tab_strings.append('Column '+str(next_column)+': '+column_2)
+      next_column += 1
+      list_of_columns.append(data[1])
+      tab_strings.append('Column '+str(next_column)+': '+column_3)
+      next_column += 1
+      list_of_columns.append(1.0/data[0])
+      tab_strings.append('Column '+str(next_column)+': '+column_4)
+      next_column += 1
+      list_of_columns.append(data[1]/data[0]**2)
+      tab_strings.append('Column '+str(next_column)+': '+column_5)
+      next_column += 1
+
       array_to_print=np.column_stack(list_of_columns)
 #   print(list_of_columns,len(list_of_columns))
  #   if len(list_of_columns) == 1:
