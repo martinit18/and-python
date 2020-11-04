@@ -66,175 +66,59 @@ import getpass
 import copy
 import configparser
 import sys
+import socket
+import argparse
 sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
-if __name__ == "__main__":
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
-             +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
-             +'Started on: {}'.format(time.asctime())+'\n'
-  try:
-# First try to detect if the python script is launched by mpiexec/mpirun
-# It can be done by looking at an environment variable
-# Unfortunaltely, this variable depends on the MPI implementation
-# For MPICH and IntelMPI, MPI_LOCALNRANKS can be checked for existence
-#   os.environ['MPI_LOCALNRANKS']
-# For OpenMPI, it is OMPI_COMM_WORLD_SIZE
-#   os.environ['OMPI_COMM_WORLD_SIZE']
-# In any case, when importing the module mpi4py, the MPI implementation for which
-# the module was created is unknown. Thus, no portable way...
-# The following line is for OpenMPI
-    os.environ['OMPI_COMM_WORLD_SIZE']
-# If no KeyError raised, the script has been launched by MPI,
-# I must thus import the mpi4py module
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    nprocs = comm.Get_size()
-    mpi_version = True
-    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
-  except KeyError:
-# Not launched by MPI, use sequential code
-    mpi_version = False
-    nprocs = 1
-    rank = 0
-    environment_string += 'Single processor version\n\n'
-  except ImportError:
-# Launched by MPI, but no mpi4py module available. Abort the calculation.
-    exit('mpi4py module not available! I stop!')
+def main():
+  parser = argparse.ArgumentParser(description='Compute spectral function using the Gross-Pitaevskii or Schoedinger equation')
+  parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
+  args = parser.parse_args()
+  parameter_file = args.filename.name
+
+# Determine is the script is ran inside MPI
+# If yes, set the mpi_version to True, the  MPI communicator to comm, the number of
+# MPI processes to nprocs, the rank of the current process to rank, and
+# set mpi_string to something containing minimal MPI information
+# If not run inside MPI, nprocs=1 and rank=0
+  mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
+             +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
+             +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
+             +mpi_string+'\n'
 
   if rank==0:
     initial_time=time.asctime()
-    hostname = os.uname()[1].split('.')[0]
+#    hostname = os.uname()[1].split('.')[0]
+    print("Python script runs on machine : "+socket.getfqdn())
+    print("Name of python script:  {}".format(os.path.abspath( __file__ )))
+    print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
+    print()
     print("Python script started on: {}".format(initial_time))
-    print("{:>24}: {}".format('from',hostname))
-    print("Name of python script: {}".format(os.path.abspath( __file__ )))
+    print()
 
-    config = configparser.ConfigParser()
-    config.read('params.dat')
-
-    Averaging = config['Averaging']
-    n_config = Averaging.getint('n_config',1)
-    n_config = (n_config+nprocs-1)//nprocs
-    print("Total number of disorder realizations: {}".format(n_config*nprocs))
-    print("Number of processes: {}".format(nprocs))
-
-    System = config['System']
-    dimension = System.getint('dimension', 1)
-    tab_size = list()
-    tab_delta = list()
-    tab_boundary_condition = list()
-    for i in range(dimension):
-      tab_size.append(System.getfloat('size_'+str(i+1)))
-      tab_delta.append(System.getfloat('delta_'+str(i+1)))
-      tab_boundary_condition.append(System.get('boundary_condition_'+str(i+1),'periodic'))
-#    print(dimension,tab_size,tab_delta,tab_boundary_condition)
-
-    Disorder = config['Disorder']
-    disorder_type = Disorder.get('type','anderson gaussian')
-    correlation_length = Disorder.getfloat('sigma',0.0)
-    V0 = Disorder.getfloat('V0',0.0)
-    disorder_strength = V0
-    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
-
-    Nonlinearity = config['Nonlinearity']
-    interaction_strength = Nonlinearity.getfloat('g',0.0)
-
-    Wavefunction = config['Wavefunction']
-    initial_state_type = Wavefunction.get('initial_state')
-    tab_k_0 = list()
-    tab_sigma_0 = list()
-    for i in range(dimension):
-      tab_k_0.append(2.0*math.pi*Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1)))
-      tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
-
-    Propagation = config['Propagation']
-    method = Propagation.get('method','che')
-    data_layout = Propagation.get('data_layout','real')
-    i_tab_0 = 0
-
-    Spectral = config['Spectral']
-    e_range = Spectral.getfloat('range')
-    e_resolution = Spectral.getfloat('resolution')
-
-    Measurement = config['Measurement']
-    use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
-  else:
-    dimension = None
-    n_config = None
-    tab_size = None
-    tab_delta = None
-    tab_boundary_condition = None
-    disorder_type = None
-    correlation_length = None
-    disorder_strength = None
-    use_mkl_random = None
-    interaction_strength = None
-    initial_state_type = None
-    tab_k_0 = None
-    tab_sigma_0 = None
-    method = None
-    data_layout = None
-    t_max = None
-    delta_t = None
-    i_tab_0 = None
-    e_range = None
-    e_resolution = None
-    use_mkl_fft = None
-
-  if mpi_version:
-    n_config, dimension,tab_size,tab_delta,tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta,tab_boundary_condition))
-    disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
-    initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
-    method, data_layout, i_tab_0, e_range, e_resolution, use_mkl_fft = comm.bcast((method, data_layout,  i_tab_0, e_range, e_resolution, use_mkl_fft))
-
+# Parse parameter file and prepare the useful objects:
+# H for the Hamiltonian of the system
+# initial_state for the initial state
+# propagation for the propagation scheme
+# measurement for the measurement scheme
+# measurement_global is used to gather (average) the results for several disorder configurations
+# my_list_of_sections is the list of sections needed for this particular calculation
+# Can be in any order
+# The list determines the various structures returned by the routine
+# Must be consistent otherwise disaster guaranted
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral']
+  H, initial_state, spectral_function, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
   timing=anderson.Timing()
+# The following line is a temporary fix
+  i_tab_0 = 0
 
-# Number of sites
-  tab_dim = list()
-  for i in range(dimension):
-    tab_dim.append(int(tab_size[i]/tab_delta[i]+0.5))
-# Renormalize delta so that the system size is exactly what is wanted and split in an integer number of sites
-    tab_delta[i] = tab_size[i]/tab_dim[i]
-#  print(tab_dim)
-
-  try:
-    import mkl
-    mkl.set_num_threads(1)
-    os.environ["MKL_NUM_THREADS"] = "1"
-  except:
-    pass
-
-  spectral_function = anderson.propagation.Spectral_function(e_range,e_resolution)
-
-  for i in range(dimension):
-    assert tab_boundary_condition[i] in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
-
-# Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
-# Define an initial state
-  initial_state = anderson.Wavefunction(tab_dim,tab_delta)
-  initial_state.type = initial_state_type
-  assert initial_state.type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
-  if (initial_state.type=='plane_wave'):
-    anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
-  if (initial_state.type=='gaussian_wave_packet'):
-    anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
-#  np.savetxt('wfc.dat',initial_state.wfc)
-#  print(initial_state.overlap(initial_state))
-
-# Define the structure of the temporal integration
-  propagation = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method,data_layout=data_layout)
-
-  measurement = anderson.propagation.Measurement(spectral_function.delta_t,  measure_autocorrelation=True, use_mkl_fft=use_mkl_fft)
-  measurement_global = copy.deepcopy(measurement)
-  measurement.prepare_measurement(propagation,tab_delta,tab_dim)
-#  print(measurement.density_final.shape)
-  measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
-  header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
+  if rank==0:
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
 
 #  print(header_string)
 
@@ -260,9 +144,9 @@ if __name__ == "__main__":
 #    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
     tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
-    anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation, tab_abscissa=measurement_global.tab_t_measurement[i_tab_0:]-measurement_global.tab_t_measurement[i_tab_0], header_string=header_string,data_type='autocorrelation')
+    anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation,H,header_string=header_string, tab_abscissa=measurement_global.tab_t_measurement[i_tab_0:]-measurement_global.tab_t_measurement[i_tab_0], data_type='autocorrelation')
     tab_energies,tab_spectrum = spectral_function.compute_spectral_function(measurement_global.tab_autocorrelation)
-    anderson.io.output_density('spectral_function.dat',tab_spectrum,tab_abscissa=tab_energies,header_string=header_string,data_type='spectral_function')
+    anderson.io.output_density('spectral_function.dat',tab_spectrum,H,header_string=header_string,tab_abscissa=tab_energies,data_type='spectral_function')
 
     """
   i_tab_0 = propagation.first_measurement_autocorr
@@ -295,3 +179,5 @@ if __name__ == "__main__":
     print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
     print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
 
+if __name__ == "__main__":
+  main()

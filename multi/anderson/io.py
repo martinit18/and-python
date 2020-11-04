@@ -127,14 +127,19 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       accurate_bounds = Propagation.getboolean('accurate_bounds',False)
       want_ctypes = Propagation.getboolean('want_ctypes',True)
       data_layout = Propagation.get('data_layout','real')
-      all_options_ok = True
-      if not config.has_option('Propagation','t_max'): all_options_ok = False
-      t_max = Propagation.getfloat('t_max')
-      if not config.has_option('Propagation','delta_t'): all_options_ok = False
-      delta_t = Propagation.getfloat('delta_t')
-      i_tab_0 = 0
-      if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Propagation section of the parameter file, there must be a maximum propagation time t_max and a time step delta_t, I stop!\n')
+      if 'Spectral' in my_list_of_sections:
+        t_max=0.0
+        delta_t=0.0
+        i_tab_0 = 0
+      else:
+        all_options_ok = True
+        if not config.has_option('Propagation','t_max'): all_options_ok = False
+        t_max = Propagation.getfloat('t_max')
+        if not config.has_option('Propagation','delta_t'): all_options_ok = False
+        delta_t = Propagation.getfloat('delta_t')
+        i_tab_0 = 0
+        if not all_options_ok:
+          my_abort(mpi_version,comm,'In the Propagation section of the parameter file, there must be a maximum propagation time t_max and a time step delta_t, I stop!\n')
 
 # Optional Measurement section
     if 'Measurement' in my_list_of_sections:
@@ -169,6 +174,22 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       IPR_max = Diagonalization.getfloat('IPR_max',1.0)
       number_of_bins = Diagonalization.getint('number_of_bins',1)
       number_of_eigenvalues = Diagonalization.getint('number_of_eigenvalues',1)
+
+# Optional Spectral section
+    if 'Spectral' in my_list_of_sections:
+      if not config.has_section('Spectral'):
+        my_abort(mpi_version,comm,'Parameter file does not have a Spectral section, I stop!\n')
+      Spectral = config['Spectral']
+      all_options_ok = True
+      if not config.has_option('Spectral','range'): all_options_ok = False
+      e_range = Spectral.getfloat('range')
+      if not config.has_option('Spectral','resolution'): all_options_ok = False
+      e_resolution = Spectral.getfloat('resolution')
+      if not all_options_ok:
+        my_abort(mpi_version,comm,'In the Spectral section of the parameter file, there must be a range and a resolution, I stop!\n')
+      if not config.has_section('Propagation'):
+        my_abort(mpi_version,comm,'Parameter file does not have a Propagation section, I stop!\n')
+
 
   else:
     dimension = None
@@ -214,6 +235,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     IPR_max = None
     number_of_bins = None
     number_of_eigenvalues = None
+    e_range = None
+    e_resolution = None
 
   if mpi_version:
     n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
@@ -226,6 +249,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = comm.bcast((delta_t_measurement, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft))
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
+    if 'Spectral' in my_list_of_sections:
+      e_range, e_resolution  = comm.bcast((e_range,e_resolution))
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
@@ -240,6 +265,26 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if (initial_state.type=='gaussian_wave_packet'):
       anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
     return_list.append(initial_state)
+
+# Define the structure of spectral_function
+  if 'Spectral' in my_list_of_sections:
+    spectral_function = anderson.propagation.Spectral_function(e_range,e_resolution)
+    t_max = spectral_function.t_max
+    delta_t = spectral_function.delta_t
+    delta_t_measurement = delta_t
+    measure_density = False
+    measure_density_momentum = False
+    measure_autocorrelation = True
+    measure_dispersion_position = False
+    measure_dispersion_position2 = False
+    measure_dispersion_momentum = False
+    measure_dispersion_energy = False
+    measure_wavefunction = False
+    measure_wavefunction_momentum = False
+    measure_extended = False
+    measure_g1 = False
+    measure_overlap = False
+    return_list.append(spectral_function)
 
 # Define the structure of the temporal integration
   if 'Propagation' in my_list_of_sections:
@@ -263,9 +308,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     return_list.append(diagonalization)
 
 
+
   return_list.append(n_config)
 #  print(return_list)
-#  return (H, initial_state, propagation, measurement, measurement_global, n_config)
   return(return_list)
 
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
