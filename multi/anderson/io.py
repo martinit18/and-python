@@ -41,6 +41,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       my_abort(mpi_version,comm,'Parameter file does not have a System section, I stop!\n')
     System = config['System']
     dimension = System.getint('dimension', 1)
+    one_over_mass = System.getfloat('one_over_mass', 1.0)
     tab_size = list()
     tab_delta = list()
     tab_boundary_condition = list()
@@ -69,10 +70,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if not config.has_section('Disorder'):
       my_abort(mpi_version,comm,'Parameter file does not have a Disorder section, I stop!\n')
     Disorder = config['Disorder']
-    disorder_type = Disorder.get('type','anderson gaussian')
+    disorder_type = Disorder.get('type','anderson_gaussian')
     correlation_length = Disorder.getfloat('sigma',0.0)
     V0 = Disorder.getfloat('V0',0.0)
     disorder_strength = V0
+    non_diagonal_disorder_strength = Disorder.getfloat('non_diagonal_disorder_strength',0.0)
     use_mkl_random = Disorder.getboolean('use_mkl_random',True)
 
 # Optional Nonlinearity section
@@ -206,6 +208,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
   else:
     dimension = None
+    one_over_mass = None
     n_config = None
     tab_size = None
     tab_delta = None
@@ -214,6 +217,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     disorder_type = None
     correlation_length = None
     disorder_strength = None
+    non_diagonal_disorder_strength = None
     use_mkl_random = None
     interaction_strength = None
     initial_state_type = None
@@ -259,8 +263,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 
   if mpi_version:
-    n_config, dimension,tab_size,tab_delta,tab_dim, tab_boundary_condition  = comm.bcast((n_config,dimension,tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, use_mkl_random, interaction_strength))
+    n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
+    disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, use_mkl_random, interaction_strength))
     if 'Wavefunction' in my_list_of_sections:
       initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
     if 'Propagation' in my_list_of_sections:
@@ -275,7 +279,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dimension,tab_dim,tab_delta, tab_boundary_condition=tab_boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+  H = anderson.Hamiltonian(dimension, tab_dim, tab_delta, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength,non_diagonal_disorder_strength=non_diagonal_disorder_strength, use_mkl_random=use_mkl_random, interaction=interaction_strength)
   return_list = [H]
 
 # Define an initial state
@@ -350,12 +354,13 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'Size_'+str(i+1)+'                          = '+str(H.tab_dim[i]*H.tab_delta[i])+'\n'\
                  +'delta_'+str(i+1)+'                         = '+str(H.tab_delta[i])+'\n'\
                  +'N_'+str(i+1)+'                             = '+str(H.tab_dim[i])+'\n'\
-                 +'Boundary_Condition_'+str(i+1)+'            = '+H.tab_boundary_condition[i]+'\n'
-
+                 +'Boundary_Condition_'+str(i+1)+'            = '+H.tab_boundary_condition[i]+'\n'\
+                 +'1/mass                          = '+str(H.one_over_mass)+'\n'
   params_string += \
                   'Volume                          = '+str(volume)+'\n'
   params_string += \
                   'V0                              = '+str(H.disorder_strength)+'\n'\
+                 +'Non diagonal disorder strength  = '+str(H.non_diagonal_disorder_strength)+'\n'\
                  +'g                               = '+str(H.interaction)+'\n'\
                  +'g_over_volume                   = '+str(H.interaction/volume)+'\n'\
                  +'Number of disorder realizations = '+str(n_config*nprocs)+'\n'\

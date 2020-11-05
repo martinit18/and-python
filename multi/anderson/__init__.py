@@ -82,18 +82,20 @@ script_tunneling and script_disorder are just rescaled variables used when the t
 They are used in the rescaling of the Hamiltonian to bring its spectrum between -1 and +1
 """
 class Hamiltonian(Potential):
-  def __init__(self, dimension, tab_dim, tab_delta, tab_boundary_condition, disorder_type='anderson gaussian', correlation_length=0.0, disorder_strength=0.0, use_mkl_random=False, interaction=0.0):
+  def __init__(self, dimension, tab_dim, tab_delta, tab_boundary_condition, disorder_type='anderson_gaussian', one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, use_mkl_random=False, interaction=0.0):
     super().__init__(dimension,tab_dim)
     self.tab_delta = tab_delta
     self.disorder_strength = disorder_strength
+    self.non_diagonal_disorder_strength = non_diagonal_disorder_strength
+    self.one_over_mass = one_over_mass
     self.tab_tunneling = list()
     self.delta_vol = 1.0
     self.diagonal = 0.0
     self.array_boundary_condition = np.zeros(dimension,dtype=np.intc)
     for i in range(dimension):
-      self.tab_tunneling.append(0.5/tab_delta[i]**2)
+      self.tab_tunneling.append(0.5*one_over_mass/tab_delta[i]**2)
       self.delta_vol *= tab_delta[i]
-      self.diagonal += 1.0/tab_delta[i]**2
+      self.diagonal += one_over_mass/tab_delta[i]**2
       if tab_boundary_condition[i]=='periodic':
         self.array_boundary_condition[i] = 1
     self.interaction = interaction
@@ -105,8 +107,10 @@ class Hamiltonian(Potential):
 #    self.script_tunneling = 0.
 #    self.script_disorder = np.zeros(tab_dim)
 #    self.medium_energy = 0.
+    if disorder_type=='nice':
+      self.non_diagonal_disorder = np.zeros(self.tab_dim)
     self.generate=''
-    if (disorder_type in ['anderson_gaussian','anderson_uniform','anderson_cauchy']):
+    if (disorder_type in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']):
       self.generate='direct'
       return
 # Build mask for correlated potentials
@@ -207,6 +211,11 @@ class Hamiltonian(Potential):
     if self.disorder_type=='anderson_gaussian':
       self.disorder = self.diagonal + self.disorder_strength*my_random_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
 #      print(self.disorder.shape,self.disorder.dtype)
+      return
+    if self.disorder_type=='nice':
+      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_random_uniform(-1.0,1.0,self.ntot).reshape(self.tab_dim)
+#      print(self.disorder)
       return
     if self.generate=='simple mask':
       self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(self.ntot).reshape(self.tab_dim))))
