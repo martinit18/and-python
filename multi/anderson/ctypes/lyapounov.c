@@ -15,7 +15,7 @@ double core_lyapounov(const int dim_x, const int loop_step, const double * restr
   int i, j, jmax;
   double psi_new, psi_cur=1.0, psi_old=M_PI/sqrt(13.0);
   for (i=0;i<dim_x;i+=loop_step) {
-    jmax=min(i+loop_step,dim_x-1);
+    jmax=min(i+loop_step,dim_x);
 /*
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
@@ -43,13 +43,14 @@ double core_lyapounov(const int dim_x, const int loop_step, const double * restr
   return(gamma);
 }
 
-double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step, const double * restrict disorder, const double * restrict non_diagonal_disorder, const double energy, const double tunneling)
+double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step, const double * restrict disorder, const int b, const double * restrict non_diagonal_disorder, const double energy, const double tunneling)
 {
   double gamma=0.0;	 
   int i, j, jmax;
-  double psi_new, psi_cur=1.0, psi_old=M_PI/sqrt(13.0);
-  for (i=0;i<dim_x;i+=loop_step) {
-    jmax=min(i+loop_step,dim_x-1);
+  if (b==1) {
+    double psi_new, psi_cur=1.0, psi_old=M_PI/sqrt(13.0);
+    for (i=0;i<dim_x;i+=loop_step) {
+      jmax=min(i+loop_step,dim_x);
 /*
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
@@ -63,16 +64,16 @@ double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step
 #endif
 #endif
 */
-    for(j=i;j<jmax;j++) {
-      psi_new=(psi_cur*(disorder[j]-energy)-(tunneling-non_diagonal_disorder[j])*psi_old)/(tunneling-non_diagonal_disorder[j+1]);
-      psi_old=psi_cur;
-      psi_cur=psi_new;
+      for(j=i;j<jmax;j++) {
+        psi_new=(psi_cur*(disorder[j]-energy)+psi_old*(non_diagonal_disorder[j]-tunneling))/(tunneling-non_diagonal_disorder[j+1]);
+        psi_old=psi_cur;
+        psi_cur=psi_new;
+      }  
+      gamma+=log(fabs(psi_cur));
+      psi_old/=psi_cur;
+      psi_cur=1.0;
     }  
-    gamma+=log(fabs(psi_cur));
-    psi_old/=psi_cur;
-    psi_cur=1.0;
-  }  
-  gamma+=log(fabs(psi_cur));
+  }
 //  printf("gamma = %lf\n",gamma);
   return(gamma);
 }
