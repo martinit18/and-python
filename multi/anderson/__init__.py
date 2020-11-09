@@ -82,7 +82,7 @@ script_tunneling and script_disorder are just rescaled variables used when the t
 They are used in the rescaling of the Hamiltonian to bring its spectrum between -1 and +1
 """
 class Hamiltonian(Potential):
-  def __init__(self, dimension, tab_dim, tab_delta, tab_boundary_condition, disorder_type='anderson_gaussian', one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, use_mkl_random=False, interaction=0.0):
+  def __init__(self, dimension, tab_dim, tab_delta, tab_boundary_condition, disorder_type='anderson_gaussian', one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, use_mkl_random=False, interaction=0.0):
     super().__init__(dimension,tab_dim)
     self.tab_delta = tab_delta
     self.disorder_strength = disorder_strength
@@ -108,7 +108,8 @@ class Hamiltonian(Potential):
 #    self.script_disorder = np.zeros(tab_dim)
 #    self.medium_energy = 0.
     if disorder_type=='nice':
-      self.non_diagonal_disorder = np.zeros(self.tab_dim)
+      self.b = b
+      self.non_diagonal_disorder = np.zeros((self.ntot+self.b,self.b))
     self.generate=''
     if (disorder_type in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']):
       self.generate='direct'
@@ -213,8 +214,9 @@ class Hamiltonian(Potential):
 #      print(self.disorder.shape,self.disorder.dtype)
       return
     if self.disorder_type=='nice':
-      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
-      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_random_uniform(-1.0,1.0,self.ntot).reshape(self.tab_dim)
+# Only in dimension 1
+      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot)/np.sqrt(self.delta_vol)
+      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_random_uniform(-1.0,1.0,self.b*(self.ntot+self.b)).reshape((self.ntot+self.b,self.b))
 #      print(self.disorder)
       return
     if self.generate=='simple mask':

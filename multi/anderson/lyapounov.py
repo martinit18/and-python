@@ -21,7 +21,7 @@ def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
   gamma=0.0
 #  h=0.0
   for i in range(0, dim_x, loop_step):
-    jmax=min(i+loop_step,dim_x-1)
+    jmax=min(i+loop_step,dim_x)
     for j in range(i,jmax):
       psi_new=psi_cur*(inv_tunneling*(disorder[j]-energy))-psi_old
       psi_old=psi_cur
@@ -32,34 +32,49 @@ def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
     gamma+=math.log(abs(psi_cur))
     psi_old/=psi_cur
     psi_cur=1.0
-  gamma+=math.log(abs(psi_cur))
+#  gamma+=math.log(abs(psi_cur))
   return gamma
 
-#def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, non_diagonal_disorder, energy, tunneling, psi_cur_ini, psi_old_ini):
-def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, non_diagonal_disorder, energy, tunneling):
-  psi_cur=1.0
-  psi_old=math.pi/math.sqrt(13.0)
-# Attempts to transmit a random value resulted in a much slower code, for no understandable (by me) reason
-# Hence, I use the above values, supposed generci enough to avoid any accidental zero
-#  print(psi_cur_ini,psi_old_ini)
-#  psi_cur = psi_cur_ini+0.0000001
-#  psi_old = psi_old_ini+0.0000001
-#  psi_cur = copy.deepcopy(psi_cur_ini)
-#  psi_old = copy.deepcopy(psi_old_ini)
-  gamma=0.0
-  for i in range(0, dim_x, loop_step):
-    jmax=min(i+loop_step,dim_x-1)
-    for j in range(i,jmax):
-      psi_new=(psi_cur*(disorder[j]-energy)-(tunneling-non_diagonal_disorder[j])*psi_old)/(tunneling-non_diagonal_disorder[j+1])
-      psi_old=psi_cur
-      psi_cur=psi_new
-# The next line can be used to count the number of sign changes, directly related to integrated density of states
-# disabled because the if has a large speed impact
-#      if psi_cur*psi_old<0.0: h+=1.0
-    gamma+=math.log(abs(psi_cur))
-    psi_old/=psi_cur
+def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, b, non_diagonal_disorder, energy, tunneling):
+  if b==1:
+#    psi_temp = np.zeros(loop_step+2)
     psi_cur=1.0
-  gamma+=math.log(abs(psi_cur))
+    psi_old=math.pi/math.sqrt(13.0)
+    gamma=0.0
+    for i in range(0, dim_x, loop_step):
+      jmax=min(i+loop_step,dim_x)
+      for j in range(i,jmax):
+  #      print(j,i,j+b-i,)
+        psi_new=(psi_cur*(disorder[j]-energy)+psi_old*(non_diagonal_disorder[j,0]-tunneling))/(tunneling-non_diagonal_disorder[j+1,0])
+        psi_old=psi_cur
+        psi_cur=psi_new
+      gamma+=math.log(abs(psi_cur))
+      psi_old/=psi_cur
+      psi_cur=1.0
+  else:
+    psi_temp = np.zeros(loop_step+2*b)
+    for i in range(2*b-1):
+      psi_temp[i]=math.pi/math.sqrt(11.0+2*b-i)
+    psi_temp[2*b-1]=1.0
+    gamma=0.0
+    for i in range(0, dim_x, loop_step):
+      jmax=min(i+loop_step,dim_x)
+      for j in range(i,jmax):
+  #      print(j,i,j+b-i,)
+        my_sum=psi_temp[j+b-i]*(disorder[j]-energy)+psi_temp[j+b-1-i]*(non_diagonal_disorder[j+b-1,0]-tunneling)
+        if b>1: my_sum+=psi_temp[j+b+1-i]*(non_diagonal_disorder[j+b,0]-tunneling)
+        for k in range(-b,-1):
+          my_sum+=psi_temp[j+k+b-i]*non_diagonal_disorder[j+b+k,-k-1]
+        for k in range(2,b):
+          my_sum+=psi_temp[j+k+b-i]*non_diagonal_disorder[j+b,k-1]
+        if b==1:
+          psi_temp[j-i+2]=my_sum/(tunneling-non_diagonal_disorder[j+1,0])
+        else:
+          psi_temp[j-i+2*b]=-my_sum/non_diagonal_disorder[j+b,b-1]
+  #    print(psi_temp)
+      gamma+=math.log(abs(psi_temp[2*b+jmax-i-1]))
+      print(gamma)
+      psi_temp[0:2*b]=psi_temp[loop_step:loop_step+2*b]/psi_temp[2*b+jmax-i-1]
   return gamma
 
 class Lyapounov:
@@ -107,7 +122,7 @@ class Lyapounov:
         if H.disorder_type=='nice':
           self.use_ctypes =hasattr(lyapounov_ctypes_lib,'core_lyapounov_non_diagonal_disorder')
           if self.use_ctypes:
-            lyapounov_ctypes_lib.core_lyapounov_non_diagonal_disorder.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_double]
+            lyapounov_ctypes_lib.core_lyapounov_non_diagonal_disorder.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctypes.c_int, ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_double]
             lyapounov_ctypes_lib.core_lyapounov_non_diagonal_disorder.restype = ctypes.c_double
         else:
           self.use_ctypes =hasattr(lyapounov_ctypes_lib,'core_lyapounov')
@@ -141,20 +156,20 @@ class Lyapounov:
       gamma += math.log(abs(r))
       if r<0.0: h+=1.0
     """
-    loop_step=64
+    loop_step=16
     number_of_energies = self.tab_energy.size
     tab_gamma = np.zeros(number_of_energies)
   #  tab_h = np.zeros(number_of_energies)
     for i_energy in range(number_of_energies):
       if self.use_ctypes:
         if H.disorder_type=='nice':
-          tab_gamma[i_energy] = lyapounov_ctypes_lib.core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
+          tab_gamma[i_energy] = lyapounov_ctypes_lib.core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.b, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
         else:
           tab_gamma[i_energy] = lyapounov_ctypes_lib.core_lyapounov(dim_x, loop_step, H.disorder, self.tab_energy[i_energy], inv_tunneling)
       else:
         if H.disorder_type=='nice':
-#          tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling, psi_cur, psi_old)
-          tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
+          tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.b, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
+#          tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder,  H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
         else:
           tab_gamma[i_energy] = core_lyapounov(dim_x, loop_step, H.disorder, self.tab_energy[i_energy], inv_tunneling)
 
