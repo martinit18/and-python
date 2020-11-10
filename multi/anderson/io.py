@@ -199,15 +199,15 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Lyapounov' in my_list_of_sections:
       if not config.has_section('Lyapounov'):
         my_abort(mpi_version,comm,'Parameter file does not have a Lyapounov section, I stop!\n')
-    Lyapounov = config['Lyapounov']
-    e_min = Lyapounov.getfloat('e_min',0.0)
-    e_max = Lyapounov.getfloat('e_max',0.0)
-    number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
-    e_histogram = Lyapounov.getfloat('e_histogram',0.0)
-    lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
-    lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
-    number_of_bins = Lyapounov.getint('number_of_bins',0)
-    want_ctypes = Lyapounov.getboolean('want_ctypes',True)
+      Lyapounov = config['Lyapounov']
+      e_min = Lyapounov.getfloat('e_min',0.0)
+      e_max = Lyapounov.getfloat('e_max',0.0)
+      number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
+      e_histogram = Lyapounov.getfloat('e_histogram',0.0)
+      lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
+      lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
+      number_of_bins = Lyapounov.getint('number_of_bins',0)
+      want_ctypes = Lyapounov.getboolean('want_ctypes',True)
 
   else:
     dimension = None
