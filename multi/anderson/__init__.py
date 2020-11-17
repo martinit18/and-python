@@ -455,9 +455,9 @@ class Hamiltonian(Potential):
 # The accurate determination should be used for strong disorder
     if (accurate):
   # rough estimate of the maximum energy (no disorder taken into account)
-      e_max_0=0.0
-      for i in range(self.dimension):
-        e_max_0 += 2.0/(self.tab_delta[i]**2)
+      e_max_0=2.0*self.diagonal
+#      for i in range(self.dimension):
+#        e_max_0 += 2.0/(self.tab_delta[i]**2)
 
       n_iterations_hamiltonian_bounds=min(10,int(50./np.log10(e_max_0)))
   # rough estimate of the minimum energy (no disorder taken into account)
@@ -516,9 +516,9 @@ class Hamiltonian(Potential):
       e_min = e_max_0 - 1.01 * estimated_bound
     else:
 # Very basic bounds using the min/max of the potential
-      e_max_0=0.0
-      for i in range(self.dimension):
-        e_max_0 += 1.0/(self.tab_delta[i]**2)
+      e_max_0=self.diagonal
+#      for i in range(self.dimension):
+#        e_max_0 += 1.0/(self.tab_delta[i]**2)
       e_min=np.amin(self.disorder)-e_max_0
       e_max=np.amax(self.disorder)+e_max_0
 #    print(e_min,e_max)
