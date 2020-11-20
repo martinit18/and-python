@@ -72,12 +72,12 @@ def main():
     0: data [default]
     2: |data|**2
     3: |data|''')
-  parser.add_argument('-k','--k', type=int, default=3, help='order of the spline')
+  parser.add_argument('-k','--k', type=int, default=3, help='order of the spline [default=3]')
   parser.add_argument('-n','--num_points', type=int, default=2000, help='number of points for the radial data [default=2000]')
-  parser.add_argument('-d','--knots_spacing', type=float, default=1.0, help='distance between knots [default=1.0]')
+  parser.add_argument('-d','--knots_spacing', type=float, default=None, help='distance between knots [default=1.5*min(discretization step_x,discretization_step_y)]')
   parser.add_argument('-m','--r_min', type=float, default=0.0, help='minimum radius [default=0.0]')
-  parser.add_argument('-M','--r_max', type=float, default=None, help='maximum radius [default=min(size_x,size_y)]')
-  parser.add_argument('-i','--interval_width', type=float, default=None, help='width of elementary interval for spline [default=min(size_x,size_y)]')
+  parser.add_argument('-M','--r_max', type=float, default=None, help='maximum radius [default=min(size_x,size_y)/2]')
+  parser.add_argument('-i','--interval_width', type=float, default=None, help='width of elementary interval for spline [default=min(size_x,size_y)/2]')
   args = parser.parse_args()
   file_name = args.filename.name
   my_choice = args.column
@@ -146,6 +146,8 @@ def main():
     r_max = min(0.5*n1*delta1,0.5*n2*delta2)
   if interval_width == None:
     interval_width = r_max
+  if distance_between_knots== None:
+    distance_between_knots = 1.5*min(delta1,delta2)
   if distance_between_knots<min(delta1,delta2):
     print('WARNING: distance_between_knots is smaller than the spatial discretization!\n         This will certainly fail if r_min=0\n         Hope you understand what you are doing...')
   #print(n1,n2)
