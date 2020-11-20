@@ -37,6 +37,7 @@ of the radius. It then prints the smoothed radial function in a 1d file
 import sys
 import os
 #import math
+import argparse
 import numpy as np
 import scipy.interpolate
 import scipy.signal
@@ -56,153 +57,170 @@ def determine_unique_postfix(fn):
       return '_'+str(i)
   return '_XXX'
 
-#for arg in sys.argv:
-#  print arg
-#for arg in sys.argv:
-#  print arg
-if len(sys.argv)<2 or len(sys.argv)>3:
-  print('Usage: my_extract_radial.py file [argument]')
-  print('       file: a real or complex 2d numpy.savetxt file')
-  print('       argument for complex data:')
-  print('         0: real part [default]')
-  print('         1: imaginary part')
-  print('         2: square modulus')
-  print('         3: modulus')
-  print('       argument for real data:')
-  print('         0: data [default]')
-  print('         2: data**2')
-  print('         3: |data|')
-  sys.exit()
 
-file_name=sys.argv[1]
+def main():
+  parser = argparse.ArgumentParser(description='Extract data from a 2D (numpy.savetxt format) file, and prints a 1D radial average, after proper smoothing',usage='use "%(prog)s -h" for more information',formatter_class=argparse.RawTextHelpFormatter)
+  parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing the 2D data')
+  parser.add_argument('-c', '--column', type=int, default=0, \
+  help='''column to read:
+  For complex data:
+    0: Re(data) [default]
+    1: Im(data)
+    2: |data|**2
+    3: |data|
+  For real data:
+    0: data [default]
+    2: |data|**2
+    3: |data|''')
+  parser.add_argument('-k','--k', type=int, default=3, help='order of the spline')
+  parser.add_argument('-n','--num_points', type=int, default=2000, help='number of points for the radial data [default=2000]')
+  parser.add_argument('-d','--knots_spacing', type=float, default=1.0, help='distance between knots [default=1.0]')
+  parser.add_argument('-m','--r_min', type=float, default=0.0, help='minimum radius [default=0.0]')
+  parser.add_argument('-M','--r_max', type=float, default=None, help='maximum radius [default=min(size_x,size_y)]')
+  parser.add_argument('-i','--interval_width', type=float, default=None, help='width of elementary interval for spline [default=min(size_x,size_y)]')
+  args = parser.parse_args()
+  file_name = args.filename.name
+  my_choice = args.column
+  k = args.k
+  if k<1 or k>5:
+    sys.exit('k should 1 <= k <= 5')
+  number_of_points = args.num_points
+  distance_between_knots = args.knots_spacing
+  r_min = args.r_min
+  r_max = args.r_max
+  interval_width = args.interval_width
 
-# Here are the parameters that may need to be modified
-# and adapted to the specific data
-# Number of points in the radial direction
-number_of_points = 2000
-# Divide the [0,rmax] interval in intervals of size interval_width*r_min
-interval_width = 40.0
-# This must be a typical over which the function varies
-distance_between_knots = 1.0
-# Order of the spline function
-# k=3 is usually a good compromise
-# smaller k generates less smooth data
-# larger k may produce spikes in the output data
-k=3
+  try:
+    arr=np.loadtxt(file_name,dtype=np.float64)
+    if my_choice==3:
+      Z=np.abs(arr)
+      specific_string='_modulus'
+    if my_choice==2:
+      Z=np.abs(arr)**2
+      specific_string='_modulus_square'
+    if my_choice==1:
+      sys.exit('Illegal choice "1" (imaginary part) for real data')
+    if my_choice==0:
+      Z=arr
+      specific_string=''
+    if my_choice>3 or my_choice<0:
+      sys.exit('Illegal choice "'+str(my_choice)+'" for -c argument')
+  except ValueError:
+    arr=np.loadtxt(file_name,dtype=np.complex128)
+    if my_choice==3:
+      Z=np.abs(arr)
+      specific_string='_modulus'
+    if my_choice==2:
+      Z=np.abs(arr)**2
+      specific_string='_modulus_square'
+    if my_choice==1:
+      Z=np.imag(arr)
+      specific_string='_Im'
+    if my_choice==0:
+      Z=np.real(arr)
+      specific_string='_Re'
+    if my_choice>3 or my_choice<0:
+      sys.exit('Illegal choice "'+str(my_choice)+'" for -c argument')
 
-# Default is to read the first column
-my_choice=0
-if len(sys.argv)==3:
-  my_choice=int(sys.argv[2])
-
-try:
-  arr=np.loadtxt(file_name,dtype=np.float64)
-  if my_choice==1:
-    sys.exit("Illegal choice '1' for the argument with real data")
-  if my_choice==2:
-    Z=np.abs(arr)**2
-  if my_choice==3:
-    Z=np.abs(arr)
-  else:
-    Z=arr
-except:
-  arr=np.loadtxt(file_name,dtype=np.complex128)
-  if my_choice==3:
-    Z=np.abs(arr)
-  if my_choice==2:
-    Z=np.abs(arr)**2
-  if my_choice==1:
-    Z=np.imag(arr)
-  if my_choice==0:
-    Z=np.real(arr)
-
-# Try to extract information from the first two lines
-try:
-  f = open(file_name,'r')
-  line=(f.readline().lstrip('#')).split()
-  n1=int(line[0])
-  if len(line)>1:
-    delta1=float(line[-1])
-  else:
+  # Try to extract information from the first two lines
+  try:
+    f = open(file_name,'r')
+    line=(f.readline().lstrip('#')).split()
+    n1=int(line[0])
+    if len(line)>1:
+      delta1=float(line[-1])
+    else:
+      delta1=1.0
+    line=(f.readline().lstrip('#')).split()
+    n2=int(line[0])
+    if len(line)>1:
+      delta2=float(line[-1])
+    else:
+      delta2=1.0
+  except:
+    n1,n2 = Z.shape
     delta1=1.0
-  line=(f.readline().lstrip('#')).split()
-  n2=int(line[0])
-  if len(line)>1:
-    delta2=float(line[-1])
-  else:
     delta2=1.0
-except:
-  n1,n2 = Z.shape
-  delta1=1.0
-  delta2=1.0
 
-#print(n1,n2)
-#X, Y = np.meshgrid(x, y)
-#Z = np.exp(-(X*X+Y*Y))
-print('Maximum value = ',Z.max())
-print('Minimum value = ',Z.min())
-name, ext = os.path.splitext(file_name)
-density_radial_file_name=name+'_radial'+ext
-#g = open(density_radial_file_name,'w')
-tab_r = np.zeros((n1,n2))
-#print(tab_r.shape,Z.shape)
-# Compute the radial distance r and sort the function by increasing r
-for i in range(n1):
-  for j in range(n2):
-    tab_r[i,j] = np.sqrt(((i-n1//2)*delta1)**2+((j-n2//2)*delta2)**2)
-idx=np.argsort(tab_r,axis=None)
-r = tab_r.ravel()[idx]
-func = Z.ravel()[idx]
-#y = scipy.signal.savgol_filter(func,501,3)
-#np.savetxt('toto.dat',np.column_stack((r,func)))
-# Determine the maximum r (which is the min of the radial distances along x and y)
-r_max = min(0.5*n1*delta1,0.5*n2*delta2)
-# Minimum distance
-r_min = min(delta1,delta2)
+  if r_max == None:
+    r_max = min(0.5*n1*delta1,0.5*n2*delta2)
+  if interval_width == None:
+    interval_width = r_max
+  if distance_between_knots<min(delta1,delta2):
+    print('WARNING: distance_between_knots is smaller than the spatial discretization!\n         This will certainly fail if r_min=0\n         Hope you understand what you are doing...')
+  #print(n1,n2)
+  #X, Y = np.meshgrid(x, y)
+  #Z = np.exp(-(X*X+Y*Y))
+  print('Maximum value = ',Z.max())
+  print('Minimum value = ',Z.min())
+  name, ext = os.path.splitext(file_name)
+  name = name+specific_string
+  density_radial_file_name=name+'_radial'+ext
+  #g = open(density_radial_file_name,'w')
+  tab_r = np.zeros((n1,n2))
+  #print(tab_r.shape,Z.shape)
+  # Compute the radial distance r and sort the function by increasing r
+  for i in range(n1):
+    for j in range(n2):
+      tab_r[i,j] = np.sqrt(((i-n1//2)*delta1)**2+((j-n2//2)*delta2)**2)
+  idx=np.argsort(tab_r,axis=None)
+  r = tab_r.ravel()[idx]
+  func = Z.ravel()[idx]
 
-# Compute the number of knots
-number_of_knots = int(interval_width/distance_between_knots+0.5)
-delta_r = interval_width*r_min
-# Round to integers
-number_of_intervals = int (r_max/delta_r+0.5)
-xnew = np.linspace(0.0,r_max,num=number_of_points+1)
-ynew = np.zeros(number_of_points+1)
-# No interpolation for the first point at r=0
-ynew[0] = func[0]
 
-delta_r = r_max/number_of_intervals
-tab_position = np.zeros(number_of_intervals+1,dtype=int)
-tab_position[0] = 0
-tab_evaluation = np.zeros(number_of_intervals+1,dtype=int)
-tab_evaluation[0] = 0
-for i in range(number_of_intervals):
-  r_sup = delta_r*(i+1)
-#  print(r_sup)
-  tab_position[i+1] = np.argmax(r>r_sup)
-  tab_evaluation[i+1] = np.argmax(xnew>r_sup)
-tab_evaluation[number_of_intervals]=number_of_points+1
-#print('tab_position',tab_position)
-#print('tab_evaluation',tab_evaluation)
-xnew = np.linspace(0.0,r_max,num=number_of_points+1)
-ynew = np.zeros(number_of_points+1)
-# No interpolation for the first point at r=0
-ynew[0] = func[0]
-for i in range(0,number_of_intervals):
-#  print(i,xnew[i*number_of_points_per_interval+2],xnew[(i+1)*number_of_points_per_interval-1],r[tab_position[i]],r[tab_position[i+1]-1],tab_position[i],tab_position[i+1])
-#  print(i,delta_r*i,delta_r*(i+1))
-#  print('r',r[tab_position[i]:tab_position[i+1]])
-#  print('func',func[tab_position[i]:tab_position[i+1]])
-  tab_knots = np.linspace(delta_r*i+delta_r/(number_of_knots+1),delta_r*i+delta_r*number_of_knots/(number_of_knots+1),num=number_of_knots)
-#  print('tab_knots',tab_knots)
-#  print('xnew',xnew[i*number_of_points_per_interval+2:(i+1)*number_of_points_per_interval])
-  s = scipy.interpolate.LSQUnivariateSpline(r[tab_position[i]:tab_position[i+1]],func[tab_position[i]:tab_position[i+1]], tab_knots, k=k, check_finite=False)
-#  print('s ok')
-  ynew[tab_evaluation[i]:tab_evaluation[i+1]] = s(xnew[tab_evaluation[i]:tab_evaluation[i+1]])
-#lowess = sm.nonparametric.lowess(func[10000:20000], r[10000:20000], is_sorted=True, frac=0.1, xvals=xvals)
-#plt.plot(r,func)
-#plt.plot(xvals,lowess)
-#plt.show()
-np.savetxt(density_radial_file_name,np.column_stack((xnew,ynew)))
+  # Compute the number of knots
+  number_of_knots = int(interval_width/distance_between_knots+0.5)
+  # Round to integers
+  number_of_intervals = int((r_max-r_min)/interval_width+0.5)
+  delta_r = (r_max-r_min)/number_of_intervals
+# r_excess is the additional guard on each interval r, which ensures smoothness at
+# the boundary between intervals
+  r_excess = 2.0*min(delta1,delta2)
+# If r_min-r_excess<0.0, the fit will try to access negative values of r
+# Thus, it is needed to slightly extend r and func towards negative values
+  if r_min<r_excess:
+    extension = np.argmax(r>(r_excess-r_min))
+    extended_r = np.zeros(n1*n2+extension)
+    extended_r[extension:n1*n2+extension] = r[0:n1*n2]
+    extended_r[0:extension] = - r[extension:0:-1]
+    r = extended_r
+    extended_func = np.zeros(n1*n2+extension)
+    extended_func[extension:n1*n2+extension] = func[0:n1*n2]
+    extended_func[0:extension] = func[extension:0:-1]
+    func = extended_func
+#    print(extended_r[0:2*extension])
+
+  xnew = np.linspace(r_min,r_max,num=number_of_points+1)
+  ynew = np.zeros(number_of_points+1)
+
+  tab_position_up = np.zeros(number_of_intervals+1,dtype=int)
+  tab_position_down = np.zeros(number_of_intervals+1,dtype=int)
+  tab_evaluation = np.zeros(number_of_intervals+1,dtype=int)
+  tab_position_down[0] = np.argmax(r>(r_min-r_excess))
+  tab_evaluation[0] = 0
+  for i in range(number_of_intervals):
+    r_sup = r_min+delta_r*(i+1)
+  #  print(r_sup)
+    tab_position_up[i+1] = np.argmax(r>(r_sup+r_excess))
+    tab_position_down[i+1] = np.argmax(r>(r_sup-r_excess))
+    tab_evaluation[i+1] = np.argmax(xnew>r_sup)
+  tab_evaluation[number_of_intervals]=number_of_points+1
+
+  for i in range(number_of_intervals):
+    tab_knots = np.linspace(r_min+delta_r*i-r_excess+delta_r/(number_of_knots+1),r_min+delta_r*(i+1)+r_excess-delta_r/(number_of_knots+1),num=number_of_knots)
+ #   print('tab_knots',tab_knots)
+ #   print('r',r[tab_position_down[i]],r[tab_position_up[i+1]])
+ #   print('xnew',xnew[tab_evaluation[i]],xnew[tab_evaluation[i+1]-1])
+  #  print('xnew',xnew[i*number_of_points_per_interval+2:(i+1)*number_of_points_per_interval])
+    s = scipy.interpolate.LSQUnivariateSpline(r[tab_position_down[i]:tab_position_up[i+1]],func[tab_position_down[i]:tab_position_up[i+1]], tab_knots, k=k, check_finite=False)
+  #  print('s ok')
+    ynew[tab_evaluation[i]:tab_evaluation[i+1]] = s(xnew[tab_evaluation[i]:tab_evaluation[i+1]])
+  #lowess = sm.nonparametric.lowess(func[10000:20000], r[10000:20000], is_sorted=True, frac=0.1, xvals=xvals)
+  #plt.plot(r,func)
+  #plt.plot(xvals,lowess)
+  #plt.show()
+  np.savetxt(density_radial_file_name,np.column_stack((xnew,ynew)))
+
 
 """
 rmax = min(0.5*n1*delta1,0.5*n2*delta2)
@@ -254,4 +272,9 @@ g.close()
 
 #im = plt.imshow(Z,origin='lower',interpolation='nearest')
 #plt.show()
+
 """
+
+if __name__ == "__main__":
+  main()
+
