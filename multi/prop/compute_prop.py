@@ -60,17 +60,19 @@ Various disorder types can be used, defined by the disorder_type variable:
 
 import os
 import time
-import math
+#import math
 import numpy as np
 import getpass
-import copy
-import configparser
+#import copy
+#import configparser
 import sys
 import socket
 import argparse
 #sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
+#from anderson import io
+from anderson import timing
 
 
 
@@ -112,10 +114,10 @@ def main():
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranted
   my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement']
-  H, initial_state, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  geometry, H, initial_state, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
-  timing=anderson.Timing()
+  my_timing=anderson.timing.Timing()
 # The following line is a temporary fix
   i_tab_0 = 0
 
@@ -144,7 +146,7 @@ def main():
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagation for one realization of disorder
-    anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, measurement, my_timing)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
 # The following lines just for generating and printing a single realization of disorder
@@ -158,21 +160,24 @@ def main():
 
 # Merge measured quantities in the various MPI processes
   if mpi_version:
-    measurement_global.mpi_merge_measurement(comm,timing)
+    measurement_global.mpi_merge_measurement(comm,my_timing)
 
 # Calculation is essentially finished
 # It remains to output the results
   t2 = time.perf_counter()
-  timing.TOTAL_TIME = t2-t1
+  my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    timing.mpi_merge(comm)
+    my_timing.mpi_merge(comm)
 
   if rank==0:
 # After the calculation, whether the C implementation has been used is known, hence recompute the header string
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=timing)
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=my_timing)
 #    print('header',header_string)
-    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
+#    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
+    measurement_global.normalize(n_config*nprocs)
+    anderson.io.print_measurements('final',measurement_global,header_string=header_string)
+    """
     if (measurement_global.measure_density):
       anderson.io.output_density('density_final.dat',measurement_global.density_final,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='density')
     if (measurement_global.measure_density_momentum):
@@ -191,6 +196,7 @@ def main():
 #      print("Squared overlap with initial state = ",abs(measurement_global.overlap)**2)
 
     """
+    """
   i_tab_0 = propagation.first_measurement_autocorr
 
   header_string=environment_string\
@@ -208,18 +214,18 @@ def main():
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if (propagation.method=='ode'):
-      print("GPE time             = {0:.3f}".format(timing.GPE_TIME))
-      print("Number of time steps =",timing.N_SOLOUT)
+      print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
+      print("Number of time steps =",my_timing.N_SOLOUT)
     else:
-      print("CHE time             = {0:.3f}".format(timing.CHE_TIME))
-      print("Max nonlinear phase  = {0:.3f}".format(timing.MAX_NONLINEAR_PHASE))
-      print("Max order            =",timing.MAX_CHE_ORDER)
-    print("Expect time          = {0:.3f}".format(timing.EXPECT_TIME))
+      print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
+      print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
+      print("Max order            =",my_timing.MAX_CHE_ORDER)
+    print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-    print("Dummy time           = {0:.3f}".format(timing.DUMMY_TIME))
-    print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
+    print("Dummy time           = {0:.3f}".format(my_timing.DUMMY_TIME))
+    print("Number of ops        = {0:.4e}".format(my_timing.NUMBER_OF_OPS))
+    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

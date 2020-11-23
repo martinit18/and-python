@@ -12,6 +12,7 @@ import configparser
 import sys
 import math
 import anderson
+#from anderson import geometry
 
 def my_abort(mpi_version,comm,message):
   if mpi_version:
@@ -282,18 +283,19 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
+  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta)
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dimension, tab_dim, tab_delta, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength,non_diagonal_disorder_strength=non_diagonal_disorder_strength, b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
-  return_list = [H]
+  H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength,non_diagonal_disorder_strength=non_diagonal_disorder_strength, b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+  return_list = [geometry, H]
 
 # Define an initial state
   if 'Wavefunction' in my_list_of_sections:
-    initial_state = anderson.Wavefunction(tab_dim,tab_delta)
+    initial_state = anderson.wavefunction.Wavefunction(geometry)
     initial_state.type = initial_state_type
     if (initial_state.type=='plane_wave'):
-      anderson.Wavefunction.plane_wave(initial_state,tab_k_0)
+      anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0)
     if (initial_state.type=='gaussian_wave_packet'):
-      anderson.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
+      anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
@@ -323,12 +325,12 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of measurements
   if 'Measurement' in my_list_of_sections:
-    measurement = anderson.propagation.Measurement(delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
+    measurement = anderson.propagation.Measurement(geometry,delta_t_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
     measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
-    measurement.prepare_measurement(propagation,tab_delta,tab_dim)
+    measurement.prepare_measurement(propagation)
 #  print(measurement.density_final.shape)
-    measurement_global.prepare_measurement_global(propagation,tab_delta,tab_dim)
+    measurement_global.prepare_measurement(propagation,global_measurement=True)
     return_list.append(measurement)
     return_list.append(measurement_global)
 
@@ -503,7 +505,7 @@ def output_density(file,position,density,general_string,print_type='density'):
   return
 """
 
-def output_density(file,data,H,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
+def output_density(file,data,geometry,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
 #  print(data.shape)
 #  print(tab_abscissa)
   if file_type=='savetxt':
@@ -569,15 +571,15 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
     tab_strings = []
 #    print(specific_string)
     next_column = 1
-    dimension = H.dimension
+    dimension = geometry.dimension
     if data_type in ['density','density_momentum']:
 #      print(data.ndim,data.shape)
 # The simple case where there is only 1d data
       if dimension==1:
         if data_type=='density':
-          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'+header_string
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
         if data_type=='density_momentum':
-          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'+header_string
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
         if data.ndim==1:
           if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
             list_of_columns.append(tab_abscissa[0])
@@ -603,12 +605,12 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
       if dimension==2:
  # Add at the beginning of the file minimal info describing the data
         if data_type=='density':
-          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'\
-                       +str(H.tab_dim[1])+' '+str(H.tab_delta[1])+'\n'\
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
                        +header_string
         if data_type=='density_momentum':
-          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'\
-                       +str(H.tab_dim[1])+' '+str(2.0*np.pi/(H.tab_dim[1]*H.tab_delta[1]))+'\n'\
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(2.0*np.pi/(geometry.tab_dim[1]*geometry.tab_delta[1]))+'\n'\
                        +header_string
         if data.ndim==2:
           array_to_print = data[:,:]
@@ -617,13 +619,13 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
     if data_type in ['wavefunction','wavefunction_momentum','g1']:
       if dimension==1:
         if data_type=='wavefunction' or data_type=='g1':
-          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'+header_string
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
         if data_type=='wavefunction_momentum':
-          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'+header_string
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
 #        print(data.size,tab_abscissa[0].size)
         if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
           if data_type=='g1':
-            list_of_columns.append(tab_abscissa[0]-0.5*H.tab_delta[0])
+            list_of_columns.append(tab_abscissa[0]-0.5*geometry.tab_delta[0])
           else:
             list_of_columns.append(tab_abscissa[0])
           tab_strings.append('Column '+str(next_column)+': '+column_1)
@@ -637,13 +639,13 @@ def output_density(file,data,H,header_string='Origin of data not specified',data
         array_to_print=np.column_stack(list_of_columns)
       if dimension==2:
         if data_type=='wavefunction' or data_type=='g1':
-          header_string=str(H.tab_dim[0])+' '+str(H.tab_delta[0])+'\n'\
-                       +str(H.tab_dim[1])+' '+str(H.tab_delta[1])+'\n'\
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
                        +header_string
 #          print(header_string)
         if data_type=='wavefunction_momentum':
-          header_string=str(H.tab_dim[0])+' '+str(2.0*np.pi/(H.tab_dim[0]*H.tab_delta[0]))+'\n'\
-                       +str(H.tab_dim[1])+' '+str(2.0*np.pi/(H.tab_dim[1]*H.tab_delta[1]))+'\n'\
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(2.0*np.pi/(geometry.tab_dim[1]*geometry.tab_delta[1]))+'\n'\
                        +header_string
         array_to_print=data[:,:]
     if data_type in ['autocorrelation']:
@@ -704,3 +706,21 @@ def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data n
   np.savetxt(file,tab_data,header=general_string+'\n'.join(tab_strings)+'\n')
   return
 
+def print_measurements(when,measurement,header_string='Origin of data not specified'):
+  if when=='final':
+    if (measurement.measure_density):
+      anderson.io.output_density('density_final.dat',measurement.density_final,measurement,header_string=header_string,tab_abscissa=measurement.tab_position,data_type='density')
+    if (measurement.measure_density_momentum):
+      anderson.io.output_density('density_momentum_final.dat',measurement.density_momentum_final,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
+    if (measurement.measure_wavefunction):
+      anderson.io.output_density('wavefunction_final.dat',measurement.wfc,measurement,header_string=header_string,tab_abscissa=measurement.tab_position,data_type='wavefunction')
+    if (measurement.measure_wavefunction_momentum):
+      anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
+    if (measurement.measure_autocorrelation):
+      anderson.io.output_density('temporal_autocorrelation.dat',measurement.tab_autocorrelation,measurement,tab_abscissa=measurement.tab_t_measurement,header_string=header_string,data_type='autocorrelation')
+    if (measurement.measure_dispersion_position or measurement.measure_dispersion_momentum or measurement.measure_dispersion_energy):
+      anderson.io.output_dispersion('dispersion.dat',measurement.tab_dispersion,measurement.tab_strings,header_string)
+    if (measurement.measure_g1):
+      anderson.io.output_density('g1_final.dat',measurement.g1,measurement,header_string=header_string,tab_abscissa=measurement.tab_position,data_type='g1')
+    print("c'est fini")
+  return
