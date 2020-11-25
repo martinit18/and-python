@@ -127,21 +127,8 @@ def main():
 # At this point, it it not yet known whether there is a C implementation available
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
 #  print(header_string)
-# Print the initial density in configuration space
-    if measurement_global.measure_density:
-      anderson.io.output_density('density_initial.dat',np.abs(initial_state.wfc)**2,H,tab_abscissa=initial_state.tab_position,header_string=header_string,data_type='density',file_type='savetxt')
-# Print the initial density in momentum space
-    if (measurement_global.measure_density_momentum):
-      anderson.io.output_density('density_momentum_initial.dat',np.abs(initial_state.convert_to_momentum_space())**2,H,tab_abscissa=measurement.frequencies,header_string=header_string,data_type='density_momentum',file_type='savetxt')
-# The initial wavefunction in configuration space
-    if (measurement_global.measure_wavefunction):
-      anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
-# The initial wavefunction in momentum space
-    if (measurement_global.measure_wavefunction_momentum):
-      anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
-
-# Next line useful only if one wants to compute the potential correlation function
-# pot_correl=np.zeros(H.tab_dim)
+# Print the initial density and wavefunction
+    anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
@@ -176,26 +163,8 @@ def main():
 #    print('header',header_string)
 #    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
     measurement_global.normalize(n_config*nprocs)
-    anderson.io.print_measurements('final',measurement_global,header_string=header_string)
-    """
-    if (measurement_global.measure_density):
-      anderson.io.output_density('density_final.dat',measurement_global.density_final,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='density')
-    if (measurement_global.measure_density_momentum):
-      anderson.io.output_density('density_momentum_final.dat',measurement_global.density_momentum_final,H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
-    if (measurement_global.measure_wavefunction):
-      anderson.io.output_density('wavefunction_final.dat',measurement_global.wfc,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='wavefunction')
-    if (measurement_global.measure_wavefunction_momentum):
-      anderson.io.output_density('wavefunction_momentum_final.dat',measurement_global.wfc_momentum,H,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
-    if (measurement_global.measure_autocorrelation):
-      anderson.io.output_density('temporal_autocorrelation.dat',measurement_global.tab_autocorrelation,H,tab_abscissa=measurement.tab_t_measurement[i_tab_0:]-measurement.tab_t_measurement[i_tab_0],header_string=header_string,data_type='autocorrelation')
-    if (measurement_global.measure_dispersion_position or measurement_global.measure_dispersion_momentum or measurement_global.measure_dispersion_energy):
-      anderson.io.output_dispersion('dispersion.dat',tab_dispersion,tab_strings,header_string)
-    if (measurement_global.measure_g1):
-      anderson.io.output_density('g1_final.dat',measurement_global.g1,H,header_string=header_string,tab_abscissa=initial_state.tab_position,data_type='g1')
-#    if (measurement_global.measure_overlap):
-#      print("Squared overlap with initial state = ",abs(measurement_global.overlap)**2)
+    anderson.io.print_measurements_final(measurement_global,header_string=header_string)
 
-    """
     """
   i_tab_0 = propagation.first_measurement_autocorr
 

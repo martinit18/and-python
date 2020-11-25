@@ -377,9 +377,10 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     return rhs
 
 class Measurement(Geometry):
-  def __init__(self, geometry, delta_t_measurement, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, use_mkl_fft=True):
+  def __init__(self, geometry, delta_t_dispersion, delta_t_density, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, use_mkl_fft=True):
     super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta)
-    self.delta_t_measurement = delta_t_measurement
+    self.delta_t_dispersion = delta_t_dispersion
+    self.delta_t_density = delta_t_density
     self.i_tab_0 = i_tab_0
     self.measure_density = measure_density
     self.measure_density_momentum = measure_density_momentum
@@ -399,6 +400,7 @@ class Measurement(Geometry):
   def prepare_measurement(self,propagation,global_measurement=False):
     delta_t = propagation.delta_t
     t_max = propagation.t_max
+    """
     how_often_to_measure = int(self.delta_t_measurement/delta_t+0.5)
     propagation.delta_t = self.delta_t_measurement/how_often_to_measure
     number_of_measurements = int(t_max/self.delta_t_measurement+1.99999)
@@ -408,6 +410,40 @@ class Measurement(Geometry):
 # correct the last time
     self.tab_i_measurement[number_of_measurements-1]=number_of_time_steps
     self.tab_t_measurement[number_of_measurements-1]=t_max
+    """
+    dim_tab_time_propagation = int(t_max/delta_t+0.99999)
+    dim_tab_time_dispersion = int(t_max/self.delta_t_dispersion+0.99999)
+    number_of_measurements = dim_tab_time_dispersion+1
+    dim_tab_time_density = int(t_max/self.delta_t_density+0.99999)
+    tab_time = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,3))
+    tab_time[0:dim_tab_time_propagation,0] = delta_t*np.arange(dim_tab_time_propagation)
+#    tab_time[0:dim_tab_time_propagation,1] = 1
+    tab_time[dim_tab_time_propagation:dim_tab_time_propagation+dim_tab_time_dispersion,0] = self.delta_t_dispersion*np.arange(dim_tab_time_dispersion)
+    tab_time[dim_tab_time_propagation:dim_tab_time_propagation+dim_tab_time_dispersion,1] = 1
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,0] = self.delta_t_density*np.arange(dim_tab_time_density)
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,2] = 1
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,0] = t_max
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,1:] = 1
+#    print(tab_time)
+# sort by increasing time
+    tab_time = tab_time[np.argsort(tab_time[:, 0])]
+#    print(tab_time)
+# merge when several times (quasi-)coincide
+    j=0
+    tiny =1.e-12
+    tab_time_new = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,3))
+    tab_time_new[0,:] = tab_time[0,:]
+    for i in range(dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density):
+      if tab_time[i+1,0]-tab_time[i,0]>tiny:
+        tab_time_new[j+1,:] = tab_time[i+1,:]
+        j+=1
+      else:
+        tab_time_new[j,1:] += tab_time[i+1,1:]
+    self.tab_time = tab_time_new[:j+1,:]
+#    print(tab_time)
+# Select only events where dispersion is measured
+    self.tab_t_measurement = self.tab_time[self.tab_time[:,1]==1.0,0]
+#    print (self.tab_t_measurement)
     dim_density = self.tab_dim[:]
     dim_dispersion = [number_of_measurements]
     dim_dispersion_vec = [self.dimension,number_of_measurements]
@@ -557,6 +593,7 @@ class Measurement(Geometry):
     if self.measure_autocorrelation:
       self.tab_autocorrelation /= n_config
     list_of_columns = [self.tab_t_measurement]
+#    print(list_of_columns)
     tab_strings=['Column 1: Time']
     next_column = 2
     if self.measure_dispersion_position:
@@ -631,7 +668,9 @@ class Measurement(Geometry):
     return
 #    return tab_strings, np.column_stack(list_of_columns)
 
-  def perform_measurement(self, i_tab, H, psi, init_state_autocorr):
+
+
+  def perform_measurement_dispersion(self, i_tab, H, psi, init_state_autocorr):
     if self.measure_dispersion_position or self.measure_dispersion_position2:
       density = psi.wfc.real**2+psi.wfc.imag**2
       norm = np.sum(density)
@@ -639,9 +678,235 @@ class Measurement(Geometry):
         local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
 #    print(dim,local_density.shape,local_density)
         if self.measure_dispersion_position:
-          self.tab_position[i,i_tab] = np.sum(psi.tab_position[i]*local_density)/norm
+          self.tab_position[i,i_tab] = np.sum(psi.grid_position[i]*local_density)/norm
         if self.measure_dispersion_position2:
-          self.tab_position2[i,i_tab] = np.sum(psi.tab_position[i]**2*local_density)/norm
+          self.tab_position2[i,i_tab] = np.sum(psi.grid_position[i]**2*local_density)/norm
+    if self.measure_dispersion_energy:
+      self.tab_energy[i_tab], self.tab_nonlinear_energy[i_tab] = psi.energy(H)
+    if (self.measure_dispersion_momentum):
+      psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+      density = psi_momentum.real**2+psi_momentum.imag**2
+      norm = np.sum(density)
+      for i in range(psi.dimension):
+        local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
+        self.tab_momentum[i,i_tab] = np.sum(self.frequencies[i]*local_density)/norm
+    if self.measure_autocorrelation and i_tab>=self.i_tab_0:
+# Inlining the overlap method is slighlty faster
+#          measurement.tab_autocorrelation[i_tab-i_tab_0] = psi.overlap(init_state_autocorr)
+      self.tab_autocorrelation[i_tab-self.i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
+    return
+
+  def perform_measurement_final(self, psi, init_state_autocorr):
+    if self.measure_density:
+      self.density_final = psi.wfc.real**2+psi.wfc.imag**2
+    if self.measure_wavefunction:
+      self.wfc = psi.wfc
+    if self.measure_wavefunction_momentum:
+      self.wfc_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+    if self.measure_density_momentum:
+      if self.measure_wavefunction_momentum:
+        self.density_momentum_final = self.wfc_momentum.real**2+self.wfc_momentum.imag**2
+      else:
+        psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+        self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
+    if self.measure_g1:
+      self.g1 = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*psi.delta_vol
+    if self.measure_overlap:
+      self.overlap = np.vdot(init_state_autocorr.wfc,psi.wfc)*psi.delta_vol
+    return
+
+
+
+class Spectral_function:
+  def __init__(self,e_range,e_resolution):
+    self.n_pts_autocorr = int(0.5*e_range/e_resolution+0.5)
+# In case e_range/e_resolution is not an integer, I keep e_resolution and rescale e_range
+    self.e_range = 2.0*e_resolution*self.n_pts_autocorr
+    self.delta_t = 2.0*np.pi/(self.e_range*(1.0+0.5/self.n_pts_autocorr))
+    self.t_max = self.delta_t*self.n_pts_autocorr
+    self.e_resolution = e_resolution
+    return
+
+  def compute_spectral_function(self,tab_autocorrelation):
+# The autocorrelation function for negative time is simply the complex conjugate of the one at positive time
+# We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
+# see manual of numpy.fft.ifft for explanations
+# The number of points in tab_autocorrelation is n_pts_autocorr+1
+    tab_autocorrelation_symmetrized=np.concatenate((tab_autocorrelation,np.conj(tab_autocorrelation[:0:-1])))
+# Make the inverse Fourier transform which is by construction real, so keep only real part
+# Note that it is surely possible to improve using Hermitian FFT (useless as it uses very few resources)
+# Both the spectrum and the energies are reordered in ascending order
+    tab_spectrum=np.fft.fftshift(np.real(np.fft.ifft(tab_autocorrelation_symmetrized)))/self.e_resolution
+    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))
+    return tab_energies,tab_spectrum
+
+
+
+
+def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False):
+
+  def solout(t,y):
+    timing.N_SOLOUT+=1
+    return None
+
+  start_dummy_time=timeit.default_timer()
+#  dimension = H.dimension
+  tab_dim = geometry.tab_dim
+#  tab_delta = geometry.tab_delta
+  ntot = geometry.ntot
+  psi = Wavefunction(geometry)
+
+#  print('start gen disorder',timeit.default_timer())
+  H.generate_disorder(seed=i_seed+1234)
+#  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+  if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy):
+    H.generate_sparse_matrix()
+
+#  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+  if propagation.data_layout=='real':
+    y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
+  else:
+    if propagation.method=='ode':
+      y = initial_state.wfc.view(np.float64).ravel()
+    else:
+      y = np.copy(initial_state.wfc.ravel())
+#  print(initial_state.wfc[0],initial_state.wfc[1])
+#  print(timeit.default_timer())
+#  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+  if (propagation.method=='ode'):
+    rhs = np.zeros(2*ntot)
+#    print('y',y.dtype,y.shape)
+#    print('rhs',rhs.dtype,rhs.shape)
+    solver = ode(f=lambda t,y: gross_pitaevskii(t,y,H,propagation.data_layout,rhs,timing)).set_integrator('dop853', atol=1e-5, rtol=1e-4)
+    solver.set_solout(solout)
+    solver.set_initial_value(y)
+  if propagation.method=='che':
+    H.energy_range(accurate=propagation.accurate_bounds)
+##    H.medium_energy = 0.5*(e_min+e_max)
+#    print(H.e_min,H.e_max)
+    #H.script_tunneling, H.script_disorder =
+#    H.script_h(e_min,e_max)
+#    propagation.script_delta_t = 0.5*propagation.delta_t*(H.e_max-H.e_min)
+    accuracy = propagation.accuracy
+#    propagation.compute_chebyshev_coefficients(accuracy,timing)
+    if propagation.want_ctypes:
+#      print('I want ctypes')
+      try:
+        chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
+        if propagation.data_layout=='real':
+          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_real') and    hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
+          chebyshev_ctypes_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+            ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
+            ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+          chebyshev_ctypes_lib.chebyshev_real.restype = ctypes.c_double
+        else:
+          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_complex') and hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_complex_'+str(H.dimension)+'d')
+          chebyshev_ctypes_lib.chebyshev_complex.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+            ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
+            ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+          chebyshev_ctypes_lib.chebyshev_complex.restype = ctypes.c_double
+        if propagation.use_ctypes == False:
+          chebyshev_ctypes_lib = None
+          if H.seed == 1234:
+            print("\nWarning, chebyshev C library found, but without routines for dimension "+str(H.dimension)+", this uses the slow Python version!\n")
+      except:
+        propagation.use_ctypes = False
+        chebyshev_ctypes_lib = None
+        if H.seed == 1234:
+          print("\nWarning, no chebyshev C library found, this uses the slow Python version!\n")
+    else:
+      propagation.use_ctypes = False
+      chebyshev_ctypes_lib = None
+
+#  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+
+#  print('1',initial_state.wfc[0],initial_state.wfc[1])
+
+
+#  print(timeit.default_timer())
+  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+
+  start_expect_time = timeit.default_timer()
+  if measurement.measure_autocorrelation:
+# Create a full structure for init_state_autocorr (the initial state for autocorrelation) and copy initial_state in it if i_tab_0=0
+    init_state_autocorr = Wavefunction(geometry)
+#    if (measurement.i_tab_0==0):
+    init_state_autocorr.wfc[:] = initial_state.wfc[:]
+#  else:
+# If no autocorrelation, init_state_autocorr will not be used, it can refer to anything
+#    init_state_autocorr = initial_state
+  measurement.perform_measurement_dispersion(0, H, initial_state, initial_state)
+  timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
+#  print('2',initial_state.wfc[0],initial_state.wfc[1])
+
+#  print(measurement.tab_i_measurement)
+#time evolution
+#  print(measurement.tab_time.shape[0])
+  j=0
+  delta_t_old = -1.0
+  tiny = 1.e-12
+  for i in range(1,measurement.tab_time.shape[0]):
+    delta_t=measurement.tab_time[i,0]-measurement.tab_time[i-1,0]
+    if abs(delta_t-delta_t_old)>tiny:
+# time step has changed
+# recompute the coefficients of the Chebyshev series
+#      print('Recompute Chebyshev coefficients for delta_t = ',delta_t)
+      propagation.delta_t = delta_t
+      propagation.script_delta_t = 0.5*propagation.delta_t*(H.e_max-H.e_min)
+      propagation.compute_chebyshev_coefficients(accuracy,timing)
+    delta_t_old=delta_t
+#    print(delta_t,measurement.tab_time[i,1],measurement.tab_time[i,2])
+    if (propagation.method == 'ode'):
+      start_ode_time = timeit.default_timer()
+      solver.integrate(measurement.tab_time[i,0])
+      timing.ODE_TIME+=(timeit.default_timer() - start_ode_time)
+    else:
+      start_che_time = timeit.default_timer()
+#      print(i_prop,start_che_time)
+#      print(timing.MAX_NONLINEAR_PHASE)
+      chebyshev_step(y, H, propagation,timing,chebyshev_ctypes_lib)
+#      print(np.vdot(y,y)*H.delta_vol)
+#      print(timing.MAX_NONLINEAR_PHASE)
+#      print(y[2000])
+      timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
+      timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*ntot*propagation.tab_coef.size
+    if measurement.tab_time[i,1]==1:
+      j+=1
+      start_dummy_time=timeit.default_timer()
+      if (propagation.method == 'ode'): y=solver.y
+#      print('3',psi.wfc.shape,psi.wfc.dtype,y.shape,y.dtype)
+      if propagation.data_layout=='real':
+# The following two lines are faster than the natural implementation psi.wfc= y[0:dim_x]+1j*y[dim_x:2*dim_x]
+        psi.wfc.real=y[0:ntot].reshape(tab_dim)
+        psi.wfc.imag=y[ntot:2*ntot].reshape(tab_dim)
+      else:
+#        print( y.view(np.complex128).shape)
+        psi.wfc[:] = y.view(np.complex128).reshape(tab_dim)[:]
+#      print('4',psi.wfc.shape,psi.wfc.dtype)
+      timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
+      start_expect_time = timeit.default_timer()
+#      print(start_expect_time)
+#      if (i_tab==measurement.i_tab_0):
+#       init_state_autocorr.wfc[:] = psi.wfc[:]
+      measurement.perform_measurement_dispersion(j, H, psi, init_state_autocorr)
+      timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
+  measurement.perform_measurement_final(psi, init_state_autocorr)
+#     i_tab+=1
+#    print('3',initial_state.wfc[0],initial_state.wfc[1])
+  return
+
+  """
+  def perform_measurement_old(self, i_tab, H, psi, init_state_autocorr):
+    if self.measure_dispersion_position or self.measure_dispersion_position2:
+      density = psi.wfc.real**2+psi.wfc.imag**2
+      norm = np.sum(density)
+      for i in range(psi.dimension):
+        local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
+#    print(dim,local_density.shape,local_density)
+        if self.measure_dispersion_position:
+          self.tab_position[i,i_tab] = np.sum(psi.grid_position[i]*local_density)/norm
+        if self.measure_dispersion_position2:
+          self.tab_position2[i,i_tab] = np.sum(psi.grid_position[i]**2*local_density)/norm
     if self.measure_dispersion_energy:
       self.tab_energy[i_tab], self.tab_nonlinear_energy[i_tab] = psi.energy(H)
     if (self.measure_dispersion_momentum):
@@ -683,34 +948,10 @@ class Measurement(Geometry):
       if self.measure_overlap:
         self.overlap = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
       return
+  """
 
-
-
-class Spectral_function:
-  def __init__(self,e_range,e_resolution):
-    self.n_pts_autocorr = int(0.5*e_range/e_resolution+0.5)
-# In case e_range/e_resolution is not an integer, I keep e_resolution and rescale e_range
-    self.e_range = 2.0*e_resolution*self.n_pts_autocorr
-    self.delta_t = 2.0*np.pi/(self.e_range*(1.0+0.5/self.n_pts_autocorr))
-    self.t_max = self.delta_t*self.n_pts_autocorr
-    self.e_resolution = e_resolution
-    return
-
-  def compute_spectral_function(self,tab_autocorrelation):
-# The autocorrelation function for negative time is simply the complex conjugate of the one at positive time
-# We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
-# see manual of numpy.fft.ifft for explanations
-# The number of points in tab_autocorrelation is n_pts_autocorr+1
-    tab_autocorrelation_symmetrized=np.concatenate((tab_autocorrelation,np.conj(tab_autocorrelation[:0:-1])))
-# Make the inverse Fourier transform which is by construction real, so keep only real part
-# Note that it is surely possible to improve using Hermitian FFT (useless as it uses very few resources)
-# Both the spectrum and the energies are reordered in ascending order
-    tab_spectrum=np.fft.fftshift(np.real(np.fft.ifft(tab_autocorrelation_symmetrized)))/self.e_resolution
-    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))
-    return tab_energies,tab_spectrum
-
-
-def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False):
+"""
+def gpe_evolution_old(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False):
   assert propagation.data_layout in ["real","complex"]
 #  assert H.boundary_condition in ["periodic","open"]
   assert propagation.method in ["ode","che"]
@@ -850,7 +1091,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
       i_tab+=1
 #    print('3',initial_state.wfc[0],initial_state.wfc[1])
   return
-
+"""
 
 """
  def output_string(self, H, propagation,initial_state,n_config):

@@ -26,9 +26,9 @@ class Geometry:
       self.tab_dim_cumulative[i] = ntot
       self.delta_vol *= tab_delta[i]
     self.ntot = ntot
-    self.tab_position = list()
+    self.grid_position = list()
     for i in range(dimension):
-      self.tab_position.append(0.5*tab_delta[i]*np.arange(1-tab_dim[i],tab_dim[i]+1,2))
+      self.grid_position.append(0.5*tab_delta[i]*np.arange(1-tab_dim[i],tab_dim[i]+1,2))
     self.frequencies = []
     for i in range(dimension):
       self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))

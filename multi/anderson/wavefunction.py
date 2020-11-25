@@ -17,14 +17,14 @@ class Wavefunction(Geometry):
   def gaussian(self,tab_k_0,tab_sigma_0):
     self.tab_k_0 = tab_k_0
     self.tab_sigma_0 = tab_sigma_0
-    tab_position = np.meshgrid(*self.tab_position,indexing='ij')
+    grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
     tab_amplitude = np.zeros(self.tab_dim)
 #    print(tab_position[0].shape)
 #    print(tab_position[1].shape)
-    for i in range(len(tab_position)):
-      tab_phase += self.tab_k_0[i]*tab_position[i]
-      tab_amplitude += (tab_position[i]/self.tab_sigma_0[i])**2
+    for i in range(len(grid_position)):
+      tab_phase += self.tab_k_0[i]*grid_position[i]
+      tab_amplitude += (grid_position[i]/self.tab_sigma_0[i])**2
 # The next two lines are to avoid too small values of abs(psi[i])
 # which slow down the calculation
     threshold = 100.
@@ -36,10 +36,10 @@ class Wavefunction(Geometry):
   def plane_wave(self,tab_k_0):
 #    self.type = 'Plane wave'
     self.tab_k_0 = tab_k_0
-    tab_position = np.meshgrid(*self.tab_position,indexing='ij')
+    grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
-    for i in range(len(tab_position)):
-      tab_phase += self.tab_k_0[i]*tab_position[i]
+    for i in range(len(grid_position)):
+      tab_phase += self.tab_k_0[i]*grid_position[i]
     self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
     return
 
