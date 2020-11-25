@@ -507,22 +507,21 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   delta_t_old = -1.0
   tiny = 1.e-12
   for i in range(1,measurement.tab_time.shape[0]):
-    delta_t=measurement.tab_time[i,0]-measurement.tab_time[i-1,0]
-    if abs(delta_t-delta_t_old)>tiny:
-# time step has changed
-# recompute the coefficients of the Chebyshev series
-#      print('Recompute Chebyshev coefficients for delta_t = ',delta_t)
-      propagation.delta_t = delta_t
-      propagation.script_delta_t = 0.5*propagation.delta_t*(H.e_max-H.e_min)
-      propagation.compute_chebyshev_coefficients(accuracy,timing)
-    delta_t_old=delta_t
-#    print(delta_t,measurement.tab_time[i,1],measurement.tab_time[i,2])
     if (propagation.method == 'ode'):
       start_ode_time = timeit.default_timer()
       solver.integrate(measurement.tab_time[i,0])
       timing.ODE_TIME+=(timeit.default_timer() - start_ode_time)
     else:
       start_che_time = timeit.default_timer()
+      delta_t=measurement.tab_time[i,0]-measurement.tab_time[i-1,0]
+      if abs(delta_t-delta_t_old)>tiny:
+# time step has changed
+# recompute the coefficients of the Chebyshev series
+#      print('Recompute Chebyshev coefficients for delta_t = ',delta_t)
+        propagation.delta_t = delta_t
+        propagation.script_delta_t = 0.5*propagation.delta_t*(H.e_max-H.e_min)
+        propagation.compute_chebyshev_coefficients(accuracy,timing)
+      delta_t_old=delta_t
 #      print(i_prop,start_che_time)
 #      print(timing.MAX_NONLINEAR_PHASE)
       chebyshev_step(y, H, propagation,timing,chebyshev_ctypes_lib)
