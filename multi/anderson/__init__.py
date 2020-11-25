@@ -12,9 +12,9 @@ import sys
 import math
 import numpy as np
 import time
-from . import geometry, diag, io, lyapounov, propagation, hamiltonian, wavefunction
+from . import geometry, diag, io, lyapounov, propagation, hamiltonian, wavefunction, measurement
 
-__all__ = ["diag","io","lyapounov","propagation","geometry","hamiltonian","wavefunction"]
+__all__ = ["diag","io","lyapounov","propagation","geometry","hamiltonian","wavefunction","measurement"]
 
 
 
