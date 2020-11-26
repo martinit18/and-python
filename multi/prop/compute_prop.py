@@ -128,7 +128,7 @@ def main():
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
 #  print(header_string)
 # Print the initial density and wavefunction
-    anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
+#    anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
@@ -163,6 +163,7 @@ def main():
 #    print('header',header_string)
 #    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
     measurement_global.normalize(n_config*nprocs)
+#    anderson.io.output_density('density_1.dat',measurement_global.density_intermediate[1],measurement_global,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
     anderson.io.print_measurements_final(measurement_global,header_string=header_string)
 
     """

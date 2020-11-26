@@ -503,7 +503,8 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #  print(measurement.tab_i_measurement)
 #time evolution
 #  print(measurement.tab_time.shape[0])
-  j=0
+  j_dispersion=0
+  j_density=0
   delta_t_old = -1.0
   tiny = 1.e-12
   for i in range(1,measurement.tab_time.shape[0]):
@@ -530,8 +531,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
       timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*ntot*propagation.tab_coef.size
-    if measurement.tab_time[i,1]==1:
-      j+=1
+    if measurement.tab_time[i,1]==1 or measurement.tab_time[i,2]==1:
       start_dummy_time=timeit.default_timer()
       if (propagation.method == 'ode'): y=solver.y
 #      print('3',psi.wfc.shape,psi.wfc.dtype,y.shape,y.dtype)
@@ -545,10 +545,16 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #      print('4',psi.wfc.shape,psi.wfc.dtype)
       timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
       start_expect_time = timeit.default_timer()
+      if measurement.tab_time[i,1]==1:
 #      print(start_expect_time)
 #      if (i_tab==measurement.i_tab_0):
 #       init_state_autocorr.wfc[:] = psi.wfc[:]
-      measurement.perform_measurement_dispersion(j, H, psi, init_state_autocorr)
+        j_dispersion+=1
+        measurement.perform_measurement_dispersion(j_dispersion, H, psi, init_state_autocorr)
+      if measurement.tab_time[i,2]==1:
+#        print('It is time to store density',measurement.tab_time[i,0],j_density)
+        measurement.perform_measurement_density(j_density,psi)
+        j_density+=1
       timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
   measurement.perform_measurement_final(psi, init_state_autocorr)
 #     i_tab+=1

@@ -63,7 +63,7 @@ n_config = 1
 
 [Measurement]
 delta_t_dispersion = 1.2
-delta_t_density = 3.
+delta_t_density = 2.1
 #first_measurement = 0
 density = True
 density_momentum = True
@@ -76,6 +76,7 @@ wavefunction = True
 wavefunction_momentum = True
 autocorrelation = True
 g1 = True
+overlap = True
 use_mkl_fft = True
 
 [Spectral]

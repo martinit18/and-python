@@ -47,8 +47,9 @@ class Measurement(Geometry):
     """
     dim_tab_time_propagation = int(t_max/delta_t+0.99999)
     dim_tab_time_dispersion = int(t_max/self.delta_t_dispersion+0.99999)
-    number_of_measurements = dim_tab_time_dispersion+1
+    number_of_measurements_dispersion = dim_tab_time_dispersion+1
     dim_tab_time_density = int(t_max/self.delta_t_density+0.99999)
+    number_of_measurements_density = dim_tab_time_density-1
     tab_time = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,3))
     tab_time[0:dim_tab_time_propagation,0] = delta_t*np.arange(dim_tab_time_propagation)
 #    tab_time[0:dim_tab_time_propagation,1] = 1
@@ -74,13 +75,16 @@ class Measurement(Geometry):
       else:
         tab_time_new[j,1:] += tab_time[i+1,1:]
     self.tab_time = tab_time_new[:j+1,:]
+# For the first and last time, remove the computation of densities
+    self.tab_time[0,2]=0.0
+    self.tab_time[-1,2]=0.0
 #    print(tab_time)
 # Select only events where dispersion is measured
-    self.tab_t_measurement = self.tab_time[self.tab_time[:,1]==1.0,0]
+    self.tab_t_measurement_dispersion = self.tab_time[self.tab_time[:,1]==1.0,0]
 #    print (self.tab_t_measurement)
     dim_density = self.tab_dim[:]
-    dim_dispersion = [number_of_measurements]
-    dim_dispersion_vec = [self.dimension,number_of_measurements]
+    dim_dispersion = [number_of_measurements_dispersion]
+    dim_dispersion_vec = [self.dimension,number_of_measurements_dispersion]
     if global_measurement:
       if self.extended:
         dim_density.insert(0,2)
@@ -94,7 +98,7 @@ class Measurement(Geometry):
       self.density_final = np.zeros(dim_density)
 #      print(self.density_final.shape,tab_dim)
     if self.measure_autocorrelation:
-      self.tab_autocorrelation = np.zeros(number_of_measurements,dtype=np.complex128)
+      self.tab_autocorrelation = np.zeros(number_of_measurements_dispersion,dtype=np.complex128)
     if self.measure_density_momentum:
       self.density_momentum_final = np.zeros(dim_density)
     if self.measure_dispersion_position:
@@ -112,8 +116,20 @@ class Measurement(Geometry):
       self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
     if self.measure_g1:
       self.g1 =  np.zeros(self.tab_dim,dtype=np.complex128)
+      dim_g1 = self.tab_dim[:]
+      dim_g1.insert(0,number_of_measurements_density)
+      self.g1_intermediate = np.zeros(dim_g1,dtype=np.complex128)
     if self.measure_overlap:
       self.overlap = 0.0
+# What follows is the code for the intermediate times
+    self.tab_t_measurement_density = self.tab_time[self.tab_time[:,2]==1.0,0]
+#    print(self.tab_t_measurement_density)
+    dim_density.insert(0,number_of_measurements_density)
+    if self.measure_density:
+      self.density_intermediate = np.zeros(dim_density)
+#      print(dim_density)
+    if self.measure_density_momentum:
+      self.density_momentum_intermediate = np.zeros(dim_density)
     return
 
 
@@ -122,12 +138,19 @@ class Measurement(Geometry):
 #      print(measurement.density_final.shape)
 #      print(self.density_final.shape)
       self.density_final[0] += measurement.density_final
+      self.density_intermediate[:,0] += measurement.density_intermediate
+#      print(self.density_intermediate.shape,measurement.density_intermediate.shape)
+#      print('merge 1',self.density_intermediate[:,0]**2)
       if self.extended:
         self.density_final[1] += measurement.density_final**2
+        self.density_intermediate[:,1] += measurement.density_intermediate**2
+#        print('merge 2',self.density_intermediate[:,1])
     if self.measure_density_momentum:
       self.density_momentum_final[0] += measurement.density_momentum_final
-      if self.extended:
+      self.density_momentum_intermediate[:,0] += measurement.density_momentum_intermediate
+    if self.extended:
         self.density_momentum_final[1] += measurement.density_momentum_final**2
+        self.density_momentum_intermediate[:,1] += measurement.density_momentum_intermediate**2
     if self.measure_autocorrelation:
       self.tab_autocorrelation += measurement.tab_autocorrelation
     if self.measure_dispersion_position:
@@ -154,6 +177,7 @@ class Measurement(Geometry):
       self.wfc_momentum += measurement.wfc_momentum
     if self.measure_g1:
       self.g1 +=  measurement.g1
+      self.g1_intermediate += measurement.g1_intermediate
     if self.measure_overlap:
       self.overlap += measurement.overlap
     return
@@ -169,10 +193,16 @@ class Measurement(Geometry):
       toto = np.empty_like(self.density_final)
       comm.Reduce(self.density_final,toto)
       self.density_final = np.copy(toto)
+      toto = np.empty_like(self.density_intermediate)
+      comm.Reduce(self.density_intermediate,toto)
+      self.density_intermediate = np.copy(toto)
     if self.measure_density_momentum:
       toto = np.empty_like(self.density_momentum_final)
       comm.Reduce(self.density_momentum_final,toto)
       self.density_momentum_final = np.copy(toto)
+      toto = np.empty_like(self.density_momentum_intermediate)
+      comm.Reduce(self.density_momentum_intermediate,toto)
+      self.density_momentum_intermediate = np.copy(toto)
     if self.measure_autocorrelation:
       toto = np.empty_like(self.tab_autocorrelation)
       comm.Reduce(self.tab_autocorrelation,toto)
@@ -207,6 +237,9 @@ class Measurement(Geometry):
       toto = np.empty_like(self.g1)
       comm.Reduce(self.g1,toto)
       self.g1 = np.copy(toto)
+      toto = np.empty_like(self.g1_intermediate)
+      comm.Reduce(self.g1_intermediate,toto)
+      self.g1_intermediate = np.copy(toto)
     if self.measure_overlap:
 #      print(self.overlap)
       toto = np.zeros(1,dtype=np.complex128)
@@ -218,15 +251,19 @@ class Measurement(Geometry):
   def normalize(self,n_config):
     if self.measure_density:
       self.density_final /= n_config
+      self.density_intermediate /= n_config
       if self.extended:
         self.density_final[1] = np.sqrt(np.abs(self.density_final[1]-self.density_final[0]**2)/n_config)
+        self.density_intermediate[:,1] = np.sqrt(np.abs(self.density_intermediate[:,1]-self.density_intermediate[:,0]**2)/n_config)
     if self.measure_density_momentum:
       self.density_momentum_final /= n_config
+      self.density_momentum_intermediate /= n_config
       if self.extended:
         self.density_momentum_final[1] = np.sqrt(np.abs(self.density_momentum_final[1]-self.density_momentum_final[0]**2)/n_config)
+        self.density_momentum_intermediate[:,1] = np.sqrt(np.abs(self.density_intermediate[:,1]-self.density_intermediate[:,0]**2)/n_config)
     if self.measure_autocorrelation:
       self.tab_autocorrelation /= n_config
-    list_of_columns = [self.tab_t_measurement]
+    list_of_columns = [self.tab_t_measurement_dispersion]
 #    print(list_of_columns)
     tab_strings=['Column 1: Time']
     next_column = 2
@@ -293,6 +330,7 @@ class Measurement(Geometry):
       self.wfc_momentum /= n_config
     if self.measure_g1:
       self.g1 /= n_config
+      self.g1_intermediate /= n_config
     if self.measure_overlap:
       self.overlap /= n_config
     self.tab_strings = tab_strings
@@ -328,6 +366,17 @@ class Measurement(Geometry):
 # Inlining the overlap method is slighlty faster
 #          measurement.tab_autocorrelation[i_tab-i_tab_0] = psi.overlap(init_state_autocorr)
       self.tab_autocorrelation[i_tab-self.i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
+    return
+
+  def perform_measurement_density(self, i_tab, psi):
+    if self.measure_density:
+#      print(self.density_intermediate.shape)
+      self.density_intermediate[i_tab,:] = psi.wfc.real**2+psi.wfc.imag**2
+    if self.measure_density_momentum:
+      psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+      self.density_momentum_intermediate[i_tab,:] = psi_momentum.real**2+psi_momentum.imag**2
+    if self.measure_g1:
+      self.g1_intermediate[i_tab,:] = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*psi.delta_vol
     return
 
   def perform_measurement_final(self, psi, init_state_autocorr):
