@@ -159,10 +159,10 @@ def main():
   if rank==0:
 # After the calculation, whether the C implementation has been used is known, hence recompute the header string
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
+    measurement_global.normalize(n_config*nprocs)
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=my_timing)
 #    print('header',header_string)
 #    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
-    measurement_global.normalize(n_config*nprocs)
 #    anderson.io.output_density('density_1.dat',measurement_global.density_intermediate[1],measurement_global,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
     anderson.io.print_measurements_final(measurement_global,header_string=header_string)
 

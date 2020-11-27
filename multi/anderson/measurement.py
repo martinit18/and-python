@@ -241,7 +241,6 @@ class Measurement(Geometry):
       comm.Reduce(self.g1_intermediate,toto)
       self.g1_intermediate = np.copy(toto)
     if self.measure_overlap:
-#      print(self.overlap)
       toto = np.zeros(1,dtype=np.complex128)
       comm.Reduce(self.overlap,toto)
       self.overlap = toto[0]
@@ -396,5 +395,6 @@ class Measurement(Geometry):
       self.g1 = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*psi.delta_vol
     if self.measure_overlap:
       self.overlap = np.vdot(init_state_autocorr.wfc,psi.wfc)*psi.delta_vol
+#      print(self.overlap)
     return
 
