@@ -156,10 +156,21 @@ def main():
   if mpi_version:
     my_timing.mpi_merge(comm)
 
+  remove_hot_pixel = True
+
   if rank==0:
 # After the calculation, whether the C implementation has been used is known, hence recompute the header string
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
     measurement_global.normalize(n_config*nprocs)
+# Remove the hot pixel in momentum distribution if required
+    if remove_hot_pixel and measurement_global.measure_density_momentum and initial_state.type=='plane_wave':
+      index_to_remove = [0]
+#  initial_state.tab_k_0=[0.,0.]
+      for i in range(geometry.dimension):
+        index_to_remove.append(np.argmin(abs(geometry.frequencies[i]-initial_state.tab_k_0[i])))
+      measurement_global.density_momentum_final[tuple(index_to_remove)]=0.0
+      for i in range(measurement_global.tab_t_measurement_density.size):
+        measurement_global.density_momentum_intermediate[tuple([i]+index_to_remove)]=0.0
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=my_timing)
 #    print('header',header_string)
 #    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)

@@ -169,6 +169,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       measure_g1 = Measurement.getboolean('g1',False)
       measure_overlap = Measurement.getboolean('overlap',False)
       use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
+      remove_hot_pixel = Measurement.getboolean('remove_hot_pixel',False)
 
 # Optional Diagonalization section
     if 'Diagonalization' in my_list_of_sections:
@@ -253,6 +254,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     measure_g1 = None
     measure_overlap = None
     use_mkl_fft = None
+    remove_hot_pixel = None
     diagonalization_method = None
     targeted_energy = None
     IPR_min = None
@@ -277,7 +279,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
     if 'Measurement' in my_list_of_sections:
-      delta_t_dispersion, delta_t_density, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft = comm.bcast((delta_t_dispersion, delta_t_density, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft))
+      delta_t_dispersion, delta_t_density, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft, remove_hot_pixel))
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
@@ -327,7 +329,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of measurements
   if 'Measurement' in my_list_of_sections:
-    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft)
+    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
     measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
     measurement.prepare_measurement(propagation)
@@ -407,6 +409,9 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     params_string += \
                   'time step for dispersion measurement = '+str(measurement.delta_t_dispersion)+'\n'\
                  +'time step for density measurement    = '+str(measurement.delta_t_density)+'\n'
+    if initial_state.type=='plane_wave':
+      params_string += \
+                  'remove hot pixel in momentum density = '+str(measurement.remove_hot_pixel)+'\n'
     if measurement.measure_overlap:
       params_string += \
                   '|overlap|**2 with initial state      = '+str(abs(measurement.overlap)**2)+'\n'

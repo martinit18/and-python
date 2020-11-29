@@ -11,7 +11,7 @@ import timeit
 from anderson.geometry import Geometry
 
 class Measurement(Geometry):
-  def __init__(self, geometry, delta_t_dispersion, delta_t_density, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, use_mkl_fft=True):
+  def __init__(self, geometry, delta_t_dispersion, delta_t_density, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, use_mkl_fft=True, remove_hot_pixel=False):
     super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta)
     self.delta_t_dispersion = delta_t_dispersion
     self.delta_t_density = delta_t_density
@@ -29,6 +29,7 @@ class Measurement(Geometry):
     self.measure_g1 = measure_g1
     self.measure_overlap = measure_overlap
     self.use_mkl_fft = use_mkl_fft
+    self.remove_hot_pixel = remove_hot_pixel
     return
 
   def prepare_measurement(self,propagation,global_measurement=False):

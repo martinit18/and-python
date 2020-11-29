@@ -488,7 +488,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
 
   start_expect_time = timeit.default_timer()
-  if measurement.measure_autocorrelation or measurement.overlap:
+  if measurement.measure_autocorrelation or measurement.measure_overlap:
 # Create a full structure for init_state_autocorr (the initial state for autocorrelation) and copy initial_state in it if i_tab_0=0
     init_state_autocorr = Wavefunction(geometry)
 #    if (measurement.i_tab_0==0):
