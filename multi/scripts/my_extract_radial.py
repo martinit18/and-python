@@ -122,13 +122,15 @@ def main():
     if my_choice>3 or my_choice<0:
       sys.exit('Illegal choice "'+str(my_choice)+'" for -c argument')
 
-  # Try to extract information from the first two lines
+  # Try to extract information from the first four lines
   try:
     f = open(file_name,'r')
     line=(f.readline().lstrip('#')).split()
     n1=int(line[0])
+    found_delta = False
     if len(line)>1:
       delta1=float(line[-1])
+      found_delta = True
     else:
       delta1=1.0
     line=(f.readline().lstrip('#')).split()
@@ -137,6 +139,11 @@ def main():
       delta2=float(line[-1])
     else:
       delta2=1.0
+    if not found_delta:
+      line=(f.readline().lstrip('#')).split()
+      delta1=float(line[-1])
+      line=(f.readline().lstrip('#')).split()
+      delta2=float(line[-1])
   except:
     n1,n2 = Z.shape
     delta1=1.0
