@@ -260,7 +260,7 @@ class Measurement(Geometry):
       self.density_momentum_intermediate /= n_config
       if self.extended:
         self.density_momentum_final[1] = np.sqrt(np.abs(self.density_momentum_final[1]-self.density_momentum_final[0]**2)/n_config)
-        self.density_momentum_intermediate[:,1] = np.sqrt(np.abs(self.density_intermediate[:,1]-self.density_intermediate[:,0]**2)/n_config)
+        self.density_momentum_intermediate[:,1] = np.sqrt(np.abs(self.density_momentum_intermediate[:,1]-self.density_momentum_intermediate[:,0]**2)/n_config)
     if self.measure_autocorrelation:
       self.tab_autocorrelation /= n_config
     list_of_columns = [self.tab_t_measurement_dispersion]
