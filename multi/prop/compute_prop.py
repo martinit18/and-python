@@ -157,14 +157,14 @@ def main():
   if mpi_version:
     my_timing.mpi_merge(comm)
 
-  remove_hot_pixel = True
+#  remove_hot_pixel = True
 
   if rank==0:
 # After the calculation, whether the C implementation has been used is known, hence recompute the header string
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
     measurement_global.normalize(n_config*nprocs)
 # Remove the hot pixel in momentum distribution if required
-    if remove_hot_pixel and measurement_global.measure_density_momentum and initial_state.type=='plane_wave':
+    if measurement_global.remove_hot_pixel and measurement_global.measure_density_momentum and initial_state.type=='plane_wave':
       index_to_remove = [0]
 #  initial_state.tab_k_0=[0.,0.]
       for i in range(geometry.dimension):

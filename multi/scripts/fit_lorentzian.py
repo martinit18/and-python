@@ -39,12 +39,14 @@ def fancy_fit(x,y,p0):
   return plocal,pcov
 
 i_min=1
-i_max=25
+i_max=50
 # Half-width of the fitting interval
-half_width=0.4
+half_width=0.1
 # check_error_bars prints errors in the least-square adjustments
 # Makes it possible to check that error bars are correctly computed
 check_error_bars = True
+# print_fit adds the fitted function, together with the original function, in a separate file
+print_fit = True
 # next parameter can be 'Python' or 'C' depending on which program generated the data
 origin_of_data = 'Python'
 #origin_of_data = 'C'
@@ -55,15 +57,22 @@ for i in range(i_max+1-i_min):
   if origin_of_data=='C':
 # Data produced by the an2d_propXX C program
     filename='density_momentum_'+"{:03d}".format(i+i_min)+'_radial.dat'
+    filename_fit='density_momentum_'+"{:03d}".format(i+i_min)+'_radial_fit.dat'
   else:
 # Data produced by the Python compute_prop program
     if i<i_max-i_min:
       filename='density_momentum_intermediate_'+str(i+i_min)+'_radial.dat'
+      filename_fit='density_momentum_intermediate_'+str(i+i_min)+'_radial_fit.dat'
     else:
       filename='density_momentum_final_radial.dat'
+      filename_fit='density_momentum_final_radial_fit.dat'
   data=np.loadtxt(filename)
   x=data[:,0]
   y=data[:,1]
+  header_string = 'Lorentzian fit of the momentum distribution\nHalf-width of the fitting interval = '+str(half_width)+'\n'\
+               +'Column 1: Momentum k\n'\
+               +'Column 2: Momentum distribution n(k)\n'\
+               +'Column 3: Lorentzian fit\n'\
 #  print(x)
 #  print(y)
 # Initial guess
@@ -71,6 +80,8 @@ for i in range(i_max+1-i_min):
   imin = np.argmax(x>p0[0]-half_width)
   imax = np.argmax(x>p0[0]+half_width)
   popt, pcov = scipy.optimize.curve_fit(lorentzian, x[imin:imax], y[imin:imax], p0)
+  if print_fit:
+    np.savetxt(filename_fit,np.column_stack((x,y,lorentzian(x,*popt))),header=header_string)
 #  print(pcov)
 # Correct the bug (?) is curve_fit, so that the uncertainty on the parameters is correct
   pcov*=(imax-imin)
