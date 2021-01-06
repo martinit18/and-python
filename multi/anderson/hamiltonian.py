@@ -9,6 +9,7 @@ Created on Sun Nov 22 19:27:50 2020
 import numpy as np
 import scipy.sparse as ssparse
 from anderson.geometry import Geometry
+import sys
 
 """
 The class Hamiltonian contains all properties that define a disordered Hamiltonian discretized spatially
@@ -118,7 +119,14 @@ class Hamiltonian(Geometry):
 #      self.mask[0]=dim_x
     """
 
-
+  def add_spin_one_half(self, spin_orbit_interaction=0.0, sigma_x=0.0, sigma_y=0.0, sigma_z=0.0):
+    self.spin_one_half = True
+    self.spin_orbit_interaction = spin_orbit_interaction
+    self.scaled_spin_orbit_interaction = spin_orbit_interaction/self.tab_delta[0]
+    self.sigma_x = sigma_x
+    self.sigma_y = sigma_y
+    self.sigma_z = sigma_z
+    return
 
   """
   Generate a specific disorder configuration
@@ -183,6 +191,9 @@ class Hamiltonian(Geometry):
   """
 
   def generate_full_matrix(self):
+    if self.spin_one_half:
+      matrix = self.generate_full_matrix_spin_one_half()
+      return matrix
     tab_index = np.zeros(self.dimension,dtype=int)
     matrix = np.diag(self.disorder.ravel())
     ntot = self.ntot
@@ -216,6 +227,32 @@ class Hamiltonian(Geometry):
         np.fill_diagonal(matrix[:,tab_offset[j+self.dimension]:],sub_diagonal[j+self.dimension,:])
 #    print(matrix)
     return matrix
+
+  def generate_full_matrix_spin_one_half(self):
+    assert(self.dimension==1)
+    dimx = self.tab_dim_cumulative[0]
+    ntot = 2*dimx
+# The disorder contribution + sigma_z contribution
+    diag = np.repeat(self.disorder,2)
+    diag[0::2] += self.sigma_z
+    diag[1::2] -= self.sigma_z
+    matrix = np.diag(diag).astype(np.complex128)
+# Hopping (p**2 operator) + spin-orbit contribution
+    np.fill_diagonal(matrix[2::2,0::2],-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction)
+    np.fill_diagonal(matrix[3::2,1::2],-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction)
+    np.fill_diagonal(matrix[0::2,2::2],-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction)
+    np.fill_diagonal(matrix[1::2,3::2],-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction)
+    if self.tab_boundary_condition[0]=='periodic':
+      matrix[0,ntot-2] = -self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction
+      matrix[1,ntot-1] = -self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction
+      matrix[ntot-2,0] = -self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction
+      matrix[ntot-1,1] = -self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction
+# sigma_x and sigma_y contributtions
+    np.fill_diagonal(matrix[0::2,1::2],self.sigma_x-1j*self.sigma_y)
+    np.fill_diagonal(matrix[1::2,0::2],self.sigma_x+1j*self.sigma_y)
+#    print(matrix)
+    return matrix
+
     """
     if (self.dimension==1):
       matrix = np.diag(self.disorder)
@@ -313,6 +350,9 @@ class Hamiltonian(Geometry):
   Converts Hamiltonian to a sparse matrix for sparse diagonalization
   """
   def generate_sparse_matrix(self):
+    if self.spin_one_half:
+      self.generate_sparse_matrix_spin_one_half()
+      return
     tab_index = np.zeros(self.dimension,dtype=int)
     diagonal = self.disorder.ravel()
     ntot = self.ntot
@@ -351,6 +391,40 @@ class Hamiltonian(Geometry):
     self.sparse_matrix = ssparse.diags(diagonals,offsets,format='csr')
 #    print('Sparse matrix computed',self.sparse_matrix.dtype)
 #    print(matrix.toarray())
+    return
+
+  def generate_sparse_matrix_spin_one_half(self):
+    assert(self.dimension==1)
+    dimx = self.tab_dim_cumulative[0]
+    ntot = 2*dimx
+# The disorder contribution + sigma_z contribution
+    diagonal = np.repeat(self.disorder,2)
+    diagonal[0::2] += self.sigma_z
+    diagonal[1::2] -= self.sigma_z
+    diagonals = [diagonal]
+    offsets = [0]
+    sub_diagonal= np.zeros((6,ntot),dtype=np.complex128)
+# Hopping (p**2 operator) + spin-orbit contribution
+    sub_diagonal[0,0::2]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction
+    sub_diagonal[0,1::2]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction
+    sub_diagonal[1,0::2]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction
+    sub_diagonal[1,1::2]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction
+    diagonals.extend([sub_diagonal[0,:],sub_diagonal[1,:]])
+    offsets.extend([2,-2])
+    if self.tab_boundary_condition[0]=='periodic':
+      sub_diagonal[2,0]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction
+      sub_diagonal[2,1]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction
+      sub_diagonal[3,0]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction
+      sub_diagonal[3,1]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction
+      diagonals.extend([sub_diagonal[2,:],sub_diagonal[3,:]])
+      offsets.extend([-ntot+2,ntot-2])
+# sigma_x and sigma_y contributtions
+    sub_diagonal[4,0::2] = self.sigma_x-1j*self.sigma_y
+    sub_diagonal[5,0::2] = self.sigma_x+1j*self.sigma_y
+    diagonals.extend([sub_diagonal[4,:],sub_diagonal[5,:]])
+    offsets.extend([1,-1])
+    self.sparse_matrix = ssparse.diags(diagonals,offsets,format='csr',dtype=np.complex128)
+#    print(self.sparse_matrix.toarray())
     return
 
   """
@@ -466,6 +540,7 @@ class Hamiltonian(Geometry):
     self.two_over_delta_e = 2.0/(e_max-e_min)
     self.two_e0_over_delta_e = self.medium_energy*self.two_over_delta_e
     return
+
   """
   Computes the rescaling of Hamiltonian for the Chebyshev method
   """

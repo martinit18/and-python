@@ -32,19 +32,18 @@ __version__ = "1.0"
 
 import os
 import time
-import math
+#import math
 import numpy as np
-import copy
+#import copy
 import getpass
-import configparser
+#import configparser
 import timeit
 import sys
 import socket
 import argparse
-sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
+sys.path.append('/home/lkb/delande/git/and-python/multi')
 import anderson
-
 
 def main():
   parser = argparse.ArgumentParser(description='Compute r distribution at a given energy')
@@ -78,9 +77,9 @@ def main():
 # propagation for the propagation scheme
 # measurement for the measurement scheme
 # measurement_global is used to gather (average) the results for several disorder configurations
-  H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization'])
+  geometry, H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization','Spin'])
   t1=time.perf_counter()
-  timing=anderson.Timing()
+  my_timing=anderson.timing.Timing()
 
   if rank==0:
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
@@ -107,13 +106,13 @@ def main():
     comm.Reduce(energy_max,energy_glob,op=MPI.MAX)
     energy_max[0] = energy_glob[0]
  #    comm.Allreduce(MPI.IN_PLACE,energy_max,op=MPI.MAX)
-    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+    my_timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
   else:
     tab_r_glob = tab_r
   t2=time.perf_counter()
-  timing.TOTAL_TIME = t2-t1
+  my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    timing.mpi_merge(comm)
+    my_timing.mpi_merge(comm)
   if rank==0:
 #    print(energy_min[0],energy_max[0])
     header_string +='Minimum energy = '+str(energy_min[0])+'\nMaximum energy = '+str(energy_max[0])+'\n'
@@ -124,8 +123,8 @@ def main():
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
+    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

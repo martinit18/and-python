@@ -46,6 +46,7 @@ sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
 
+
 def main():
   parser = argparse.ArgumentParser(description='Generate random disorder')
   parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
@@ -78,11 +79,11 @@ def main():
 # propagation for the propagation scheme
 # measurement for the measurement scheme
 # measurement_global is used to gather (average) the results for several disorder configurations
-  H, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,[])
+  geometry, H, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Spin'])
 # force n_config to 1
   n_config = 1
   t1=time.perf_counter()
-  timing=anderson.Timing()
+  my_timing=anderson.timing.Timing()
 
   if rank==0:
 
@@ -103,9 +104,9 @@ def main():
 #    H.generate_full_matrix()
 #    print(H.generate_full_complex_matrix(1.0j))
   t2 = time.perf_counter()
-  timing.TOTAL_TIME = t2-t1
+  my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    timing.mpi_merge(comm)
+    my_timing.mpi_merge(comm)
 #  print(H.disorder.shape)
   np.savetxt('potential.dat',H.disorder-H.diagonal,header=header_string)
   if rank==0:
@@ -114,10 +115,10 @@ def main():
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
+      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
 #    print("Dummy time           = {0:.3f}".format(timing.DUMMY_TIME))
 #    print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

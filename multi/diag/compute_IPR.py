@@ -76,10 +76,10 @@ def main():
 # Parse parameter file and prepare the useful objects:
 # H for the Hamiltonian of the system
 # diagonalization for exact (or sparse) diagonalization
-  H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization'])
+  geometry, H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization','Spin'])
 
   t1=time.perf_counter()
-  timing=anderson.Timing()
+  my_timing=anderson.timing.Timing()
 
   if rank==0:
 
@@ -103,14 +103,14 @@ def main():
     tab_IPR_glob = np.zeros(n_config*nprocs*number_of_eigenvalues)
     comm.Gather(tab_energy,tab_energy_glob)
     comm.Gather(tab_IPR,tab_IPR_glob)
-    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+    my_timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
   else:
     tab_energy_glob = tab_energy
     tab_IPR_glob = tab_IPR
   t2=time.perf_counter()
-  timing.TOTAL_TIME = t2-t1
+  my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    timing.mpi_merge(comm)
+    my_timing.mpi_merge(comm)
   if rank==0:
 #    print(tab_energy_glob)
 #    print(tab_IPR_glob)
@@ -126,8 +126,8 @@ def main():
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
+    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

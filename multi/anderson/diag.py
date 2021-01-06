@@ -28,24 +28,25 @@ class Diagonalization:
 #    print(w)
 #      index = np.abs(w-self.targeted_energy).argmin()
       index_array = np.argsort(abs(w-self.targeted_energy))
-      IPR = np.zeros(self.number_of_eigenvalues)
-      sorted_w = np.zeros(self.number_of_eigenvalues)
-      for i in range(self.number_of_eigenvalues):
-        IPR[i] = np.sum(v[:,index_array[i]]**4)/(H.delta_vol)
-        sorted_w[i] = w[index_array[i]]
-#       print(sorted_w[i],IPR[i])
-      return (sorted_w,IPR)
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
     if self.method=='sparse':
       H.generate_sparse_matrix()
-#      print(H.sparse_matrix.dtype)
-#      matrix2 = H.generate_sparse_complex_matrix(1j)
       w, v = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal')
-      IPR = np.zeros(self.number_of_eigenvalues)
-      for i in range(self.number_of_eigenvalues):
-        IPR[i] = np.sum(v[:,i]**4)/(H.delta_vol)
-#        print(w[i],IPR[i])
-# The normalization (division by delta_vol) ensures that IPR is roughly the inverse of the localization length
-      return (w,IPR)
+      imin = 0
+      imax = self.number_of_eigenvalues
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        index_array = np.argsort(w)
+        w = w[index_array]
+        v = v[:,index_array]
+  # The normalization (division by delta_vol) ensures that IPR is roughly the inverse of the localization length
+    if H.spin_one_half:
+      IPR = np.sum(np.abs(v[:,imin:imax])**4,axis=0)/H.delta_vol
+    else:
+      IPR = np.sum(v[:,imin:imax]**4,axis=0)/H.delta_vol
+    return w[imin:imax], IPR
 
   def compute_tab_r(self, i, H):
     H.generate_disorder(seed=i+1234)
@@ -57,12 +58,14 @@ class Diagonalization:
 #    print(index_array[0:self.number_of_eigenvalues])
       imin = np.min(index_array[0:self.number_of_eigenvalues])
       imax = np.max(index_array[0:self.number_of_eigenvalues])+1
-#    print(imin,imax)
     if self.method=='sparse':
       H.generate_sparse_matrix()
 #      print(H.sparse_matrix.dtype)
 #      matrix2 = H.generate_sparse_complex_matrix(1j)
-      w, _ = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal')
+      w = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal',return_eigenvectors=False)
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        w = np.sort(w)
       imin = 0
       imax = self.number_of_eigenvalues
     tab_r = np.zeros(imax-2-imin)
@@ -72,13 +75,48 @@ class Diagonalization:
       tab_r[j-imin] = r
     return (w[imin+1:imax-1],tab_r)
 
-  def compute_wavefunction(self,i,H,k=4):
+  def compute_wavefunction(self,i,H):
     H.generate_disorder(seed=i+1234)
     if self.method=='lapack':
       matrix = H.generate_full_matrix()
 #    print(matrix)
       w, v = np.linalg.eigh(matrix)
-#    print(w)
+      index_array = np.argsort(abs(w-self.targeted_energy))
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
+    if self.method=='sparse':
+      H.generate_sparse_matrix()
+      w, v = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal')
+      imin = 0
+      imax = self.number_of_eigenvalues
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        index_array = np.argsort(w)
+        w = w[index_array]
+        v = v[:,index_array]
+    return w[imin:imax],v[:,imin:imax]/np.sqrt(H.delta_vol)
+
+  def compute_full_spectrum(self,i,H):
+    H.generate_disorder(seed=i+1234)
+    matrix = H.generate_full_matrix()
+#    print(matrix)
+    w = np.linalg.eigvalsh(matrix)
+    return w
+
+  def compute_spectrum(self,i,H):
+    H.generate_disorder(seed=i+1234)
+    if self.method=='lapack':
+      matrix = H.generate_full_matrix()
+#    print(matrix)
+      w = np.linalg.eigvalsh(matrix)
+      index_array = np.argsort(abs(w-self.targeted_energy))
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
+      return w[imin:imax]
+# Old, less efficient, code
+      """
 # identify the closest eigenvalue
       index = np.abs(w-self.targeted_energy).argmin()
       index_right = index+1
@@ -89,25 +127,16 @@ class Diagonalization:
           index_left -=1
         else:
           index_right += 1
-      return w[index_left+1:index_right],v[:,index_left+1:index_right]/np.sqrt(H.delta_x)
-
+      return w[index_left+1:index_right]
+      """
     if self.method=='sparse':
-      matrix = H.generate_sparse_matrix()
-# The following line is obviously less efficient
-#    matrix = H.generate_full_matrix()
-# The following line uses a CSR storage for the sparse matrix and is slightly less efficient
-#    matrix = scipy.sparse.csr_matrix(matrix)
-      w, v = sparse_linalg.eigsh(matrix,k=k,sigma=self.targeted_energy,mode='normal')
-#      print(w)
-#  print('Energy=',w[index])
-      return w,v/np.sqrt(H.delta_x)
+      H.generate_sparse_matrix()
+      w = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal',return_eigenvectors=False)
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        w = np.sort(w)
+      return w
 
-  def compute_full_spectrum(self,i,H):
-    H.generate_disorder(seed=i+1234)
-    matrix = H.generate_full_matrix()
-#    print(matrix)
-    w, v = np.linalg.eigh(matrix)
-    return w
 
   def compute_landscape(self,i,H,initial_state,pivot):
     H.generate_disorder(seed=i+1234)
