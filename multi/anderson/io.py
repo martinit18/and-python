@@ -84,15 +84,18 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Optional Spin section
     if 'Spin' in my_list_of_sections:
       if not config.has_section('Spin'):
-        my_abort(mpi_version,comm,'Parameter file does not have a Spin section, I stop!\n')
-      Spin = config['Spin']
-      spin_one_half = Spin.getboolean('spin_one_half',False)
-      if spin_one_half and dimension != 1:
-        my_abort(mpi_version,comm,'Spin 1/2 is supported only in dimension 1, I stop!\n')
-      spin_orbit_interaction = Spin.getfloat('spin_orbit_interaction',0.0)
-      sigma_x = Spin.getfloat('sigma_x',0.0)
-      sigma_y = Spin.getfloat('sigma_y',0.0)
-      sigma_z = Spin.getfloat('sigma_z',0.0)
+        spin_one_half = False
+#        my_abort(mpi_version,comm,'Parameter file does not have a Spin section, I stop!\n')
+      else:
+        Spin = config['Spin']
+        spin_one_half = Spin.getboolean('spin_one_half',False)
+        if spin_one_half and dimension != 1:
+          my_abort(mpi_version,comm,'Spin 1/2 is supported only in dimension 1, I stop!\n')
+        spin_orbit_interaction = Spin.getfloat('spin_orbit_interaction',0.0)
+        sigma_x = Spin.getfloat('sigma_x',0.0)
+        sigma_y = Spin.getfloat('sigma_y',0.0)
+        sigma_z = Spin.getfloat('sigma_z',0.0)
+        alpha = Spin.getfloat('alpha',0.0)
     else:
       spin_one_half = False
 
@@ -247,6 +250,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     sigma_x = None
     sigma_y = None
     sigma_z = None
+    alpha = None
     interaction_strength = None
     initial_state_type = None
     tab_k_0 = None
@@ -296,7 +300,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
     disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength))
     if 'Spin' in my_list_of_sections:
-      spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z = comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z))
+      spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
       initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
     if 'Propagation' in my_list_of_sections:
@@ -314,7 +318,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength,non_diagonal_disorder_strength=non_diagonal_disorder_strength, b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
   if spin_one_half:
-    H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z)
+    H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z, alpha=alpha)
   else:
     H.spin_one_half = False
   return_list = [geometry, H]
@@ -407,7 +411,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'Spin-orbit interaction               = '+str(H.spin_orbit_interaction)+'\n'\
                  +'Sigma_x strength                     = '+str(H.sigma_x)+'\n'\
                  +'Sigma_y strength                     = '+str(H.sigma_y)+'\n'\
-                 +'Sigma_z strength                     = '+str(H.sigma_z)+'\n'
+                 +'Sigma_z strength                     = '+str(H.sigma_z)+'\n'\
+                 +'alpha                                = '+str(H.alpha)+'\n'
   params_string += \
                   'g                                    = '+str(H.interaction)+'\n'\
                  +'g_over_volume                        = '+str(H.interaction/volume)+'\n'\
