@@ -91,11 +91,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         spin_one_half = Spin.getboolean('spin_one_half',False)
         if spin_one_half and dimension != 1:
           my_abort(mpi_version,comm,'Spin 1/2 is supported only in dimension 1, I stop!\n')
-        spin_orbit_interaction = Spin.getfloat('spin_orbit_interaction',0.0)
-        sigma_x = Spin.getfloat('sigma_x',0.0)
-        sigma_y = Spin.getfloat('sigma_y',0.0)
-        sigma_z = Spin.getfloat('sigma_z',0.0)
-        alpha = Spin.getfloat('alpha',0.0)
+        spin_orbit_interaction = Spin.getfloat('gamma',0.0)
+        sigma_x = 0.5*Spin.getfloat('Omega',0.0)
+        sigma_y = Spin.getfloat('beta',0.0)
+        sigma_z = 0.5*Spin.getfloat('delta',0.0)
+        alpha = Spin.getfloat('h',0.0)
     else:
       spin_one_half = False
 
@@ -408,11 +408,11 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if H.spin_one_half:
     params_string += \
                   'Spin 1/2                             = True\n'\
-                 +'Spin-orbit interaction               = '+str(H.spin_orbit_interaction)+'\n'\
-                 +'Sigma_x strength                     = '+str(H.sigma_x)+'\n'\
-                 +'Sigma_y strength                     = '+str(H.sigma_y)+'\n'\
-                 +'Sigma_z strength                     = '+str(H.sigma_z)+'\n'\
-                 +'alpha                                = '+str(H.alpha)+'\n'
+                 +'gamma (p sigma_z)                    = '+str(H.spin_orbit_interaction)+'\n'\
+                 +'Omega (sigma_x/2)                    = '+str(2.0*H.sigma_x)+'\n'\
+                 +'beta (sigma_y)                       = '+str(H.sigma_y)+'\n'\
+                 +'delta (sigma_z/2)                    = '+str(2.0*H.sigma_z)+'\n'\
+                 +'h (p^2 sigma_z)                      = '+str(H.alpha)+'\n'
   params_string += \
                   'g                                    = '+str(H.interaction)+'\n'\
                  +'g_over_volume                        = '+str(H.interaction/volume)+'\n'\

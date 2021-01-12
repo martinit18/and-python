@@ -7,7 +7,7 @@ size_2 = 30.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
-delta_1 = 1.0
+delta_1 = 0.2
 delta_2 = 1.0
 delta_3 = 0.25
 delta_4 = 0.25
@@ -19,11 +19,11 @@ boundary_condition_4 = periodic
 
 [Spin]
 spin_one_half = True
-spin_orbit_interaction = 0.2
-sigma_x = 0.2
-sigma_y = 0.0
-sigma_z = 0.2
-alpha = 0.0
+gamma = 0.2
+Omega = 0.4
+beta = 0.0
+delta = 0.4
+h = 0.0
 
 [Disorder]
 #  Various disorder types can be used
@@ -37,7 +37,7 @@ use_mkl_random = True
 # Correlation length of disorder
 sigma = 2.0
 # Disorder strength
-V0 = 0.4
+V0 = 0.25
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -68,7 +68,7 @@ delta_t = 0.6
 #want_cffi = False
 
 [Averaging]
-n_config = 10000
+n_config = 1000
 
 [Measurement]
 delta_t_measurement = 40.2
@@ -91,9 +91,9 @@ resolution = 0.01
 
 [Diagonalization]
 #method = lapack
-targeted_energy = 0.9999
+targeted_energy = 0.0
 IPR_min = 0.0
 IPR_max = 0.04
 number_of_bins = 200
-number_of_eigenvalues = 50
+number_of_eigenvalues = 30
 
