@@ -108,12 +108,12 @@ def main():
 # my_list_of_sections is the list of sections needed for this particular calculation
 # Can be in any order
 # The list determines the various structures returned by the routine
-# Must be consistent otherwise disaster guaranted
+# Must be consistent otherwise disaster guaranteed
   my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral']
-  H, initial_state, spectral_function, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  geometry, H, initial_state, spectral_function, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
-  timing=anderson.Timing()
+  my_timing=anderson.timing.Timing()
 # The following line is a temporary fix
   i_tab_0 = 0
 
@@ -124,16 +124,16 @@ def main():
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-    anderson.propagation.gpe_evolution(i+rank*n_config, initial_state, H, propagation, measurement, timing)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, measurement, my_timing)
     measurement_global.merge_measurement(measurement)
 #  print(measurement_global.tab_position)
 #
   if mpi_version:
-    measurement_global.mpi_merge_measurement(comm,timing)
+    measurement_global.mpi_merge_measurement(comm,my_timing)
   t2 = time.perf_counter()
-  timing.TOTAL_TIME = t2-t1
+  my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    timing.mpi_merge(comm)
+    my_timing.mpi_merge(comm)
 #    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
 #    toto = np.empty_like(measurement_global.tab_autocorrelation)
 #    comm.Reduce(measurement_global.tab_autocorrelation,toto,op=MPI.SUM)
@@ -143,10 +143,13 @@ def main():
 #    print(rank,global_timing.CHE_TIME)
 #    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
-    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
-    anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation,H,header_string=header_string, tab_abscissa=measurement_global.tab_t_measurement[i_tab_0:]-measurement_global.tab_t_measurement[i_tab_0], data_type='autocorrelation')
+    environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
+    measurement_global.normalize(n_config*nprocs)
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function, timing=my_timing)
+    anderson.io.print_measurements_final(measurement_global,header_string=header_string)
+#   anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation,H,header_string=header_string, data_type='autocorrelation')
     tab_energies,tab_spectrum = spectral_function.compute_spectral_function(measurement_global.tab_autocorrelation)
-    anderson.io.output_density('spectral_function.dat',tab_spectrum,H,header_string=header_string,tab_abscissa=tab_energies,data_type='spectral_function')
+    anderson.io.output_density('spectral_function.dat',tab_spectrum,measurement,header_string=header_string,tab_abscissa=tab_energies,data_type='spectral_function')
 
     """
   i_tab_0 = propagation.first_measurement_autocorr
@@ -166,18 +169,18 @@ def main():
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if (propagation.method=='ode'):
-      print("GPE time             = {0:.3f}".format(timing.GPE_TIME))
-      print("Number of time steps =",timing.N_SOLOUT)
+      print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
+      print("Number of time steps =",my_timing.N_SOLOUT)
     else:
-      print("CHE time             = {0:.3f}".format(timing.CHE_TIME))
-      print("Max nonlinear phase  = {0:.3f}".format(timing.MAX_NONLINEAR_PHASE))
-      print("Max order            =",timing.MAX_CHE_ORDER)
-    print("Expect time          = {0:.3f}".format(timing.EXPECT_TIME))
+      print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
+      print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
+      print("Max order            =",my_timing.MAX_CHE_ORDER)
+    print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-    print("Dummy time           = {0:.3f}".format(timing.DUMMY_TIME))
-    print("Number of ops        = {0:.4e}".format(timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
+    print("Dummy time           = {0:.3f}".format(my_timing.DUMMY_TIME))
+    print("Number of ops        = {0:.4e}".format(my_timing.NUMBER_OF_OPS))
+    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

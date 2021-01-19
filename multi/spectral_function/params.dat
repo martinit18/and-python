@@ -1,13 +1,13 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 20.
-size_2 = 20.
+size_1 = 99.20819
+size_2 = 99.20819
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
-delta_1 = 0.5
-delta_2 = 0.5
+delta_1 = 0.3968
+delta_2 = 0.3968
 delta_3 = 0.25
 delta_4 = 0.25
 # either periodic or open
@@ -20,7 +20,7 @@ boundary_condition_4 = periodic
 #  Various disorder types can be used
 # type = anderson
 # type = anderson_gaussian
-# type = regensburg
+#type = regensburg
 type = konstanz
 # type = singapore
 # type = speckle
@@ -28,7 +28,7 @@ use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 1.0
+V0 = -0.2
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -39,7 +39,7 @@ g = 0.0
 initial_state = plane_wave
 #initial_state = gaussian_wave_packet
 # make sure that k_0_over_2_pi_i*size_i is an integer
-k_0_over_2_pi_1 = 0.0
+k_0_over_2_pi_1 = 0.242038
 k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
 sigma_0_1 = 10.0
@@ -56,7 +56,7 @@ t_max = 25.0
 delta_t = 1.0
 
 [Averaging]
-n_config = 10000
+n_config = 400
 
 [Measurement]
 delta_t_measurement = 1.0
@@ -74,5 +74,5 @@ dispersion_variance = True
 use_mkl_fft = True
 
 [Spectral]
-range = 20.0
-resolution = 0.01
+range = 6.0
+resolution = 0.005

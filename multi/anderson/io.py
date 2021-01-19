@@ -339,6 +339,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     t_max = spectral_function.t_max
     delta_t = spectral_function.delta_t
     delta_t_dispersion = delta_t
+    delta_t_density = delta_t
     measure_density = False
     measure_density_momentum = False
     measure_autocorrelation = True
