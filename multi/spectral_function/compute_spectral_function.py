@@ -149,7 +149,10 @@ def main():
     anderson.io.print_measurements_final(measurement_global,header_string=header_string)
 #   anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation,H,header_string=header_string, data_type='autocorrelation')
     tab_energies,tab_spectrum = spectral_function.compute_spectral_function(measurement_global.tab_autocorrelation)
-    anderson.io.output_density('spectral_function.dat',tab_spectrum,measurement,header_string=header_string,tab_abscissa=tab_energies,data_type='spectral_function')
+    if initial_state.type == 'point':
+      anderson.io.output_density('density_of_states.dat',tab_spectrum,measurement,header_string=header_string,tab_abscissa=tab_energies,data_type='density_of_states')
+    else:
+      anderson.io.output_density('spectral_function.dat',tab_spectrum,measurement,header_string=header_string,tab_abscissa=tab_energies,data_type='spectral_function')
 
     """
   i_tab_0 = propagation.first_measurement_autocorr

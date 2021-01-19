@@ -43,6 +43,12 @@ class Wavefunction(Geometry):
     self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
     return
 
+  def point(self):
+    point = list()
+    for i in range(self.dimension): point.append(0)
+    self.wfc[tuple(point)] = 1.0/self.delta_vol
+    return
+
   def overlap(self, other_wavefunction):
 #    return np.sum(self.wfc*np.conj(other_wavefunction.wfc))*self.delta_x
 # The following line is 5 times faster!

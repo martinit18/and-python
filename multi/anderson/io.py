@@ -125,22 +125,23 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       Wavefunction = config['Wavefunction']
       all_options_ok=True
       initial_state_type = Wavefunction.get('initial_state')
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet"]: all_options_ok=False
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","point"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
-      for i in range(dimension):
-        if not config.has_option('Wavefunction','k_0_over_2_pi_'+str(i+1)): all_options_ok=False
+      if initial_state_type in ["plane_wave","gaussian_wave_packet"]:
+        for i in range(dimension):
+          if not config.has_option('Wavefunction','k_0_over_2_pi_'+str(i+1)): all_options_ok=False
 #        tab_k_0.append(2.0*math.pi*
-        k_0_over_2_pi=Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1))
+          k_0_over_2_pi=Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1))
 # k_0_over_2_pi*size must be an integer is all dimensions
 # Renormalize k_0_over_2_pi to ensure it
-        tab_k_0.append(2.0*math.pi*int(k_0_over_2_pi*tab_size[i]+0.5)/tab_size[i])
-        if initial_state_type != "plane_wave":
-          if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
-          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
+          tab_k_0.append(2.0*math.pi*int(k_0_over_2_pi*tab_size[i]+0.5)/tab_size[i])
+          if initial_state_type != "plane_wave":
+            if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
+            tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
       if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, I stop!\n')
+        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a single point, I stop!\n')
 
 # Optional Propagation section
     if 'Propagation' in my_list_of_sections:
@@ -331,6 +332,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0)
     if (initial_state.type=='gaussian_wave_packet'):
       anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
+    if (initial_state.type=='point'):
+      anderson.wavefunction.Wavefunction.point(initial_state)
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
@@ -423,11 +426,12 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not initial_state == None:
     params_string += \
                   'Initial state                        = '+initial_state.type+'\n'
-    for i in range(H.dimension):
-      params_string += \
-                  'k_0_'+str(i+1)+'                                = '+str(initial_state.tab_k_0[i])+'\n'
-      if initial_state.type == 'gaussian_wave_packet':
+    if initial_state.type != 'point':
+      for i in range(H.dimension):
         params_string += \
+                  'k_0_'+str(i+1)+'                                = '+str(initial_state.tab_k_0[i])+'\n'
+        if initial_state.type == 'gaussian_wave_packet':
+          params_string += \
                  'sigma_0_'+str(i+1)+'                             = '+str(initial_state.tab_sigma_0[i])+'\n'
   if not propagation == None:
     params_string += \
@@ -512,6 +516,10 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       column_1='Energy'
       column_2='Spectral function'
       specific_string='Spectral function\n'
+    if data_type=='density_of_states':
+      column_1='Energy'
+      column_2='Density of states'
+      specific_string='Density of states\n'
     if data_type=='g1':
       column_1='Relative position'
       column_2='Re(g1)'
@@ -634,7 +642,7 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       tab_strings.append('Column '+str(next_column)+': '+column_3)
       next_column += 1
       array_to_print=np.column_stack(list_of_columns)
-    if data_type in ['spectral_function','histogram_IPR','rbar','histogram_r']:
+    if data_type in ['spectral_function','density_of_states','histogram_IPR','rbar','histogram_r']:
       list_of_columns.append(tab_abscissa)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
