@@ -209,12 +209,19 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         my_abort(mpi_version,comm,'Parameter file does not have a Spectral section, I stop!\n')
       Spectral = config['Spectral']
       all_options_ok = True
-      if not config.has_option('Spectral','range'): all_options_ok = False
-      e_range = Spectral.getfloat('range')
+      spectre_min = Spectral.getfloat('e_min')
+      spectre_max = Spectral.getfloat('e_max')
+      if spectre_min==None or spectre_max==None:
+        if not config.has_option('Spectral','range'):
+          all_options_ok = False
+        else:
+          e_range = Spectral.getfloat('range')
+          spectre_min = -0.5*e_range
+          spectre_max =  0.5*e_range
       if not config.has_option('Spectral','resolution'): all_options_ok = False
-      e_resolution = Spectral.getfloat('resolution')
+      spectre_resolution = Spectral.getfloat('resolution')
       if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Spectral section of the parameter file, there must be a range and a resolution, I stop!\n')
+        my_abort(mpi_version,comm,'In the Spectral section of the parameter file, there must be a resolution and either an energy interval [e_min,e_max] or an energy range e_range, I stop!\n')
       if not config.has_section('Propagation'):
         my_abort(mpi_version,comm,'Parameter file does not have a Propagation section, I stop!\n')
 
@@ -287,8 +294,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     IPR_max = None
     number_of_bins = None
     number_of_eigenvalues = None
-    e_range = None
-    e_resolution = None
+    spectre_min = None
+    spectre_max = None
+    spectre_resolution = None
     e_min = None
     e_max = None
     number_of_e_steps = None
@@ -311,7 +319,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
-      e_range, e_resolution  = comm.bcast((e_range,e_resolution))
+      spectre_min, spectre_max, spectre_resolution  = comm.bcast((spectre_min, spectre_max, spectre_resolution))
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
@@ -338,7 +346,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of spectral_function
   if 'Spectral' in my_list_of_sections:
-    spectral_function = anderson.propagation.Spectral_function(e_range,e_resolution)
+    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution)
     t_max = spectral_function.t_max
     delta_t = spectral_function.delta_t
     delta_t_dispersion = delta_t
@@ -461,7 +469,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   '|overlap|**2 with initial state      = '+str(abs(measurement.overlap)**2)+'\n'
   if not spectral_function == None:
     params_string += \
-                  'energy range                         = '+str(spectral_function.e_range)+'\n'\
+                  'minimum energy                       = '+str(spectral_function.e_min)+'\n'\
+                  'maximum energy                       = '+str(spectral_function.e_max)+'\n'\
                  +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'
   if not diagonalization == None:
     params_string += \

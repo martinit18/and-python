@@ -379,11 +379,14 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
 
 
 class Spectral_function:
-  def __init__(self,e_range,e_resolution):
+  def __init__(self,e_min,e_max,e_resolution):
+    e_range = e_max - e_min
+    e_middle = 0.5*(e_max+e_min)
     self.n_pts_autocorr = int(0.5*e_range/e_resolution+0.5)
 # In case e_range/e_resolution is not an integer, I keep e_resolution and rescale e_range
-    self.e_range = 2.0*e_resolution*self.n_pts_autocorr
-    self.delta_t = 2.0*np.pi/(self.e_range*(1.0+0.5/self.n_pts_autocorr))
+    self.e_min = e_middle - e_resolution*self.n_pts_autocorr
+    self.e_max = e_middle + e_resolution*self.n_pts_autocorr
+    self.delta_t = 2.0*np.pi/(e_resolution*(2*self.n_pts_autocorr+1))
     self.t_max = self.delta_t*self.n_pts_autocorr
     self.e_resolution = e_resolution
     return
@@ -393,12 +396,19 @@ class Spectral_function:
 # We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
 # see manual of numpy.fft.ifft for explanations
 # The number of points in tab_autocorrelation is n_pts_autocorr+1
+# Multiply by a complex oscillatory exponential so that the energy is shifted
+    e_middle = 0.5*(self.e_max+self.e_min)
+#    print(e_middle)
+    tab_autocorrelation *= np.exp(1j*e_middle*self.delta_t*np.arange(self.n_pts_autocorr+1))
     tab_autocorrelation_symmetrized=np.concatenate((tab_autocorrelation,np.conj(tab_autocorrelation[:0:-1])))
+
 # Make the inverse Fourier transform which is by construction real, so keep only real part
 # Note that it is surely possible to improve using Hermitian FFT (useless as it uses very few resources)
 # Both the spectrum and the energies are reordered in ascending order
     tab_spectrum=np.fft.fftshift(np.real(np.fft.ifft(tab_autocorrelation_symmetrized)))/self.e_resolution
-    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))
+    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))+e_middle
+# The energy spectrum at this stage is starting at e=-n_pts_autocorr*delta_e and ending at e=-n_pts_autocorr*delta_e
+# with delta_e = 2*pi/delta_t
     return tab_energies,tab_spectrum
 
 
