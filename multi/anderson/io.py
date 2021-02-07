@@ -43,6 +43,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     System = config['System']
     dimension = System.getint('dimension', 1)
     one_over_mass = System.getfloat('one_over_mass', 1.0)
+    use_mkl_fft = System.getboolean('use_mkl_fft',True)
     tab_size = list()
     tab_delta = list()
     tab_boundary_condition = list()
@@ -153,28 +154,22 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       accurate_bounds = Propagation.getboolean('accurate_bounds',False)
       want_ctypes = Propagation.getboolean('want_ctypes',True)
       data_layout = Propagation.get('data_layout','real')
-      if 'Spectral' in my_list_of_sections:
-        t_max=0.0
-        delta_t=0.0
-        i_tab_0 = 0
-      else:
-        all_options_ok = True
-        if not config.has_option('Propagation','t_max'): all_options_ok = False
-        t_max = Propagation.getfloat('t_max')
-        if not config.has_option('Propagation','delta_t'): all_options_ok = False
-        delta_t = Propagation.getfloat('delta_t')
-        i_tab_0 = 0
-        if not all_options_ok:
-          my_abort(mpi_version,comm,'In the Propagation section of the parameter file, there must be a maximum propagation time t_max and a time step delta_t, I stop!\n')
+      t_max = Propagation.getfloat('t_max','0.0')
+      delta_t = Propagation.getfloat('delta_t','0.0')
+      i_tab_0 = 0
+#      if not all_options_ok:
+#        my_abort(mpi_version,comm,'In the Propagation section of the parameter file, there must be a maximum propagation time t_max and a time step delta_t, I stop!\n')
 
 # Optional Measurement section
     if 'Measurement' in my_list_of_sections:
       if not config.has_section('Measurement'):
         my_abort(mpi_version,comm,'Parameter file does not have a Measurement section, I stop!\n')
-
+      if not config.has_section('Propagation'):
+        my_abort(mpi_version,comm,'Parameter file has a Measurement section, but no Propagation section, I stop!\n')
       Measurement = config['Measurement']
       delta_t_dispersion = Measurement.getfloat('delta_t_dispersion',delta_t)
       delta_t_density = Measurement.getfloat('delta_t_density',t_max)
+      delta_t_spectral_function = Measurement.getfloat('delta_t_spectral_function',t_max)
       first_measurement_autocorr = Measurement.getint('first_measurement_autocorr',0)
       measure_density = Measurement.getboolean('density',False)
       measure_density_momentum = Measurement.getboolean('density_momentum',False)
@@ -188,7 +183,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       measure_extended = Measurement.getboolean('dispersion_variance',False)
       measure_g1 = Measurement.getboolean('g1',False)
       measure_overlap = Measurement.getboolean('overlap',False)
-      use_mkl_fft = Measurement.getboolean('use_mkl_fft',True)
+      measure_spectral_function = Measurement.getboolean('spectral_function',False)
+      if measure_spectral_function and not 'Spectral' in my_list_of_sections:
+        my_abort(mpi_version,comm,'Measurement section requires to measure the spectral function, but there is no Spectral section in the parameter file, I stop!\n')
       remove_hot_pixel = Measurement.getboolean('remove_hot_pixel',False)
 
 # Optional Diagonalization section
@@ -207,6 +204,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Spectral' in my_list_of_sections:
       if not config.has_section('Spectral'):
         my_abort(mpi_version,comm,'Parameter file does not have a Spectral section, I stop!\n')
+      if not config.has_section('Propagation'):
+        my_abort(mpi_version,comm,'Parameter file has a Spectral section, but no Propagation section, I stop!\n')
       Spectral = config['Spectral']
       all_options_ok = True
       spectre_min = Spectral.getfloat('e_min')
@@ -273,6 +272,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     i_tab_0 = None
     delta_t_dispersion = None
     delta_t_density = None
+    delta_t_spectral_function = None
     first_measurement_autocorr = None
     measure_density = None
     measure_density_momentum = None
@@ -286,6 +286,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     measure_extended = None
     measure_g1 = None
     measure_overlap = None
+    measure_spectral_function = None
     use_mkl_fft = None
     remove_hot_pixel = None
     diagonalization_method = None
@@ -315,7 +316,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
     if 'Measurement' in my_list_of_sections:
-      delta_t_dispersion, delta_t_density, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, use_mkl_fft, remove_hot_pixel))
+      delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
@@ -346,38 +347,35 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of spectral_function
   if 'Spectral' in my_list_of_sections:
+    measure_spectral_function_local = not 'Measurement' in my_list_of_sections
     spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution)
-    t_max = spectral_function.t_max
-    delta_t = spectral_function.delta_t
-    delta_t_dispersion = delta_t
-    delta_t_density = delta_t
-    measure_density = False
-    measure_density_momentum = False
-    measure_autocorrelation = True
-    measure_dispersion_position = False
-    measure_dispersion_position2 = False
-    measure_dispersion_momentum = False
-    measure_dispersion_energy = False
-    measure_wavefunction = False
-    measure_wavefunction_momentum = False
-    measure_extended = False
-    measure_g1 = False
-    measure_overlap = False
+    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
+    return_list.append(propagation_spectral)
     return_list.append(spectral_function)
-
-# Define the structure of the temporal integration
-  if 'Propagation' in my_list_of_sections:
-    propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
-    return_list.append(propagation)
+    measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, use_mkl_fft=use_mkl_fft)
+    measurement_spectral_global = copy.deepcopy(measurement_spectral)
+    measurement_spectral.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local)
+#  print(measurement.density_final.shape)
+    measurement_spectral_global.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local,global_measurement=True)
+    measurement_spectral.tab_time[:,3]=0
+    measurement_spectral_global.tab_time[:,3]=0
+    return_list.append(measurement_spectral)
+    return_list.append(measurement_spectral_global)
+  else:
+    spectral_function = None
 
 # Define the structure of measurements
   if 'Measurement' in my_list_of_sections:
-    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
+# Define the structure of the temporal integration
+    propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
+    return_list.append(propagation)
+    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, measure_spectral_function=measure_spectral_function, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
     measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
-    measurement.prepare_measurement(propagation)
+#    print(delta_t,propagation.delta_t)
+    measurement.prepare_measurement(propagation,spectral_function=spectral_function)
 #  print(measurement.density_final.shape)
-    measurement_global.prepare_measurement(propagation,global_measurement=True)
+    measurement_global.prepare_measurement(propagation,spectral_function=spectral_function,global_measurement=True)
     return_list.append(measurement)
     return_list.append(measurement_global)
 
@@ -396,6 +394,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   return(return_list)
 
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
+#  print(spectral_function)
   params_string = 'Disorder type                        = '+H.disorder_type+'\n'\
                  +'Correlation length                   = '+str(H.correlation_length)+'\n'\
                  +'Dimension                            = '+str(H.dimension)+'\n'\
@@ -440,7 +439,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'k_0_'+str(i+1)+'                                = '+str(initial_state.tab_k_0[i])+'\n'
         if initial_state.type == 'gaussian_wave_packet':
           params_string += \
-                 'sigma_0_'+str(i+1)+'                             = '+str(initial_state.tab_sigma_0[i])+'\n'
+                  'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'
   if not propagation == None:
     params_string += \
                   'Integration Method                   = '+propagation.method+'\n'\
@@ -460,7 +459,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not measurement == None:
     params_string += \
                   'time step for dispersion measurement = '+str(measurement.delta_t_dispersion)+'\n'\
-                 +'time step for density measurement    = '+str(measurement.delta_t_density)+'\n'
+                 +'time step for density measurement    = '+str(measurement.delta_t_density)+'\n'\
+                 +'time step for spectral function      = '+str(measurement.delta_t_spectral_function)+'\n'
     if initial_state.type=='plane_wave':
       params_string += \
                   'remove hot pixel in momentum density = '+str(measurement.remove_hot_pixel)+'\n'
@@ -469,8 +469,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   '|overlap|**2 with initial state      = '+str(abs(measurement.overlap)**2)+'\n'
   if not spectral_function == None:
     params_string += \
-                  'minimum energy                       = '+str(spectral_function.e_min)+'\n'\
-                  'maximum energy                       = '+str(spectral_function.e_max)+'\n'\
+                  'minimum energy for spectral function = '+str(spectral_function.e_min)+'\n'\
+                  'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
                  +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'
   if not diagonalization == None:
     params_string += \
@@ -698,7 +698,7 @@ def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data n
   np.savetxt(file,tab_data,header=general_string+'\n'.join(tab_strings)+'\n')
   return
 
-def print_measurements_final(measurement,header_string='Origin of data not specified'):
+def print_measurements_final(measurement,initial_state=None,header_string='Origin of data not specified'):
   if (measurement.measure_density):
 #      print(measurement.grid_position)
     anderson.io.output_density('density_final.dat',measurement.density_final,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
@@ -721,6 +721,25 @@ def print_measurements_final(measurement,header_string='Origin of data not speci
     for i in range(measurement.tab_t_measurement_density.size):
       anderson.io.output_density('g1_intermediate_'+str(i+1)+'.dat',measurement.g1_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='g1')
 #    print("c'est fini")
+  if measurement.measure_spectral_function:
+#    print(measurement.tab_t_measurement_spectral_function.size)
+#    print(measurement.tab_spectrum)
+    if initial_state.type == 'point':
+      base_string='density_of_states'
+      data_type='density_of_states'
+    else:
+      base_string='spectral_function'
+      data_type='spectral_function'
+    if measurement.tab_t_measurement_spectral_function.size==1:
+      anderson.io.output_density(base_string+'.dat',measurement.tab_spectrum, measurement,header_string=header_string,tab_abscissa=measurement.tab_energies,data_type=data_type)
+    else:
+      anderson.io.output_density(base_string+'_initial.dat',measurement.tab_spectrum[:,0], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[0])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
+      for i in range(1,measurement.tab_t_measurement_spectral_function.size-1):
+#        print(i)
+        anderson.io.output_density(base_string+'_intermediate_'+str(i)+'.dat',measurement.tab_spectrum[:,i], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[i])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
+      i=measurement.tab_t_measurement_spectral_function.size-1
+#      print(i)
+      anderson.io.output_density(base_string+'_final.dat',measurement.tab_spectrum[:,i], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[i])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
   return
 
 def print_measurements_initial(measurement,initial_state,header_string='Origin of data not specified'):

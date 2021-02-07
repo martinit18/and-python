@@ -114,27 +114,27 @@ def main():
 # Can be in any order
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranted
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement']
-  geometry, H, initial_state, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral']
+  geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
 # The following line is a temporary fix
   i_tab_0 = 0
 
-  if rank==0:
+#  if rank==0:
 
 # Print various things for the initial state
 # At this point, it it not yet known whether there is a C implementation available
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global)
+  header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
 #  print(header_string)
 # Print the initial density and wavefunction
-#    anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
+  anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagation for one realization of disorder
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, measurement, my_timing)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
 # The following lines just for generating and printing a single realization of disorder
@@ -172,11 +172,11 @@ def main():
       measurement_global.density_momentum_final[tuple(index_to_remove)]=0.0
       for i in range(measurement_global.tab_t_measurement_density.size):
         measurement_global.density_momentum_intermediate[tuple([i]+index_to_remove)]=0.0
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,timing=my_timing)
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function,timing=my_timing)
 #    print('header',header_string)
 #    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
 #    anderson.io.output_density('density_1.dat',measurement_global.density_intermediate[1],measurement_global,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
-    anderson.io.print_measurements_final(measurement_global,header_string=header_string)
+    anderson.io.print_measurements_final(measurement_global,initial_state=initial_state,header_string=header_string)
 
     """
   i_tab_0 = propagation.first_measurement_autocorr

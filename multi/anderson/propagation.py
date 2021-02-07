@@ -391,7 +391,7 @@ class Spectral_function:
     self.e_resolution = e_resolution
     return
 
-  def compute_spectral_function(self,tab_autocorrelation):
+  def spectral_function_from_temporal_autocorrelation(self,tab_autocorrelation):
 # The autocorrelation function for negative time is simply the complex conjugate of the one at positive time
 # We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
 # see manual of numpy.fft.ifft for explanations
@@ -406,20 +406,32 @@ class Spectral_function:
 # Note that it is surely possible to improve using Hermitian FFT (useless as it uses very few resources)
 # Both the spectrum and the energies are reordered in ascending order
     tab_spectrum=np.fft.fftshift(np.real(np.fft.ifft(tab_autocorrelation_symmetrized)))/self.e_resolution
-    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))+e_middle
+#    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))+e_middle
 # The energy spectrum at this stage is starting at e=-n_pts_autocorr*delta_e and ending at e=-n_pts_autocorr*delta_e
 # with delta_e = 2*pi/delta_t
-    return tab_energies,tab_spectrum
+    return tab_spectrum
 
 
+def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, no_init=False):
+#  print(H.interaction)
+# When computing the spectral function from the temporal autocorrelation, it is better to switch off the interaction, so that what is computed is <psi(t)|delta(E-H)|\psi(t)> without any non-linear term in the delta function
+# When the initial state is a plane wave, \overline{|\psi(r,t)|^2} is simply g/V that is a constant shift in energy
+  save_interaction = H.interaction
+  H.interaction=0.0
+#  print(H.interaction)
+  gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, no_init=no_init)
+  H.interaction = save_interaction
+#  print(H.interaction)
+#  print(measurement.tab_autocorrelation)
+#  measurement.tab_spectrum[:] = spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
+#  print(measurement.tab_spectrum)
+  return spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
 
-
-def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False):
+def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, no_init=False):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
     return None
-
   start_dummy_time=timeit.default_timer()
 #  dimension = H.dimension
   tab_dim = geometry.tab_dim
@@ -427,11 +439,14 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   ntot = geometry.ntot
   psi = Wavefunction(geometry)
 
+#  print(i_seed,no_init)
+#  print(measurement.tab_time)
+  if not no_init:
 #  print('start gen disorder',timeit.default_timer())
-  H.generate_disorder(seed=i_seed+1234)
+    H.generate_disorder(seed=i_seed+1234)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-  if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy):
-    H.generate_sparse_matrix()
+    if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy):
+      H.generate_sparse_matrix()
 
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
   if propagation.data_layout=='real':
@@ -452,7 +467,8 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
     solver.set_solout(solout)
     solver.set_initial_value(y)
   if propagation.method=='che':
-    H.energy_range(accurate=propagation.accurate_bounds)
+    if not no_init:
+      H.energy_range(accurate=propagation.accurate_bounds)
 ##    H.medium_energy = 0.5*(e_min+e_max)
 #    print(H.e_min,H.e_max)
     #H.script_tunneling, H.script_disorder =
@@ -515,6 +531,12 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #  print(measurement.tab_time.shape[0])
   j_dispersion=0
   j_density=0
+  j_spectral_function=0
+  if measurement.tab_time[0,3]==1:
+#    print('Measure spectral function at time:',measurement.tab_time[0,0],j_spectral_function)
+#        print('It is time to store density',measurement.tab_time[i,0],j_density)
+    measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement_spectral, spectral_function, timing)
+    j_spectral_function+=1
   delta_t_old = -1.0
   tiny = 1.e-12
   for i in range(1,measurement.tab_time.shape[0]):
@@ -566,9 +588,16 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
         measurement.perform_measurement_density(j_density,psi)
         j_density+=1
       timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
+      if measurement.tab_time[i,3]==1:
+#        print('Measure spectral function at time:',measurement.tab_time[i,0],j_spectral_function)
+#        print('It is time to store density',measurement.tab_time[i,0],j_density)
+        measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, psi, H, propagation, measurement_spectral, spectral_function, timing, no_init=True)
+        j_spectral_function+=1
   measurement.perform_measurement_final(psi, init_state_autocorr)
 #     i_tab+=1
 #    print('3',initial_state.wfc[0],initial_state.wfc[1])
+#  if not no_init:
+#    measurement.tab_spectrum[:] = anderson.propagation.compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement_spectral, spectral_function, timing)
   return
 
   """

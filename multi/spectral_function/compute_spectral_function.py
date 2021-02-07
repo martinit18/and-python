@@ -109,8 +109,8 @@ def main():
 # Can be in any order
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranteed
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral']
-  geometry, H, initial_state, spectral_function, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Spectral']
+  geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
@@ -124,7 +124,9 @@ def main():
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, measurement, my_timing)
+ #   print(measurement.tab_spectrum)
+    measurement.tab_spectrum = anderson.propagation.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, propagation, measurement, spectral_function, my_timing)
+ #   print(measurement.tab_spectrum)
     measurement_global.merge_measurement(measurement)
 #  print(measurement_global.tab_position)
 #
@@ -146,13 +148,7 @@ def main():
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
     measurement_global.normalize(n_config*nprocs)
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function, timing=my_timing)
-    anderson.io.print_measurements_final(measurement_global,header_string=header_string)
-#   anderson.io.output_density('temporal_autocorrelation.dat', measurement_global.tab_autocorrelation,H,header_string=header_string, data_type='autocorrelation')
-    tab_energies,tab_spectrum = spectral_function.compute_spectral_function(measurement_global.tab_autocorrelation)
-    if initial_state.type == 'point':
-      anderson.io.output_density('density_of_states.dat',tab_spectrum,measurement,header_string=header_string,tab_abscissa=tab_energies,data_type='density_of_states')
-    else:
-      anderson.io.output_density('spectral_function.dat',tab_spectrum,measurement,header_string=header_string,tab_abscissa=tab_energies,data_type='spectral_function')
+    anderson.io.print_measurements_final(measurement_global,initial_state=initial_state,header_string=header_string)
 
     """
   i_tab_0 = propagation.first_measurement_autocorr
