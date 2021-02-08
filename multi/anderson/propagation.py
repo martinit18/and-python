@@ -14,6 +14,7 @@ import timeit
 import ctypes
 import numpy.ctypeslib as ctl
 import anderson
+import copy
 
 from anderson.wavefunction import Wavefunction
 
@@ -416,10 +417,14 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 #  print(H.interaction)
 # When computing the spectral function from the temporal autocorrelation, it is better to switch off the interaction, so that what is computed is <psi(t)|delta(E-H)|\psi(t)> without any non-linear term in the delta function
 # When the initial state is a plane wave, \overline{|\psi(r,t)|^2} is simply g/V that is a constant shift in energy
+#  print('inside compute_spectral_function')
   save_interaction = H.interaction
   H.interaction=0.0
 #  print(H.interaction)
-  gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, no_init=no_init)
+#  print(propagation.delta_t,propagation.t_max)
+#  print(initial_state.wfc[0])
+  gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation, measurement, timing, no_init=no_init)
+#  print(initial_state.wfc[0])
   H.interaction = save_interaction
 #  print(H.interaction)
 #  print(measurement.tab_autocorrelation)
@@ -427,7 +432,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 #  print(measurement.tab_spectrum)
   return spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
 
-def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, no_init=False):
+def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_spectral, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, no_init=False):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
@@ -448,6 +453,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
     if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy):
       H.generate_sparse_matrix()
 
+#  print(measurement.tab_time)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
@@ -514,6 +520,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
 
   start_expect_time = timeit.default_timer()
+  """
   if measurement.measure_autocorrelation or measurement.measure_overlap:
 # Create a full structure for init_state_autocorr (the initial state for autocorrelation) and copy initial_state in it if i_tab_0=0
     init_state_autocorr = Wavefunction(geometry)
@@ -522,6 +529,8 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   else:
 # If no autocorrelation, init_state_autocorr will not be used, it can refer to anything
     init_state_autocorr = initial_state
+  """
+  init_state_autocorr = copy.deepcopy(initial_state)
   measurement.perform_measurement_dispersion(0, H, initial_state, initial_state)
   timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
 #  print('2',initial_state.wfc[0],initial_state.wfc[1])
@@ -535,7 +544,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   if measurement.tab_time[0,3]==1:
 #    print('Measure spectral function at time:',measurement.tab_time[0,0],j_spectral_function)
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
-    measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement_spectral, spectral_function, timing)
+    measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, initial_state, H, propagation_spectral, measurement_spectral, spectral_function, timing)
     j_spectral_function+=1
   delta_t_old = -1.0
   tiny = 1.e-12
@@ -563,6 +572,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
       timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*ntot*propagation.tab_coef.size
+#      print(y[0])
     if measurement.tab_time[i,1]==1 or measurement.tab_time[i,2]==1:
       start_dummy_time=timeit.default_timer()
       if (propagation.method == 'ode'): y=solver.y
@@ -591,7 +601,10 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
       if measurement.tab_time[i,3]==1:
 #        print('Measure spectral function at time:',measurement.tab_time[i,0],j_spectral_function)
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
-        measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, psi, H, propagation, measurement_spectral, spectral_function, timing, no_init=True)
+#        print(j_spectral_function,psi.wfc[0])
+#        print(propagation_spectral.delta_t,propagation_spectral.t_max)
+        measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, psi, H, propagation_spectral, measurement_spectral, spectral_function, timing, no_init=True)
+#        print(j_spectral_function,psi.wfc[0])
         j_spectral_function+=1
   measurement.perform_measurement_final(psi, init_state_autocorr)
 #     i_tab+=1

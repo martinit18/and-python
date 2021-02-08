@@ -134,7 +134,8 @@ def main():
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagation for one realization of disorder
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function)
+#    print(propagation.delta_t,propagation.t_max,propagation_spectral.delta_t,propagation_spectral.t_max,)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, propagation_spectral,measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
 # The following lines just for generating and printing a single realization of disorder

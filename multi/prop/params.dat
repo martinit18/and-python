@@ -1,7 +1,7 @@
 [System]
 dimension = 1
 # System size in natural units
-size_1 = 5000.
+size_1 = 50000.
 size_2 = 60.
 size_3 = 5.
 size_4 = 1.
@@ -32,7 +32,7 @@ V0 = 0.1
 
 [Nonlinearity]
 # g is the nonlinear interaction
-g_over_volume = 0.01
+g_over_volume = 0.04
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
@@ -40,7 +40,7 @@ initial_state = plane_wave
 #initial_state = gaussian_wave_packet
 #initial_state = point
 # make sure that k_0_over_2_pi_i*size_i is an integer
-k_0_over_2_pi_1 = 0.159
+k_0_over_2_pi_1 = 0.0
 #k_0_over_2_pi_1 = 0.0
 k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
@@ -53,24 +53,25 @@ method = che
 data_layout = real
 #data_layout = complex
 # Total duration of the propagation
-t_max = 100000.0
+t_max = 20000.0
 # Elementary time step
-delta_t = 0.5
+delta_t = 0.125
+#want_ctypes = False
 
 [Averaging]
-n_config = 400
+n_config = 8
 
 [Measurement]
-delta_t_dispersion = 10000.0
-delta_t_density = 10000.
-delta_t_spectral_function = 20000.
+delta_t_dispersion = 2000.0
+delta_t_density = 2000.
+delta_t_spectral_function = 2000.
 #first_measurement = 0
 #density = True
-#density_momentum = True
+density_momentum = True
 #dispersion_position = True
 #dispersion_position2 = True
 #dispersion_momentum = True
-#dispersion_energy = True
+dispersion_energy = True
 #dispersion_variance = True
 #wavefunction = True
 #wavefunction_momentum = True
@@ -79,11 +80,12 @@ use_mkl_fft = True
 spectral_function = True
 
 [Spectral]
-# To specifiy the energy interval where the spectral function or the density of states is computed
+# To specify the energy interval where the spectral function or the density of states is computed
 # You may either use the pair [e_min,e_max]
 # or the range variable, in which case the interval is [-range/2,range/2]
 # [e_min,e_max] has precedence over range if both are specified
-range = 100.0
+#range = 100.0
 resolution = 0.01
-e_min=-1.
-e_max=9.
+#e_min=2.5
+e_min=-0.5
+e_max=2.5
