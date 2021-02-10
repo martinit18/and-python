@@ -68,8 +68,8 @@ import configparser
 import sys
 import socket
 import argparse
-sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
+sys.path.append('/home/lkb/delande/git/and-python/multi')
 import anderson
 
 def main():
