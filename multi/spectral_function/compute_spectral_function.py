@@ -109,7 +109,7 @@ def main():
 # Can be in any order
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranteed
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Spectral']
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Spectral','Spin']
   geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()

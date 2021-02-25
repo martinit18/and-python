@@ -8,15 +8,17 @@ Created on Wed Nov 25 11:45:37 2020
 
 import numpy as np
 import timeit
+import copy
 from anderson.geometry import Geometry
 
 class Measurement(Geometry):
-  def __init__(self, geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, i_tab_0=0, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, measure_spectral_function=False, use_mkl_fft=True, remove_hot_pixel=False):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta)
+  def __init__(self, geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, i_tab_0=0, teta_measurement=0.0,  measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, measure_spectral_function=False, use_mkl_fft=True, remove_hot_pixel=False):
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta, spin_one_half=geometry.spin_one_half)
     self.delta_t_dispersion = delta_t_dispersion
     self.delta_t_density = delta_t_density
     self.delta_t_spectral_function = delta_t_spectral_function
     self.i_tab_0 = i_tab_0
+    self.teta_measurement = teta_measurement
     self.measure_density = measure_density
     self.measure_density_momentum = measure_density_momentum
     self.measure_autocorrelation = measure_autocorrelation
@@ -64,7 +66,7 @@ class Measurement(Geometry):
       dim_tab_time_dispersion = int(t_max/self.delta_t_dispersion+0.999)
       number_of_measurements_dispersion = dim_tab_time_dispersion+1
       dim_tab_time_density = int(t_max/self.delta_t_density+0.999)
-      number_of_measurements_density = dim_tab_time_density-1
+      number_of_measurements_density = dim_tab_time_density+1
       dim_tab_time_spectral_function = int(t_max/self.delta_t_spectral_function+0.999)
       number_of_measurements_spectral_function = dim_tab_time_spectral_function+1
 #      print(t_max,self.delta_t_spectral_function)
@@ -97,8 +99,8 @@ class Measurement(Geometry):
           tab_time_new[j,1:] += tab_time[i+1,1:]
       self.tab_time = tab_time_new[:j+1,:]
   # For the first and last time, remove the computation of densities
-      self.tab_time[0,2]=0.0
-      self.tab_time[-1,2]=0.0
+  #    self.tab_time[0,2]=0.0
+  #    self.tab_time[-1,2]=0.0
   #    print(tab_time)
   # Select only events where dispersion is measured
       self.tab_t_measurement_dispersion = self.tab_time[self.tab_time[:,1]==1.0,0]
@@ -132,9 +134,9 @@ class Measurement(Geometry):
         self.tab_energy = np.zeros(dim_dispersion)
         self.tab_nonlinear_energy = np.zeros(dim_dispersion)
       if self.measure_wavefunction:
-        self.wfc =  np.zeros(self.tab_dim,dtype=np.complex128)
-      if self.measure_wavefunction_momentum:
-        self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
+        self.wfc =  np.zeros(self.tab_hs_dim,dtype=np.complex128)
+#      if self.measure_wavefunction_momentum:
+#        self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
       if self.measure_g1:
         self.g1 =  np.zeros(self.tab_dim,dtype=np.complex128)
         dim_g1 = self.tab_dim[:]
@@ -142,6 +144,7 @@ class Measurement(Geometry):
         self.g1_intermediate = np.zeros(dim_g1,dtype=np.complex128)
       if self.measure_overlap:
         self.overlap = 0.0
+#      print('Measure spectral function = ',self.measure_spectral_function)
       if self.measure_spectral_function:
         self.tab_energies = np.fft.fftshift(np.fft.fftfreq(2*spectral_function.n_pts_autocorr+1,d=spectral_function.delta_t/(2.0*np.pi)))+0.5*(spectral_function.e_max+spectral_function.e_min)
  #       print(number_of_measurements_spectral_function)
@@ -201,8 +204,8 @@ class Measurement(Geometry):
         self.tab_nonlinear_energy[1] += measurement.tab_nonlinear_energy**2
     if self.measure_wavefunction:
       self.wfc += measurement.wfc
-    if self.measure_wavefunction_momentum:
-      self.wfc_momentum += measurement.wfc_momentum
+#    if self.measure_wavefunction_momentum:
+#      self.wfc_momentum += measurement.wfc_momentum
     if self.measure_g1:
       self.g1 +=  measurement.g1
       self.g1_intermediate += measurement.g1_intermediate
@@ -259,10 +262,10 @@ class Measurement(Geometry):
       toto = np.empty_like(self.wfc)
       comm.Reduce(self.wfc,toto)
       self.wfc = np.copy(toto)
-    if self.measure_wavefunction_momentum:
-      toto = np.empty_like(self.wfc_momentum)
-      comm.Reduce(self.wfc_momentum,toto)
-      self.wfc_momentum = np.copy(toto)
+#    if self.measure_wavefunction_momentum:
+#      toto = np.empty_like(self.wfc_momentum)
+#      comm.Reduce(self.wfc_momentum,toto)
+#      self.wfc_momentum = np.copy(toto)
     if self.measure_g1:
       toto = np.empty_like(self.g1)
       comm.Reduce(self.g1,toto)
@@ -359,8 +362,8 @@ class Measurement(Geometry):
         next_column += 1
     if self.measure_wavefunction:
       self.wfc /= n_config
-    if self.measure_wavefunction_momentum:
-      self.wfc_momentum /= n_config
+#    if self.measure_wavefunction_momentum:
+#      self.wfc_momentum /= n_config
     if self.measure_g1:
       self.g1 /= n_config
       self.g1_intermediate /= n_config
@@ -378,24 +381,32 @@ class Measurement(Geometry):
 
 
   def perform_measurement_dispersion(self, i_tab, H, psi, init_state_autocorr):
+#    print('teta_measurement = ',self.teta_measurement)
+    if self.spin_one_half:
+# Select only a single component
+      local_psi = copy.deepcopy(psi)
+      local_psi.wfc = np.zeros(self.tab_dim,dtype=np.complex128)
+      local_psi.wfc[:] = np.cos(self.teta_measurement)*psi.wfc[0::2]+np.sin(self.teta_measurement)*psi.wfc[1::2]
+    else:
+      local_psi=psi
     if self.measure_dispersion_position or self.measure_dispersion_position2:
-      density = psi.wfc.real**2+psi.wfc.imag**2
+      density = local_psi.wfc.real**2+local_psi.wfc.imag**2
       norm = np.sum(density)
       for i in range(psi.dimension):
-        local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
+        local_density = np.sum(density, axis = tuple(j for j in range(local_psi.dimension) if j!=i))
 #    print(dim,local_density.shape,local_density)
         if self.measure_dispersion_position:
-          self.tab_position[i,i_tab] = np.sum(psi.grid_position[i]*local_density)/norm
+          self.tab_position[i,i_tab] = np.sum(local_psi.grid_position[i]*local_density)/norm
         if self.measure_dispersion_position2:
-          self.tab_position2[i,i_tab] = np.sum(psi.grid_position[i]**2*local_density)/norm
+          self.tab_position2[i,i_tab] = np.sum(local_psi.grid_position[i]**2*local_density)/norm
     if self.measure_dispersion_energy:
       self.tab_energy[i_tab], self.tab_nonlinear_energy[i_tab] = psi.energy(H)
     if (self.measure_dispersion_momentum):
-      psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+      psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
       density = psi_momentum.real**2+psi_momentum.imag**2
       norm = np.sum(density)
-      for i in range(psi.dimension):
-        local_density = np.sum(density, axis = tuple(j for j in range(psi.dimension) if j!=i))
+      for i in range(local_psi.dimension):
+        local_density = np.sum(density, axis = tuple(j for j in range(local_psi.dimension) if j!=i))
         self.tab_momentum[i,i_tab] = np.sum(self.frequencies[i]*local_density)/norm
     if self.measure_autocorrelation and i_tab>=self.i_tab_0:
 # Inlining the overlap method is slighlty faster
@@ -404,31 +415,46 @@ class Measurement(Geometry):
     return
 
   def perform_measurement_density(self, i_tab, psi):
+#    print(self.spin_one_half,self.teta_measurement)
+    if self.spin_one_half:
+# Select only a single component
+      local_psi = copy.deepcopy(psi)
+      local_psi.wfc = np.zeros(self.tab_dim,dtype=np.complex128)
+      local_psi.wfc[:] = np.cos(self.teta_measurement)*psi.wfc[0::2]+np.sin(self.teta_measurement)*psi.wfc[1::2]
+    else:
+      local_psi=psi
     if self.measure_density:
 #      print(self.density_intermediate.shape)
-      self.density_intermediate[i_tab,:] = psi.wfc.real**2+psi.wfc.imag**2
+      self.density_intermediate[i_tab,:] = local_psi.wfc.real**2+local_psi.wfc.imag**2
     if self.measure_density_momentum:
-      psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+      psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
       self.density_momentum_intermediate[i_tab,:] = psi_momentum.real**2+psi_momentum.imag**2
     if self.measure_g1:
-      self.g1_intermediate[i_tab,:] = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*psi.delta_vol
+      self.g1_intermediate[i_tab,:] = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(local_psi.wfc)*np.conj(np.fft.fftn(local_psi.wfc))))*local_psi.delta_vol
     return
 
   def perform_measurement_final(self, psi, init_state_autocorr):
-    if self.measure_density:
-      self.density_final = psi.wfc.real**2+psi.wfc.imag**2
+#    if self.spin_one_half:
+# Select only a single component
+#      local_psi = copy.deepcopy(psi)
+#      local_psi.wfc = np.zeros(self.tab_dim,dtype=np.complex128)
+#      local_psi.wfc[:] = np.cos(self.teta_measurement)*psi.wfc[0::2]+np.sin(self.teta_measurement)*psi.wfc[1::2]
+#    else:
+#      local_psi=psi
+#    if self.measure_density:
+#      self.density_final = local_psi.wfc.real**2+local_psi.wfc.imag**2
     if self.measure_wavefunction:
       self.wfc = psi.wfc
-    if self.measure_wavefunction_momentum:
-      self.wfc_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
-    if self.measure_density_momentum:
-      if self.measure_wavefunction_momentum:
-        self.density_momentum_final = self.wfc_momentum.real**2+self.wfc_momentum.imag**2
-      else:
-        psi_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
-        self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
-    if self.measure_g1:
-      self.g1 = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(psi.wfc)*np.conj(np.fft.fftn(psi.wfc))))*psi.delta_vol
+#    if self.measure_wavefunction_momentum:
+#      self.wfc_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
+#    if self.measure_density_momentum:
+#      if self.measure_wavefunction_momentum:
+#        self.density_momentum_final = self.wfc_momentum.real**2+self.wfc_momentum.imag**2
+#      else:
+#        psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
+#        self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
+#    if self.measure_g1:
+#      self.g1 = #np.fft.fftshift(np.fft.ifftn(np.fft.fftn(local_psi.wfc)*np.conj(np.fft.fftn(local_psi.wfc))))*local_psi.delta_vol
     if self.measure_overlap:
       self.overlap = np.vdot(init_state_autocorr.wfc,psi.wfc)*psi.delta_vol
 #      print(self.overlap)

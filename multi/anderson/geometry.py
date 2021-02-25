@@ -6,15 +6,17 @@ Created on Sun Nov 22 19:26:01 2020
 @author: delande
 """
 
+import copy
 import numpy as np
 
 """
-The class Geometry defines the geometry of the system, with no reference to the Hamiltonian
+The class Geometry defines the geometry of the system, including the local Hilbert space on each site (currently limited to spin 1/2 systems) with no reference to the Hamiltonian
 """
 class Geometry:
-  def __init__(self, dimension, tab_dim ,tab_delta):
+  def __init__(self, dimension, tab_dim ,tab_delta, spin_one_half=False):
     self.dimension = dimension
     self.tab_dim = tab_dim
+    self.tab_hs_dim = copy.deepcopy(tab_dim)
     self.tab_delta = tab_delta
  #    self.array_dim = np.array(tab_dim,dtype=np.intc)
     self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
@@ -25,6 +27,7 @@ class Geometry:
       ntot *= tab_dim[i]
       self.tab_dim_cumulative[i] = ntot
       self.delta_vol *= tab_delta[i]
+# Total number of sites
     self.ntot = ntot
     self.grid_position = list()
     for i in range(dimension):
@@ -32,4 +35,13 @@ class Geometry:
     self.frequencies = []
     for i in range(dimension):
       self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
+# Local Hilbert space dimension
+    if spin_one_half:
+      self.lhs_dim = 2
+      self.tab_hs_dim[0] *= 2
+    else:
+      self.lhs_dim = 1
+# Total Hilbert space dimension
+    self.hs_dim = self.lhs_dim*self.ntot
+    self.spin_one_half = spin_one_half
     return

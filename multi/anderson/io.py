@@ -99,7 +99,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         alpha = Spin.getfloat('h',0.0)
     else:
       spin_one_half = False
-
+    if spin_one_half and dimension!=1:
+      my_abort(mpi_version,comm,'Spin 1/2 works only in dimension 1, I stop!\n')
 
 # Optional Nonlinearity section
     if 'Nonlinearity' in my_list_of_sections:
@@ -137,12 +138,18 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           k_0_over_2_pi=Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1))
 # k_0_over_2_pi*size must be an integer is all dimensions
 # Renormalize k_0_over_2_pi to ensure it
-          tab_k_0.append(2.0*math.pi*int(k_0_over_2_pi*tab_size[i]+0.5)/tab_size[i])
+          tab_k_0.append(2.0*math.pi*round(k_0_over_2_pi*tab_size[i])/tab_size[i])
           if initial_state_type != "plane_wave":
             if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
             tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a single point, I stop!\n')
+      teta = Wavefunction.getfloat('teta',0.0)
+      teta_measurement = Wavefunction.getfloat('teta_measurement',0.0)
+#      print(teta,teta_measurement)
+
+
+
 
 # Optional Propagation section
     if 'Propagation' in my_list_of_sections:
@@ -157,6 +164,10 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       t_max = Propagation.getfloat('t_max','0.0')
       delta_t = Propagation.getfloat('delta_t','0.0')
       i_tab_0 = 0
+      if spin_one_half and method=='che':
+        my_abort(mpi_version,comm,'Chebyshev propagation is not supported for spin_one_half, I stop!\n')
+      if spin_one_half and data_layout=='real':
+        my_abort(mpi_version,comm,'Real data layout is not supported for spin_one_half, I stop!\n')
 #      if not all_options_ok:
 #        my_abort(mpi_version,comm,'In the Propagation section of the parameter file, there must be a maximum propagation time t_max and a time step delta_t, I stop!\n')
 
@@ -238,6 +249,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       number_of_bins = Lyapounov.getint('number_of_bins',0)
       want_ctypes = Lyapounov.getboolean('want_ctypes',True)
 
+
   else:
     dimension = None
     one_over_mass = None
@@ -262,6 +274,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     initial_state_type = None
     tab_k_0 = None
     tab_sigma_0 = None
+    teta = None
+    teta_measurement = None
     method = None
     accuracy = None
     accurate_bounds = None
@@ -312,11 +326,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Spin' in my_list_of_sections:
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
-      initial_state_type, tab_k_0, tab_sigma_0 = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0))
+      initial_state_type, tab_k_0, tab_sigma_0, teta, teta_measurement = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
     if 'Measurement' in my_list_of_sections:
-      delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
+      delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
@@ -324,13 +338,12 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
-  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta)
+
+  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, spin_one_half)
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength,non_diagonal_disorder_strength=non_diagonal_disorder_strength, b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
   if spin_one_half:
     H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z, alpha=alpha)
-  else:
-    H.spin_one_half = False
   return_list = [geometry, H]
 
 # Define an initial state
@@ -338,11 +351,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     initial_state = anderson.wavefunction.Wavefunction(geometry)
     initial_state.type = initial_state_type
     if (initial_state.type=='plane_wave'):
-      anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0)
+      anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0,spin_one_half=H.spin_one_half,teta=teta)
     if (initial_state.type=='gaussian_wave_packet'):
-      anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0)
+      anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0,spin_one_half=H.spin_one_half,teta=teta)
     if (initial_state.type=='point'):
-      anderson.wavefunction.Wavefunction.point(initial_state)
+      anderson.wavefunction.Wavefunction.point(initial_state,spin_one_half=H.spin_one_half,teta=teta)
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
@@ -357,8 +370,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     measurement_spectral.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local)
 #  print(measurement.density_final.shape)
     measurement_spectral_global.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local,global_measurement=True)
-    measurement_spectral.tab_time[:,3]=0
-    measurement_spectral_global.tab_time[:,3]=0
+#    measurement_spectral.tab_time[:,3]=0
+#    measurement_spectral_global.tab_time[:,3]=0
     return_list.append(measurement_spectral)
     return_list.append(measurement_spectral_global)
   else:
@@ -369,7 +382,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Define the structure of the temporal integration
     propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
     return_list.append(propagation)
-    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, measure_spectral_function=measure_spectral_function, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
+    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement=teta_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, measure_spectral_function=measure_spectral_function, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
     measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
 #    print(delta_t,propagation.delta_t)
@@ -467,7 +480,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if measurement.measure_overlap:
       params_string += \
                   '|overlap|**2 with initial state      = '+str(abs(measurement.overlap)**2)+'\n'
-  if not spectral_function == None:
+  if measurement.measure_spectral_function:
     params_string += \
                   'minimum energy for spectral function = '+str(spectral_function.e_min)+'\n'\
                   'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
@@ -508,8 +521,14 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       specific_string='Density in momentum space\n'
     if data_type=='wavefunction':
       column_1='Position'
-      column_2='Re(wavefunction)'
-      column_3='Im(wavefunction)'
+      if geometry.spin_one_half:
+        column_2='Re(wavefunction) spin up'
+        column_3='Im(wavefunction) spin up'
+        column_4='Re(wavefunction) spin down'
+        column_5='Im(wavefunction) spin down'
+      else:
+        column_2='Re(wavefunction)'
+        column_3='Im(wavefunction)'
       specific_string='Wavefunction in configuration space\n'
     if data_type=='wavefunction_momentum':
       column_1='Momentum'
@@ -610,24 +629,39 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
           array_to_print=data[0,:,:]
     if data_type in ['wavefunction','wavefunction_momentum','g1']:
       if dimension==1:
-        if data_type=='wavefunction' or data_type=='g1':
+        if data_type=='g1' or data_type=='wavefunction':
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
-        if data_type=='wavefunction_momentum':
-          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
+#        if data_type=='wavefunction_momentum':
+#          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
 #        print(data.size,tab_abscissa[0].size)
-        if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
+#        if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
+        if tab_abscissa!=[]:
           if data_type=='g1':
             list_of_columns.append(tab_abscissa[0]-0.5*geometry.tab_delta[0])
           else:
             list_of_columns.append(tab_abscissa[0])
-          tab_strings.append('Column '+str(next_column)+': '+column_1)
+        tab_strings.append('Column '+str(next_column)+': '+column_1)
+        next_column += 1
+        if geometry.spin_one_half and data_type=='wavefunction':
+          list_of_columns.append(np.real(data[0::2]))
+          tab_strings.append('Column '+str(next_column)+': '+column_2)
           next_column += 1
-        list_of_columns.append(np.real(data))
-        tab_strings.append('Column '+str(next_column)+': '+column_2)
-        next_column += 1
-        list_of_columns.append(np.imag(data))
-        tab_strings.append('Column '+str(next_column)+': '+column_3)
-        next_column += 1
+          list_of_columns.append(np.imag(data[0::2]))
+          tab_strings.append('Column '+str(next_column)+': '+column_3)
+          next_column += 1
+          list_of_columns.append(np.real(data[1::2]))
+          tab_strings.append('Column '+str(next_column)+': '+column_4)
+          next_column += 1
+          list_of_columns.append(np.imag(data[1::2]))
+          tab_strings.append('Column '+str(next_column)+': '+column_5)
+          next_column += 1
+        else:
+          list_of_columns.append(np.real(data))
+          tab_strings.append('Column '+str(next_column)+': '+column_2)
+          next_column += 1
+          list_of_columns.append(np.imag(data))
+          tab_strings.append('Column '+str(next_column)+': '+column_3)
+          next_column += 1
         array_to_print=np.column_stack(list_of_columns)
       if dimension==2:
         if data_type=='wavefunction' or data_type=='g1':
@@ -701,25 +735,26 @@ def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data n
 def print_measurements_final(measurement,initial_state=None,header_string='Origin of data not specified'):
   if (measurement.measure_density):
 #      print(measurement.grid_position)
-    anderson.io.output_density('density_final.dat',measurement.density_final,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
+#    anderson.io.output_density('density_final.dat',measurement.density_final,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
     for i in range(measurement.tab_t_measurement_density.size):
-      anderson.io.output_density('density_intermediate_'+str(i+1)+'.dat',measurement.density_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='density')
+      anderson.io.output_density('density_intermediate_'+str(i)+'.dat',measurement.density_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='density')
   if (measurement.measure_density_momentum):
-    anderson.io.output_density('density_momentum_final.dat',measurement.density_momentum_final,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
+#    anderson.io.output_density('density_momentum_final.dat',measurement.density_momentum_final,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
     for i in range(measurement.tab_t_measurement_density.size):
-      anderson.io.output_density('density_momentum_intermediate_'+str(i+1)+'.dat',measurement.density_momentum_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.frequencies,data_type='density_momentum')
+      anderson.io.output_density('density_momentum_intermediate_'+str(i)+'.dat',measurement.density_momentum_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.frequencies,data_type='density_momentum')
   if (measurement.measure_wavefunction):
+    anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
     anderson.io.output_density('wavefunction_final.dat',measurement.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
-  if (measurement.measure_wavefunction_momentum):
-    anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
+#  if (measurement.measure_wavefunction_momentum):
+#    anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
   if (measurement.measure_autocorrelation):
     anderson.io.output_density('temporal_autocorrelation.dat',measurement.tab_autocorrelation,measurement,tab_abscissa=measurement.tab_t_measurement_dispersion,header_string=header_string,data_type='autocorrelation')
   if (measurement.measure_dispersion_position or measurement.measure_dispersion_momentum or measurement.measure_dispersion_energy):
     anderson.io.output_dispersion('dispersion.dat',measurement.tab_dispersion,measurement.tab_strings,header_string)
   if (measurement.measure_g1):
-    anderson.io.output_density('g1_final.dat',measurement.g1,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='g1')
+#    anderson.io.output_density('g1_final.dat',measurement.g1,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='g1')
     for i in range(measurement.tab_t_measurement_density.size):
-      anderson.io.output_density('g1_intermediate_'+str(i+1)+'.dat',measurement.g1_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='g1')
+      anderson.io.output_density('g1_intermediate_'+str(i)+'.dat',measurement.g1_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='g1')
 #    print("c'est fini")
   if measurement.measure_spectral_function:
 #    print(measurement.tab_t_measurement_spectral_function.size)
@@ -733,18 +768,19 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
     if measurement.tab_t_measurement_spectral_function.size==1:
       anderson.io.output_density(base_string+'.dat',measurement.tab_spectrum, measurement,header_string=header_string,tab_abscissa=measurement.tab_energies,data_type=data_type)
     else:
-      anderson.io.output_density(base_string+'_initial.dat',measurement.tab_spectrum[:,0], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[0])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
-      for i in range(1,measurement.tab_t_measurement_spectral_function.size-1):
+#      anderson.io.output_density(base_string+'_initial.dat',measurement.tab_spectrum[:,0], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[0])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
+      for i in range(0,measurement.tab_t_measurement_spectral_function.size):
 #        print(i)
         anderson.io.output_density(base_string+'_intermediate_'+str(i)+'.dat',measurement.tab_spectrum[:,i], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[i])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
-      i=measurement.tab_t_measurement_spectral_function.size-1
+#      i=measurement.tab_t_measurement_spectral_function.size-1
 #      print(i)
-      anderson.io.output_density(base_string+'_final.dat',measurement.tab_spectrum[:,i], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[i])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
+#      anderson.io.output_density(base_string+'_final.dat',measurement.tab_spectrum[:,i], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[i])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
   return
 
+"""
 def print_measurements_initial(measurement,initial_state,header_string='Origin of data not specified'):
   if (measurement.measure_density):
-#      print(measurement.grid_position)
+#    print(measurement.grid_position)
     anderson.io.output_density('density_initial.dat',np.abs(initial_state.wfc)**2,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
   if (measurement.measure_density_momentum):
     anderson.io.output_density('density_momentum_initial.dat',np.abs(initial_state.convert_to_momentum_space())**2,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
@@ -753,3 +789,4 @@ def print_measurements_initial(measurement,initial_state,header_string='Origin o
   if (measurement.measure_wavefunction_momentum):
     anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_to_momentum_space(),measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
   return
+"""

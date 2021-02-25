@@ -114,7 +114,7 @@ def main():
 # Can be in any order
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranted
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral']
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral','Spin']
   geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
@@ -129,7 +129,7 @@ def main():
   header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
 #  print(header_string)
 # Print the initial density and wavefunction
-  anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
+#  anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):

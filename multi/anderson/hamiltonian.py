@@ -20,7 +20,7 @@ They are used in the rescaling of the Hamiltonian to bring its spectrum between 
 
 class Hamiltonian(Geometry):
   def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, use_mkl_random=False, interaction=0.0):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta)
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,spin_one_half=geometry.spin_one_half)
     dimension = self.dimension
     tab_dim = self.tab_dim
     tab_delta = self.tab_delta
@@ -120,7 +120,6 @@ class Hamiltonian(Geometry):
     """
 
   def add_spin_one_half(self, spin_orbit_interaction=0.0, sigma_x=0.0, sigma_y=0.0, sigma_z=0.0, alpha=0.0):
-    self.spin_one_half = True
     self.spin_orbit_interaction = spin_orbit_interaction
     self.scaled_spin_orbit_interaction = spin_orbit_interaction/self.tab_delta[0]
     self.sigma_x = sigma_x
@@ -232,8 +231,8 @@ class Hamiltonian(Geometry):
 
   def generate_full_matrix_spin_one_half(self):
     assert(self.dimension==1)
-    dimx = self.tab_dim_cumulative[0]
-    ntot = 2*dimx
+    ntot = self.ntot
+    hs_dim = 2*ntot
 # The disorder contribution + sigma_z contribution + p**2*sigma_z contribution
     diag = np.repeat(self.disorder,2)
     diag[0::2] +=  self.sigma_z+2.0*self.scaled_alpha
@@ -245,10 +244,10 @@ class Hamiltonian(Geometry):
     np.fill_diagonal(matrix[0::2,2::2],-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha)
     np.fill_diagonal(matrix[1::2,3::2],-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha)
     if self.tab_boundary_condition[0]=='periodic':
-      matrix[0,ntot-2] = -self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
-      matrix[1,ntot-1] = -self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
-      matrix[ntot-2,0] = -self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
-      matrix[ntot-1,1] = -self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
+      matrix[0,hs_dim-2] = -self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
+      matrix[1,hs_dim-1] = -self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
+      matrix[hs_dim-2,0] = -self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
+      matrix[hs_dim-1,1] = -self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
 # sigma_x and sigma_y contributtions
     np.fill_diagonal(matrix[0::2,1::2],self.sigma_x-1j*self.sigma_y)
     np.fill_diagonal(matrix[1::2,0::2],self.sigma_x+1j*self.sigma_y)
@@ -397,29 +396,28 @@ class Hamiltonian(Geometry):
 
   def generate_sparse_matrix_spin_one_half(self):
     assert(self.dimension==1)
-    dimx = self.tab_dim_cumulative[0]
-    ntot = 2*dimx
+    hs_dim = self.hs_dim
 # The disorder contribution + sigma_z contribution
     diagonal = np.repeat(self.disorder,2)
     diagonal[0::2] +=  self.sigma_z+2.0*self.scaled_alpha
     diagonal[1::2] += -self.sigma_z-2.0*self.scaled_alpha
     diagonals = [diagonal]
     offsets = [0]
-    sub_diagonal= np.zeros((6,ntot),dtype=np.complex128)
+    sub_diagonal= np.zeros((6,hs_dim),dtype=np.complex128)
 # Hopping (p**2 operator) + spin-orbit contribution
-    sub_diagonal[0,0::2]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
-    sub_diagonal[0,1::2]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
-    sub_diagonal[1,0::2]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
-    sub_diagonal[1,1::2]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
+    sub_diagonal[0,0::2]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
+    sub_diagonal[0,1::2]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
+    sub_diagonal[1,0::2]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
+    sub_diagonal[1,1::2]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
     diagonals.extend([sub_diagonal[0,:],sub_diagonal[1,:]])
     offsets.extend([2,-2])
     if self.tab_boundary_condition[0]=='periodic':
-      sub_diagonal[2,0]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
-      sub_diagonal[2,1]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
-      sub_diagonal[3,0]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
-      sub_diagonal[3,1]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
+      sub_diagonal[2,0]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
+      sub_diagonal[2,1]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
+      sub_diagonal[3,0]=-self.tab_tunneling[0]+0.5j*self.scaled_spin_orbit_interaction-self.scaled_alpha
+      sub_diagonal[3,1]=-self.tab_tunneling[0]-0.5j*self.scaled_spin_orbit_interaction+self.scaled_alpha
       diagonals.extend([sub_diagonal[2,:],sub_diagonal[3,:]])
-      offsets.extend([-ntot+2,ntot-2])
+      offsets.extend([-hs_dim+2,hs_dim-2])
 # sigma_x and sigma_y contributtions
     sub_diagonal[4,0::2] = self.sigma_x-1j*self.sigma_y
     sub_diagonal[5,0::2] = self.sigma_x+1j*self.sigma_y
@@ -443,7 +441,7 @@ class Hamiltonian(Geometry):
   """
 
   def apply_h(self, wfc):
-    if self.dimension==1:
+    if self.dimension==1 and not self.spin_one_half:
       dim_x = self.tab_dim[0]
       tunneling = self.tab_tunneling[0]
       if wfc.dtype==np.float64:

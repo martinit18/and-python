@@ -10,11 +10,14 @@ from anderson.geometry import Geometry
 
 class Wavefunction(Geometry):
   def __init__(self, geometry):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta)
-    self.wfc = np.zeros(self.tab_dim,dtype=np.complex128)
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,spin_one_half=geometry.spin_one_half)
+    if geometry.spin_one_half:
+      self.wfc = np.zeros([self.hs_dim],dtype=np.complex128)
+    else:
+      self.wfc = np.zeros(self.tab_dim,dtype=np.complex128)
     return
 
-  def gaussian(self,tab_k_0,tab_sigma_0):
+  def gaussian(self,tab_k_0,tab_sigma_0,spin_one_half=False,teta=0.0):
     self.tab_k_0 = tab_k_0
     self.tab_sigma_0 = tab_sigma_0
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
@@ -30,23 +33,37 @@ class Wavefunction(Geometry):
     threshold = 100.
     tab_amplitude =np.where(tab_amplitude>threshold,threshold,tab_amplitude)
     psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
-    self.wfc = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+    if spin_one_half:
+      hs_dim = self.hs_dim
+      self.wfc[0:hs_dim:2] = np.cos(teta)*psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+      self.wfc[1:hs_dim:2] = np.sin(teta)*psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+    else:
+      self.wfc = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
     return
 
-  def plane_wave(self,tab_k_0):
+  def plane_wave(self,tab_k_0,spin_one_half=False,teta=0.0):
 #    self.type = 'Plane wave'
     self.tab_k_0 = tab_k_0
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
     for i in range(len(grid_position)):
       tab_phase += self.tab_k_0[i]*grid_position[i]
-    self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
+    if spin_one_half:
+      hs_dim = self.hs_dim
+      self.wfc[0:hs_dim:2] = np.cos(teta)*np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
+      self.wfc[1:hs_dim:2] = np.sin(teta)*np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
+    else:
+      self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
     return
 
-  def point(self):
+  def point(self,spin_one_half=False,teta=0.0):
     point = list()
     for i in range(self.dimension): point.append(0)
-    self.wfc[tuple(point)] = 1.0/self.delta_vol
+    if spin_one_half:
+      self.wfc[0] = np.cos(teta)
+      self.wfc[1] = np.sin(teta)
+    else:
+      self.wfc[tuple(point)] = 1.0/self.delta_vol
     return
 
   def overlap(self, other_wavefunction):
@@ -100,6 +117,7 @@ class Wavefunction(Geometry):
 
   def energy(self, H):
 #    rhs = H.apply_h(self.wfc)
+#    print(H.spin_one_half)
     if H.interaction==0.0:
       non_linear_energy=0.0
     else:
@@ -107,7 +125,11 @@ class Wavefunction(Geometry):
       non_linear_energy = 0.5*H.interaction*np.sum((self.wfc.real**2+self.wfc.imag**2)**2)*self.delta_vol
 #    energy = np.sum(np.real(self.wfc.ravel()*np.conjugate(H.apply_h(self.wfc))))*self.delta_vol + non_linear_energy
 #    print(self.wfc.ravel().real.dtype,self.wfc.real.dtype,H.apply_h(self.wfc.real).dtype)
-    energy = np.sum(self.wfc.ravel().real*H.apply_h(self.wfc.real)+self.wfc.ravel().imag*H.apply_h(self.wfc.imag))*self.delta_vol + non_linear_energy
+    if H.spin_one_half:
+#      print('Complex energy = ',np.sum(np.conj(self.wfc)*H.apply_h(self.wfc))*self.delta_vol)
+      energy = np.sum(np.real(np.conj(self.wfc)*H.apply_h(self.wfc)))*self.delta_vol+non_linear_energy
+    else:
+      energy = np.sum(self.wfc.ravel().real*H.apply_h(self.wfc.real)+self.wfc.ravel().imag*H.apply_h(self.wfc.imag))*self.delta_vol + non_linear_energy
     norm = np.linalg.norm(self.wfc)**2*self.delta_vol
 #    print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm

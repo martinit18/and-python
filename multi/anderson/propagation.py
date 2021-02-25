@@ -58,10 +58,12 @@ class Temporal_Propagation:
 def apply_minus_i_h_gpe_complex(wfc, H, rhs):
   ntot=H.ntot
   if H.interaction == 0.0:
-    rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
-    rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
+    if not H.spin_one_half:
+      rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
+      rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
+    else:
 # The next line makes everything in one call, but is significantly slower
-#  rhs[:] = (-1j*H.sparse_matrix.dot(wfc.view(np.complex128))).view(np.float64)
+      rhs[:] = (-1j*H.sparse_matrix.dot(wfc.view(np.complex128))).view(np.float64)
   else:
     non_linear_phase = H.interaction*(wfc[0:2*ntot:2]**2+wfc[1:2*ntot:2]**2)
     rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])+non_linear_phase*wfc[1:2*ntot:2]
@@ -366,15 +368,16 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """
     start_time = timeit.default_timer()
     if (data_layout=='real'):
-      apply_minus_i_h_gpe_real(wfc, H, rhs)
+      pass
+ #     apply_minus_i_h_gpe_real(wfc, H, rhs)
 #      print('inside gpe real',wfc[100],rhs[100])
     else:
-#     print('inside gpe wfc',wfc.dtype,wfc.shape)
-#     print('inside gpe rhs',rhs.dtype,rhs.shape)
+#      print('inside gpe wfc',wfc.dtype,wfc.shape)
+#      print('inside gpe rhs',rhs.dtype,rhs.shape)
       apply_minus_i_h_gpe_complex(wfc, H, rhs)
 #      print('inside gpe complex',wfc[200],wfc[201],rhs[200],rhs[201])
     timing.GPE_TIME+=(timeit.default_timer() - start_time)
-    timing.NUMBER_OF_OPS+=16.0*H.ntot
+    timing.NUMBER_OF_OPS+=16.0*H.hs_dim
     return rhs
 
 
@@ -440,8 +443,9 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
   start_dummy_time=timeit.default_timer()
 #  dimension = H.dimension
   tab_dim = geometry.tab_dim
+  tab_hs_dim = geometry.tab_hs_dim
 #  tab_delta = geometry.tab_delta
-  ntot = geometry.ntot
+  hs_dim = geometry.hs_dim
   psi = Wavefunction(geometry)
 
 #  print(i_seed,no_init)
@@ -450,7 +454,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #  print('start gen disorder',timeit.default_timer())
     H.generate_disorder(seed=i_seed+1234)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-    if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy):
+    if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy) or H.spin_one_half:
       H.generate_sparse_matrix()
 
 #  print(measurement.tab_time)
@@ -466,7 +470,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #  print(timeit.default_timer())
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
   if (propagation.method=='ode'):
-    rhs = np.zeros(2*ntot)
+    rhs = np.zeros(2*hs_dim)
 #    print('y',y.dtype,y.shape)
 #    print('rhs',rhs.dtype,rhs.shape)
     solver = ode(f=lambda t,y: gross_pitaevskii(t,y,H,propagation.data_layout,rhs,timing)).set_integrator('dop853', atol=1e-5, rtol=1e-4)
@@ -535,16 +539,29 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
   timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
 #  print('2',initial_state.wfc[0],initial_state.wfc[1])
 
-#  print(measurement.tab_i_measurement)
+
 #time evolution
-#  print(measurement.tab_time.shape[0])
+#  print(measurement.tab_time)
   j_dispersion=0
   j_density=0
   j_spectral_function=0
+#      print('3',psi.wfc.shape,psi.wfc.dtype,y.shape,y.dtype)
+  if propagation.data_layout=='real':
+# The following two lines are faster than the natural implementation psi.wfc= y[0:dim_x]+1j*y[dim_x:2*dim_x]
+    psi.wfc.real=y[0:hs_dim].reshape(tab_hs_dim)
+    psi.wfc.imag=y[hs_dim:2*hs_dim].reshape(tab_hs_dim)
+  else:
+#        print( y.view(np.complex128).shape)
+    psi.wfc[:] = y.view(np.complex128).reshape(tab_hs_dim)[:]
+  if measurement.tab_time[0,2]== 1:
+ #   print('It is time to store density',measurement.tab_time[0,0],j_density)
+    measurement.perform_measurement_density(j_density,psi)
+    j_density+=1
   if measurement.tab_time[0,3]==1:
 #    print('Measure spectral function at time:',measurement.tab_time[0,0],j_spectral_function)
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
     measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, initial_state, H, propagation_spectral, measurement_spectral, spectral_function, timing)
+#    print('j_spectral_function = ',j_spectral_function)
     j_spectral_function+=1
   delta_t_old = -1.0
   tiny = 1.e-12
@@ -571,7 +588,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #      print(timing.MAX_NONLINEAR_PHASE)
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
-      timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*ntot*propagation.tab_coef.size
+      timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*hs_dim*propagation.tab_coef.size
 #      print(y[0])
     if measurement.tab_time[i,1]==1 or measurement.tab_time[i,2]==1:
       start_dummy_time=timeit.default_timer()
@@ -579,11 +596,11 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #      print('3',psi.wfc.shape,psi.wfc.dtype,y.shape,y.dtype)
       if propagation.data_layout=='real':
 # The following two lines are faster than the natural implementation psi.wfc= y[0:dim_x]+1j*y[dim_x:2*dim_x]
-        psi.wfc.real=y[0:ntot].reshape(tab_dim)
-        psi.wfc.imag=y[ntot:2*ntot].reshape(tab_dim)
+        psi.wfc.real=y[0:hs_dim].reshape(tab_hs_dim)
+        psi.wfc.imag=y[hs_dim:2*hs_dim].reshape(tab_hs_dim)
       else:
 #        print( y.view(np.complex128).shape)
-        psi.wfc[:] = y.view(np.complex128).reshape(tab_dim)[:]
+        psi.wfc[:] = y.view(np.complex128).reshape(tab_hs_dim)[:]
 #      print('4',psi.wfc.shape,psi.wfc.dtype)
       timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
       start_expect_time = timeit.default_timer()
@@ -605,6 +622,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #        print(propagation_spectral.delta_t,propagation_spectral.t_max)
         measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(i_seed, geometry, psi, H, propagation_spectral, measurement_spectral, spectral_function, timing, no_init=True)
 #        print(j_spectral_function,psi.wfc[0])
+#        print('j_spectral_function = ',j_spectral_function)
         j_spectral_function+=1
   measurement.perform_measurement_final(psi, init_state_autocorr)
 #     i_tab+=1
