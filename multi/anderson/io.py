@@ -480,8 +480,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if measurement.measure_overlap:
       params_string += \
                   '|overlap|**2 with initial state      = '+str(abs(measurement.overlap)**2)+'\n'
-  if measurement.measure_spectral_function:
-    params_string += \
+    if measurement.measure_spectral_function:
+      params_string += \
                   'minimum energy for spectral function = '+str(spectral_function.e_min)+'\n'\
                   'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
                  +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'

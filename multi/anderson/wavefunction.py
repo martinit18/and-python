@@ -60,8 +60,8 @@ class Wavefunction(Geometry):
     point = list()
     for i in range(self.dimension): point.append(0)
     if spin_one_half:
-      self.wfc[0] = np.cos(teta)
-      self.wfc[1] = np.sin(teta)
+      self.wfc[0] = np.cos(teta)/self.delta_vol
+      self.wfc[1] = np.sin(teta)/self.delta_vol
     else:
       self.wfc[tuple(point)] = 1.0/self.delta_vol
     return

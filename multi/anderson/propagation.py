@@ -454,7 +454,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #  print('start gen disorder',timeit.default_timer())
     H.generate_disorder(seed=i_seed+1234)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
-    if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or (measurement.measure_dispersion_energy) or H.spin_one_half:
+    if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or propagation.method=='ode' or (measurement.measure_dispersion_energy) or H.spin_one_half:
       H.generate_sparse_matrix()
 
 #  print(measurement.tab_time)
