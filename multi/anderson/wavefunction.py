@@ -37,6 +37,7 @@ class Wavefunction(Geometry):
       hs_dim = self.hs_dim
       self.wfc[0:hs_dim:2] = np.cos(teta)*psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
       self.wfc[1:hs_dim:2] = np.sin(teta)*psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+      self.teta = teta
     else:
       self.wfc = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
     return
@@ -52,6 +53,7 @@ class Wavefunction(Geometry):
       hs_dim = self.hs_dim
       self.wfc[0:hs_dim:2] = np.cos(teta)*np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
       self.wfc[1:hs_dim:2] = np.sin(teta)*np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
+      self.teta = teta
     else:
       self.wfc = np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
     return
@@ -62,6 +64,7 @@ class Wavefunction(Geometry):
     if spin_one_half:
       self.wfc[0] = np.cos(teta)/self.delta_vol
       self.wfc[1] = np.sin(teta)/self.delta_vol
+      self.teta = teta
     else:
       self.wfc[tuple(point)] = 1.0/self.delta_vol
     return

@@ -453,6 +453,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
         if initial_state.type == 'gaussian_wave_packet':
           params_string += \
                   'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'
+    if H.spin_one_half:
+      params_string += \
+                  'teta                                 = '+str(initial_state.teta)+' \n'\
+                 +'teta_measurement                     = '+str(measurement.teta_measurement)+'\n'
   if not propagation == None:
     params_string += \
                   'Integration Method                   = '+propagation.method+'\n'\

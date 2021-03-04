@@ -391,7 +391,10 @@ class Measurement(Geometry):
       local_psi=psi
     if self.measure_dispersion_position or self.measure_dispersion_position2:
       density = local_psi.wfc.real**2+local_psi.wfc.imag**2
-      norm = np.sum(density)
+      if self.spin_one_half:
+        norm = 1.0
+      else:
+        norm = np.sum(density)
       for i in range(psi.dimension):
         local_density = np.sum(density, axis = tuple(j for j in range(local_psi.dimension) if j!=i))
 #    print(dim,local_density.shape,local_density)
@@ -404,7 +407,10 @@ class Measurement(Geometry):
     if (self.measure_dispersion_momentum):
       psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
       density = psi_momentum.real**2+psi_momentum.imag**2
-      norm = np.sum(density)
+      if self.spin_one_half:
+        norm = 1.0
+      else:
+        norm = np.sum(density)
       for i in range(local_psi.dimension):
         local_density = np.sum(density, axis = tuple(j for j in range(local_psi.dimension) if j!=i))
         self.tab_momentum[i,i_tab] = np.sum(self.frequencies[i]*local_density)/norm
