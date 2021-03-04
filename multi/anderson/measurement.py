@@ -392,12 +392,13 @@ class Measurement(Geometry):
     if self.measure_dispersion_position or self.measure_dispersion_position2:
       density = local_psi.wfc.real**2+local_psi.wfc.imag**2
       if self.spin_one_half:
-        norm = 1.0
+        norm = 1.0/H.delta_vol
       else:
         norm = np.sum(density)
       for i in range(psi.dimension):
         local_density = np.sum(density, axis = tuple(j for j in range(local_psi.dimension) if j!=i))
 #    print(dim,local_density.shape,local_density)
+#        np.savetxt('toto_dispersion.dat',local_density)
         if self.measure_dispersion_position:
           self.tab_position[i,i_tab] = np.sum(local_psi.grid_position[i]*local_density)/norm
         if self.measure_dispersion_position2:
@@ -408,7 +409,7 @@ class Measurement(Geometry):
       psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
       density = psi_momentum.real**2+psi_momentum.imag**2
       if self.spin_one_half:
-        norm = 1.0
+        norm = 1.0/H.delta_vol
       else:
         norm = np.sum(density)
       for i in range(local_psi.dimension):
@@ -432,6 +433,7 @@ class Measurement(Geometry):
     if self.measure_density:
 #      print(self.density_intermediate.shape)
       self.density_intermediate[i_tab,:] = local_psi.wfc.real**2+local_psi.wfc.imag**2
+#      np.savetxt('toto_density.dat',self.density_intermediate[i_tab])
     if self.measure_density_momentum:
       psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
       self.density_momentum_intermediate[i_tab,:] = psi_momentum.real**2+psi_momentum.imag**2
