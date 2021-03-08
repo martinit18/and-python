@@ -86,6 +86,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Spin' in my_list_of_sections:
       if not config.has_section('Spin'):
         spin_one_half = False
+        spin_orbit_interaction = 0.0
+        sigma_x = 0.0
+        sigma_y = 0.0
+        sigma_z = 0.0
+        alpha = 0.0
 #        my_abort(mpi_version,comm,'Parameter file does not have a Spin section, I stop!\n')
       else:
         Spin = config['Spin']
@@ -99,6 +104,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         alpha = Spin.getfloat('h',0.0)
     else:
       spin_one_half = False
+      spin_orbit_interaction = 0.0
+      sigma_x = 0.0
+      sigma_y = 0.0
+      sigma_z = 0.0
+      alpha = 0.0
     if spin_one_half and dimension!=1:
       my_abort(mpi_version,comm,'Spin 1/2 works only in dimension 1, I stop!\n')
 
