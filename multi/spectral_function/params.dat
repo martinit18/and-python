@@ -65,7 +65,6 @@ n_config = 1
 delta_t_dispersion = 5.0
 delta_t_density = 10.
 delta_t_spectral_function = 100.
-#first_measurement = 0
 #density = True
 #density_momentum = True
 dispersion_position = True

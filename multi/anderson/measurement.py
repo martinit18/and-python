@@ -12,12 +12,11 @@ import copy
 from anderson.geometry import Geometry
 
 class Measurement(Geometry):
-  def __init__(self, geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, i_tab_0=0, teta_measurement=0.0,  measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, measure_spectral_function=False, use_mkl_fft=True, remove_hot_pixel=False):
+  def __init__(self, geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement=0.0,  measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, measure_spectral_function=False, use_mkl_fft=True, remove_hot_pixel=False):
     super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta, spin_one_half=geometry.spin_one_half)
     self.delta_t_dispersion = delta_t_dispersion
     self.delta_t_density = delta_t_density
     self.delta_t_spectral_function = delta_t_spectral_function
-    self.i_tab_0 = i_tab_0
     self.teta_measurement = teta_measurement
     self.measure_density = measure_density
     self.measure_density_momentum = measure_density_momentum
@@ -415,10 +414,10 @@ class Measurement(Geometry):
       for i in range(local_psi.dimension):
         local_density = np.sum(density, axis = tuple(j for j in range(local_psi.dimension) if j!=i))
         self.tab_momentum[i,i_tab] = np.sum(self.frequencies[i]*local_density)/norm
-    if self.measure_autocorrelation and i_tab>=self.i_tab_0:
+    if self.measure_autocorrelation:
 # Inlining the overlap method is slighlty faster
-#          measurement.tab_autocorrelation[i_tab-i_tab_0] = psi.overlap(init_state_autocorr)
-      self.tab_autocorrelation[i_tab-self.i_tab_0] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
+#          self.tab_autocorrelation[i_tab] = psi.overlap(init_state_autocorr)
+      self.tab_autocorrelation[i_tab] = np.vdot(init_state_autocorr.wfc,psi.wfc)*H.delta_vol
     return
 
   def perform_measurement_density(self, i_tab, psi):

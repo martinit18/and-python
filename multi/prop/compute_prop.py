@@ -119,8 +119,6 @@ def main():
 
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
-# The following line is a temporary fix
-  i_tab_0 = 0
 
 #  if rank==0:
 
@@ -179,18 +177,6 @@ def main():
 #    anderson.io.output_density('density_1.dat',measurement_global.density_intermediate[1],measurement_global,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
     anderson.io.print_measurements_final(measurement_global,initial_state=initial_state,header_string=header_string)
 
-    """
-  i_tab_0 = propagation.first_measurement_autocorr
-
-  header_string=environment_string\
-             +params_string\
-             +'Temporal autocorrelation function\n'\
-             +'Column 1: Time\n'\
-             +'Column 2: Real(<psi(0)|psi(t)>)\n'\
-             +'Column 3: Imag(<psi(0)|psi(t)>)\n'\
-             +'\n'
-  np.savetxt('temporal_autocorrelation.dat',np.column_stack([propagation.tab_t_measurement[i_tab_0:]-propagation.tab_t_measurement[i_tab_0],np.mean(np.real(tab_autocorrelation[:,:number_of_measurements-i_tab_0]),0),np.mean(np.imag(tab_autocorrelation[:,:number_of_measurements-i_tab_0]),0)]),header=header_string)
-    """
 
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))

@@ -173,7 +173,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       data_layout = Propagation.get('data_layout','real')
       t_max = Propagation.getfloat('t_max','0.0')
       delta_t = Propagation.getfloat('delta_t','0.0')
-      i_tab_0 = 0
       if spin_one_half and method=='che':
         my_abort(mpi_version,comm,'Chebyshev propagation is not supported for spin_one_half, I stop!\n')
       if spin_one_half and data_layout=='real':
@@ -191,7 +190,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       delta_t_dispersion = Measurement.getfloat('delta_t_dispersion',delta_t)
       delta_t_density = Measurement.getfloat('delta_t_density',t_max)
       delta_t_spectral_function = Measurement.getfloat('delta_t_spectral_function',t_max)
-      first_measurement_autocorr = Measurement.getint('first_measurement_autocorr',0)
       measure_density = Measurement.getboolean('density',False)
       measure_density_momentum = Measurement.getboolean('density_momentum',False)
       measure_autocorrelation = Measurement.getboolean('autocorrelation',False)
@@ -293,11 +291,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     data_layout = None
     t_max = None
     delta_t = None
-    i_tab_0 = None
     delta_t_dispersion = None
     delta_t_density = None
     delta_t_spectral_function = None
-    first_measurement_autocorr = None
     measure_density = None
     measure_density_momentum = None
     measure_autocorrelation = None
@@ -338,9 +334,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Wavefunction' in my_list_of_sections:
       initial_state_type, tab_k_0, tab_sigma_0, teta, teta_measurement = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
-      method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0 = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t, i_tab_0))
+      method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t))
     if 'Measurement' in my_list_of_sections:
-      delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, first_measurement_autocorr, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
+      delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
@@ -512,9 +508,6 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'number of energy steps               = '+str(lyapounov.number_of_e_steps)+'\n'\
                  +'use ctypes implementation            = '+str(lyapounov.use_ctypes)+'\n'
   params_string += '\n'
-#  print(params_string)
-#                 +'first measurement step          = '+str(my_first_measurement_autocorr)+'\n'\
-#                  +'total measurement time          = '+str(my_t_max-my_first_measurement_autocorr*my_delta_t_measurement)+'\n'\
   return params_string
 
 
