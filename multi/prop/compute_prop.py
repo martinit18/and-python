@@ -72,7 +72,7 @@ import argparse
 sys.path.append('/users/champ/delande/git/and-python/multi')
 sys.path.append('/home/lkb/delande/git/and-python/multi')
 import anderson
-#from anderson import io
+from anderson import propagation
 from anderson import timing
 
 
@@ -89,7 +89,7 @@ def main():
 # set mpi_string to something containing minimal MPI information
 # If not run inside MPI, nprocs=1 and rank=0
   mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.gethostname()+'\n'\
              +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
              +mpi_string+'\n'
@@ -97,7 +97,7 @@ def main():
   if rank==0:
     initial_time=time.asctime()
 #    hostname = os.uname()[1].split('.')[0]
-    print("Python script runs on machine : "+socket.getfqdn())
+    print("Python script runs on machine : "+socket.gethostname())
     print("Name of python script:  {}".format(os.path.abspath( __file__ )))
     print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
     print()
@@ -116,6 +116,10 @@ def main():
 # Must be consistent otherwise disaster guaranted
   my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral','Spin']
   geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+#  propagation.use_ctypes = False
+#  propagation.chebyshev_propagation = chebyshev_propagation_generic
+#  propagation.chebyshev_step = eval("chebyshev_step_generic_"+propagation.data_layout)
+#  H.apply_h = H.apply_h_generic
 
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()

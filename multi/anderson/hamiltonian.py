@@ -8,8 +8,12 @@ Created on Sun Nov 22 19:27:50 2020
 
 import numpy as np
 import scipy.sparse as ssparse
-from anderson.geometry import Geometry
 import sys
+import ctypes
+import numpy.ctypeslib as ctl
+import anderson
+from anderson.geometry import Geometry
+from anderson.wavefunction import Wavefunction
 
 """
 The class Hamiltonian contains all properties that define a disordered Hamiltonian discretized spatially
@@ -21,9 +25,14 @@ They are used in the rescaling of the Hamiltonian to bring its spectrum between 
 class Hamiltonian(Geometry):
   def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, use_mkl_random=False, interaction=0.0):
     super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,spin_one_half=geometry.spin_one_half)
+# seed is set to zero to recognize a generic Hamiltonian where the disorder has not been yet set
+    self.seed = 0
     dimension = self.dimension
     tab_dim = self.tab_dim
     tab_delta = self.tab_delta
+    self.is_real = True
+    if self.spin_one_half:
+      self.is_real = False
     self.disorder_strength = disorder_strength
     self.non_diagonal_disorder_strength = non_diagonal_disorder_strength
     self.one_over_mass = one_over_mass
@@ -46,6 +55,23 @@ class Hamiltonian(Geometry):
 #    self.script_tunneling = 0.
 #    self.script_disorder = np.zeros(tab_dim)
 #    self.medium_energy = 0.
+
+# In general, there is no specific routine for applying Hamiltonian on vector
+# and one then uses sparse multiplication
+    self.has_specific_apply_h_routine = False
+    self.apply_h = self.apply_h_generic
+ #   self.apply_h = lambda wfc: self.sparse_matrix.dot(wfc.ravel())
+# There are few specific cases for a specialized routine is available
+# Standard 1d system
+    if self.dimension == 1 and not self.spin_one_half:
+      self.has_specific_apply_h_routine = True
+      self.apply_h = self.apply_h_1d
+# Standard 2d system
+    if self.dimension == 2 and not self.spin_one_half:
+      self.has_specific_apply_h_routine = True
+      self.apply_h = self.apply_h_2d
+
+# Generate the disorder
     if disorder_type=='nice':
       self.b = b
       self.non_diagonal_disorder = np.zeros((self.ntot+self.b,self.b))
@@ -278,7 +304,7 @@ class Hamiltonian(Geometry):
         sub_diagonal[i*ny:(i+1)*ny] = -self.tab_tunneling[0]
       np.fill_diagonal(matrix[ny:,:],sub_diagonal)
       np.fill_diagonal(matrix[:,ny:],sub_diagonal)
-      if self.tab_boundary_condition[0]=='periodic':
+      if self.tab_boundary_condition[0]=='psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))periodic':
         np.fill_diagonal(matrix[ntot-ny:,:],sub_diagonal)
         np.fill_diagonal(matrix[:,ntot-ny:],sub_diagonal)
 # Hopping along y
@@ -440,24 +466,130 @@ class Hamiltonian(Geometry):
   Apply Hamiltonian on a wavefunction
   """
 
-  def apply_h(self, wfc):
-    if self.dimension==1 and not self.spin_one_half:
-      dim_x = self.tab_dim[0]
-      tunneling = self.tab_tunneling[0]
-      if wfc.dtype==np.float64:
-        rhs = np.empty(dim_x,dtype=np.float64)
-      else:
-        rhs = np.empty(dim_x,dtype=np.complex128)
-      if self.tab_boundary_condition[0]=='periodic':
-        rhs[0]       = -tunneling * (wfc[dim_x-1] + wfc[1]) + self.disorder[0] * wfc[0]
-        rhs[dim_x-1] = -tunneling * (wfc[dim_x-2] + wfc[0]) + self.disorder[dim_x-1] * wfc[dim_x-1]
-      else:
-        rhs[0]       = -tunneling * wfc[1]       + self.disorder[0]       * wfc[0]
-        rhs[dim_x-1] = -tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
-      rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
-      return rhs
+  def apply_h_1d(self, wfc):
+ #   print('inside apply_h_1d')
+    dim_x = self.tab_dim[0]
+    tunneling = self.tab_tunneling[0]
+    if wfc.dtype==np.float64:
+      rhs = np.empty(dim_x,dtype=np.float64)
     else:
-      return self.sparse_matrix.dot(wfc.ravel())
+      rhs = np.empty(dim_x,dtype=np.complex128)
+    if self.tab_boundary_condition[0]=='periodic':
+      rhs[0]       = -tunneling * (wfc[dim_x-1] + wfc[1]) + self.disorder[0] * wfc[0]
+      rhs[dim_x-1] = -tunneling * (wfc[dim_x-2] + wfc[0]) + self.disorder[dim_x-1] * wfc[dim_x-1]
+    else:
+      rhs[0]       = -tunneling * wfc[1]       + self.disorder[0]       * wfc[0]
+      rhs[dim_x-1] = -tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
+    rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
+    return rhs
+
+  def apply_h_2d(self, wfc):
+#    print('apply_h_2d')
+    local_wfc = wfc.ravel()
+    dim_x = self.tab_dim[0]
+    dim_y = self.tab_dim[1]
+    if wfc.dtype==np.float64:
+      rhs = np.empty(dim_x*dim_y,dtype=np.float64)
+    else:
+      rhs = np.empty(dim_x*dim_y,dtype=np.complex128)
+    b_x = self.tab_boundary_condition[0]
+    b_y = self.tab_boundary_condition[1]
+    tunneling_x = self.tab_tunneling[0]
+    tunneling_y = self.tab_tunneling[1]
+
+  # The code propagates along the x axis, computing one vector (along y) at each iteration
+  # To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
+  # To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
+  # Create the 3 temporary vectors
+    if wfc.dtype==np.float64:
+      p_old=np.zeros(dim_y+2,dtype=np.float64)
+      p_current=np.zeros(dim_y+2,dtype=np.float64)
+      p_new=np.zeros(dim_y+2,dtype=np.float64)
+    else:
+      p_old=np.zeros(dim_y+2,dtype=np.complex128)
+      p_current=np.zeros(dim_y+2,dtype=np.complex128)
+      p_new=np.zeros(dim_y+2,dtype=np.complex128)
+  # If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
+    if b_x=='periodic':
+      p_current[1:dim_y+1]=local_wfc[(dim_x-1)*dim_y:dim_x*dim_y]
+  # Initialize the next row, which will become the current row in the first iteration of the loop
+    p_new[1:dim_y+1]=local_wfc[0:dim_y]
+  # If periodic boundary condition along y, copy the first and last components
+    if b_y=='periodic':
+      p_new[0]=p_new[dim_y]
+      p_new[dim_y+1]=p_new[1]
+    for i in range(dim_x):
+      p_temp=p_old
+      p_old=p_current
+      p_current=p_new
+      p_new=p_temp
+      if i<dim_x-1:
+  # The generic row
+        p_new[1:dim_y+1]=local_wfc[(i+1)*dim_y:(i+2)*dim_y]
+      else:
+  # If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+        if b_x=='periodic':
+          p_new[1:dim_y+1]=local_wfc[0:dim_y]
+        else:
+          p_new[1:dim_y+1]=0.0
+  # If periodic boundary condition along y, copy the first and last components
+      if b_y=='periodic':
+        p_new[0]=p_new[dim_y]
+        p_new[dim_y+1]=p_new[1]
+      i_low=i*dim_y
+      i_high=i_low+dim_y
+  # Ready to treat the current row
+      rhs[i_low:i_high] = self.disorder[i,0:dim_y]*p_current[1:dim_y+1] - tunneling_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - tunneling_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1])
+    return rhs
+
+  def apply_h_generic(self,wfc):
+#    print('inside generic_apply_h')
+    return self.sparse_matrix.dot(wfc.ravel())
+
+  def apply_minus_i_h_gpe_complex(self, wfc, rhs):
+    ntot=self.hs_dim
+    if self.interaction == 0.0:
+      if self.is_real:
+  #     rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])
+  #     rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])
+  #     print('inside apply_minus_i_h_gpe_complex')
+  #      print(H.specific_apply_h_routine)
+        rhs[0:2*ntot:2]=self.apply_h(wfc[1:2*ntot:2])
+        rhs[1:2*ntot:2]=-self.apply_h(wfc[0:2*ntot:2])
+      else:
+  # The next line makes everything in one call, but is significantly slower
+  #      print('inside apply_minus_i_h_gpe_complex')
+  #     print(H.specific_apply_h_routine)
+  #      rhs[:] = (-1j*H.apply_h(wfc.view(np.complex128))).view(np.float64)
+        rhs[:] = (-1j*self.apply_h(wfc.view(np.complex128))).view(np.float64)
+  # The following line is what is actually done in the generic case, when no specific routine exists
+  #     rhs[:] = (-1j*H.sparse_matrix.dot(wfc.view(np.complex128))).view(np.float64)
+    else:
+      non_linear_phase = self.interaction*(wfc[0:2*ntot:2]**2+wfc[1:2*ntot:2]**2)
+      if self.is_real:
+  #    rhs[0:2*ntot:2]=H.sparse_matrix.dot(wfc[1:2*ntot:2])+non_linear_phase*wfc[1:2*ntot:2]
+  #    rhs[1:2*ntot:2]=-H.sparse_matrix.dot(wfc[0:2*ntot:2])-non_linear_phase*wfc[0:2*ntot:2]
+        rhs[0:2*ntot:2]=self.apply_h(wfc[1:2*ntot:2])+non_linear_phase*wfc[1:2*ntot:2]
+        rhs[1:2*ntot:2]=-self.apply_h(wfc[0:2*ntot:2])-non_linear_phase*wfc[0:2*ntot:2]
+      else:
+   #     print(ntot,non_linear_phase.shape,wfc.view(np.complex128).shape,H.apply_h(wfc.view(np.complex128)).shape)
+        rhs[:] = (-1j*(self.apply_h(wfc.view(np.complex128))+non_linear_phase*wfc.view(np.complex128))).view(np.float64)
+  #  print(wfc[200],wfc[201],rhs[200],rhs[201])
+    return
+
+  def apply_minus_i_h_gpe_real(self, wfc, rhs):
+  #  print('wfc',wfc.dtype,wfc.shape)
+#    if not self.is_real and self.seed==1234:
+#      sys.exit("Real layout is supported only for real Hamiltonians, I stop !")
+    ntot=self.hs_dim
+    if self.interaction == 0.0:
+      rhs[0:ntot]=self.apply_h(wfc[ntot:2*ntot])
+      rhs[ntot:2*ntot]=-self.apply_h(wfc[0:ntot])
+    else:
+      non_linear_phase = self.interaction*(wfc[0:ntot]**2+wfc[ntot:2*ntot]**2)
+      rhs[0:ntot]=self.apply_h(wfc[ntot:2*ntot])+non_linear_phase*wfc[ntot:2*ntot]
+      rhs[ntot:2*ntot]=-self.apply_h(wfc[0:ntot])-non_linear_phase*wfc[0:ntot]
+    return
 
   """
   Try to estimate bounds of the spectrum of The Hamiltonian
@@ -476,7 +608,8 @@ class Hamiltonian(Geometry):
       e_min_0 = 0.0
   # First determine the lower bound
   # Start with plane wave k=0 (minimum energy state)
-      psic = Wavefunction(self.tab_dim, self.tab_delta)
+#      psic = Wavefunction(self.tab_dim, self.tab_delta)
+      psic = Wavefunction(self)
       tab_k= []
       for i in range(self.dimension):
         tab_k.append(0.0)
@@ -487,9 +620,9 @@ class Hamiltonian(Geometry):
       estimated_bound = 0.0
       while not finished:
         for i in range(n_iterations_hamiltonian_bounds-1):
-          psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_max_0*psic.wfc
+          psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_extended_dim)-e_max_0*psic.wfc
         norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
-        psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_max_0*psic.wfc
+        psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_extended_dim)-e_max_0*psic.wfc
         new_norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
         new_estimated_bound = np.sqrt(new_norm/norm)
         norm = new_norm
@@ -512,9 +645,9 @@ class Hamiltonian(Geometry):
       estimated_bound = 0.0
       while not finished:
         for i in range(n_iterations_hamiltonian_bounds-1):
-          psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_min_0*psic.wfc
+          psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_extended_dim)-e_min_0*psic.wfc
         norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
-        psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_dim)-e_min_0*psic.wfc
+        psic.wfc = self.apply_h(psic.wfc).reshape(self.tab_extended_dim)-e_min_0*psic.wfc
         new_norm = np.linalg.norm(psic.wfc)**2*self.delta_vol
         new_estimated_bound = np.sqrt(new_norm/norm)
         norm = new_norm
@@ -529,10 +662,13 @@ class Hamiltonian(Geometry):
     else:
 # Very basic bounds using the min/max of the potential
       e_max_0=self.diagonal
-#      for i in range(self.dimension):
-#        e_max_0 += 1.0/(self.tab_delta[i]**2)
       e_min=np.amin(self.disorder)-e_max_0
       e_max=np.amax(self.disorder)+e_max_0
+# Add correction for spin one-half term
+# Warning: the h term is NOT taken into account here
+      if self.spin_one_half:
+        e_min -= (np.sqrt(1.0+(self.spin_orbit_interaction*self.tab_delta[0])**2)-1.0)/(self.tab_delta[0]**2)+np.sqrt(self.sigma_x**2+self.sigma_z**2)
+        e_max += (np.sqrt(1.0+(self.spin_orbit_interaction*self.tab_delta[0])**2)-1.0)/(self.tab_delta[0]**2)+np.sqrt(self.sigma_x**2+self.sigma_z**2)
 #    print(e_min,e_max)
     self.e_min = e_min
     self.e_max = e_max

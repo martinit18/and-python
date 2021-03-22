@@ -16,7 +16,7 @@ class Geometry:
   def __init__(self, dimension, tab_dim ,tab_delta, spin_one_half=False):
     self.dimension = dimension
     self.tab_dim = tab_dim
-    self.tab_hs_dim = copy.deepcopy(tab_dim)
+#    self.tab_hs_dim = copy.deepcopy(tab_dim)
     self.tab_delta = tab_delta
  #    self.array_dim = np.array(tab_dim,dtype=np.intc)
     self.tab_dim_cumulative = np.zeros(dimension+1,dtype=int)
@@ -36,12 +36,15 @@ class Geometry:
     for i in range(dimension):
       self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
 # Local Hilbert space dimension
+    self.tab_extended_dim = copy.deepcopy(tab_dim)
+    self.spin_one_half = spin_one_half
     if spin_one_half:
       self.lhs_dim = 2
-      self.tab_hs_dim[0] *= 2
+      self.tab_extended_dim.append(self.lhs_dim)
+# Total Hilbert space dimension
+      self.hs_dim = self.lhs_dim*self.ntot
     else:
       self.lhs_dim = 1
 # Total Hilbert space dimension
     self.hs_dim = self.lhs_dim*self.ntot
-    self.spin_one_half = spin_one_half
     return

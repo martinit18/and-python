@@ -95,8 +95,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       else:
         Spin = config['Spin']
         spin_one_half = Spin.getboolean('spin_one_half',False)
-        if spin_one_half and dimension != 1:
-          my_abort(mpi_version,comm,'Spin 1/2 is supported only in dimension 1, I stop!\n')
+#       if spin_one_half and dimension != 1:
+#         my_abort(mpi_version,comm,'Spin 1/2 is supported only in dimension 1, I stop!\n')
         spin_orbit_interaction = Spin.getfloat('gamma',0.0)
         sigma_x = 0.5*Spin.getfloat('Omega',0.0)
         sigma_y = Spin.getfloat('beta',0.0)
@@ -109,8 +109,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       sigma_y = 0.0
       sigma_z = 0.0
       alpha = 0.0
-    if spin_one_half and dimension!=1:
-      my_abort(mpi_version,comm,'Spin 1/2 works only in dimension 1, I stop!\n')
+#    if spin_one_half and dimension!=1:
+#      my_abort(mpi_version,comm,'Spin 1/2 works only in dimension 1, I stop!\n')
 
 # Optional Nonlinearity section
     if 'Nonlinearity' in my_list_of_sections:
@@ -173,8 +173,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       data_layout = Propagation.get('data_layout','real')
       t_max = Propagation.getfloat('t_max','0.0')
       delta_t = Propagation.getfloat('delta_t','0.0')
-      if spin_one_half and method=='che':
-        my_abort(mpi_version,comm,'Chebyshev propagation is not supported for spin_one_half, I stop!\n')
+#      if spin_one_half and method=='che':
+#        my_abort(mpi_version,comm,'Chebyshev propagation is not supported for spin_one_half, I stop!\n')
       if spin_one_half and data_layout=='real':
         my_abort(mpi_version,comm,'Real data layout is not supported for spin_one_half, I stop!\n')
 #      if not all_options_ok:
@@ -356,19 +356,24 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   if 'Wavefunction' in my_list_of_sections:
     initial_state = anderson.wavefunction.Wavefunction(geometry)
     initial_state.type = initial_state_type
+    if spin_one_half:
+      initial_lhs_state = np.array([np.cos(teta),np.sin(teta)])
+      initial_state.teta = teta
+    else:
+      initial_lhs_state = None
     if (initial_state.type=='plane_wave'):
-      anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0,spin_one_half=H.spin_one_half,teta=teta)
+      anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0,initial_lhs_state)
     if (initial_state.type=='gaussian_wave_packet'):
-      anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0,spin_one_half=H.spin_one_half,teta=teta)
+      anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0,initial_lhs_state)
     if (initial_state.type=='point'):
-      anderson.wavefunction.Wavefunction.point(initial_state,spin_one_half=H.spin_one_half,teta=teta)
+      anderson.wavefunction.Wavefunction.point(initial_state,initial_lhs_state)
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
   if 'Spectral' in my_list_of_sections:
     measure_spectral_function_local = not 'Measurement' in my_list_of_sections
     spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution)
-    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
+    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
     return_list.append(propagation_spectral)
     return_list.append(spectral_function)
     measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, use_mkl_fft=use_mkl_fft)
@@ -386,7 +391,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Define the structure of measurements
   if 'Measurement' in my_list_of_sections:
 # Define the structure of the temporal integration
-    propagation = anderson.propagation.Temporal_Propagation(t_max,delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes)
+    propagation = anderson.propagation.Temporal_Propagation(t_max, delta_t, method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
     return_list.append(propagation)
     measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement=teta_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, measure_spectral_function=measure_spectral_function, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
     measurement_global = copy.deepcopy(measurement)
@@ -470,7 +475,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if propagation.method=='che':
       params_string += \
                   'accurate spectrum bounds             = '+str(propagation.accurate_bounds)+'\n'\
-                 +'use ctypes implementation            = '+str(propagation.use_ctypes)+'\n'
+                 +'use ctypes implementation            = '+str(propagation.use_ctypes)+'\n'\
+                 +'use specific full Chebyshev routine  = '+str(propagation.has_specific_full_chebyshev_routine)+'\n'\
+                 +'use specific Chebyshev step routine  = '+str(propagation.has_specific_chebyshev_step_routine)+'\n'\
+                 +'use specific H|psi> routine          = '+str(H.has_specific_apply_h_routine)+'\n'
       if not timing==None:
         params_string += \
                   'maximum Chebyshev order              = '+str(timing.MAX_CHE_ORDER)+'\n'\
