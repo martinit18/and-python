@@ -72,8 +72,8 @@ import argparse
 sys.path.append('/users/champ/delande/git/and-python/multi')
 sys.path.append('/home/lkb/delande/git/and-python/multi')
 import anderson
-from anderson import propagation
-from anderson import timing
+#from anderson import propagation
+#from anderson import timing
 
 
 
@@ -116,9 +116,8 @@ def main():
 # Must be consistent otherwise disaster guaranted
   my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral','Spin']
   geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
-#  propagation.use_ctypes = False
-#  propagation.chebyshev_propagation = chebyshev_propagation_generic
-#  propagation.chebyshev_step = eval("chebyshev_step_generic_"+propagation.data_layout)
+#  propagation.chebyshev_propagation = anderson.propagation.chebyshev_propagation_generic
+#  propagation.chebyshev_step = eval("anderson.propagation.chebyshev_step_generic_"+propagation.data_layout)
 #  H.apply_h = H.apply_h_generic
 
   t1=time.perf_counter()

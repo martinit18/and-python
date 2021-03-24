@@ -17,7 +17,7 @@ boundary_condition_3 = periodic
 boundary_condition_4 = periodic
 
 [Spin]
-#spin_one_half = True
+spin_one_half = True
 gamma = 0.4
 beta = 0.0
 Omega = 0.4
@@ -67,7 +67,7 @@ data_layout = complex
 t_max = 1000.
 # Elementary time step
 delta_t = 1.0
-want_ctypes = False
+#want_ctypes = False
 
 [Averaging]
 n_config = 1

@@ -120,6 +120,7 @@ class Wavefunction(Geometry):
 
 
   def energy(self, H):
+#    print(self.wfc.shape)
 #    rhs = H.apply_h(self.wfc)
 #    print(H.spin_one_half)
     if H.interaction==0.0:
@@ -130,11 +131,12 @@ class Wavefunction(Geometry):
 #    energy = np.sum(np.real(self.wfc.ravel()*np.conjugate(H.apply_h(self.wfc))))*self.delta_vol + non_linear_energy
 #    print(self.wfc.ravel().real.dtype,self.wfc.real.dtype,H.apply_h(self.wfc.real).dtype)
     if H.is_real:
-      energy = np.sum(self.wfc.ravel().real*H.apply_h(self.wfc.real)+self.wfc.ravel().imag*H.apply_h(self.wfc.imag))*self.delta_vol + non_linear_energy#      print('Complex energy = ',np.sum(np.conj(self.wfc)*H.apply_h(self.wfc))*self.delta_vol)
+      energy = np.sum(self.wfc.ravel().real*H.apply_h(self.wfc.ravel().real)+self.wfc.ravel().imag*H.apply_h(self.wfc.ravel().imag))*self.delta_vol + non_linear_energy
+#      print('Complex energy = ',np.sum(np.conj(self.wfc)*H.apply_h(self.wfc))*self.delta_vol)
 #      print(self.wfc.shape)
 #      print((H.apply_h(self.wfc).shape))
     else:
-      energy = np.sum(np.real(np.conj(self.wfc.ravel())*H.apply_h(self.wfc)))*self.delta_vol+non_linear_energy
+      energy = np.sum(np.real(np.conj(self.wfc.ravel())*H.apply_h(self.wfc.ravel())))*self.delta_vol+non_linear_energy
     norm = np.linalg.norm(self.wfc)**2*self.delta_vol
 #    print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm

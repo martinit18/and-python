@@ -14,6 +14,8 @@ import numpy.ctypeslib as ctl
 import anderson
 from anderson.geometry import Geometry
 from anderson.wavefunction import Wavefunction
+import os
+import numba
 
 """
 The class Hamiltonian contains all properties that define a disordered Hamiltonian discretized spatially
@@ -70,7 +72,11 @@ class Hamiltonian(Geometry):
     if self.dimension == 2 and not self.spin_one_half:
       self.has_specific_apply_h_routine = True
       self.apply_h = self.apply_h_2d
-
+# 1d system with spin-orbit
+    if self.dimension == 1 and self.spin_one_half:
+      self.has_specific_apply_h_routine = True
+      self.apply_h = self.apply_h_1d_so
+#
 # Generate the disorder
     if disorder_type=='nice':
       self.b = b
@@ -257,8 +263,7 @@ class Hamiltonian(Geometry):
 
   def generate_full_matrix_spin_one_half(self):
     assert(self.dimension==1)
-    ntot = self.ntot
-    hs_dim = 2*ntot
+    hs_dim = self.hs_dim
 # The disorder contribution + sigma_z contribution + p**2*sigma_z contribution
     diag = np.repeat(self.disorder,2)
     diag[0::2] +=  self.sigma_z+2.0*self.scaled_alpha
@@ -466,81 +471,34 @@ class Hamiltonian(Geometry):
   Apply Hamiltonian on a wavefunction
   """
 
+  def apply_h_1d_so(self, wfc):
+ #   print('inside apply_h_1d_so')
+    return apply_h_1d_so_numba(self.tab_dim[0], self.tab_tunneling[0], self.tab_boundary_condition[0], self.disorder, self.scaled_spin_orbit_interaction, self.sigma_x, self.sigma_y, self.sigma_z, self.scaled_alpha, wfc)
+
+
+
   def apply_h_1d(self, wfc):
- #   print('inside apply_h_1d')
-    dim_x = self.tab_dim[0]
-    tunneling = self.tab_tunneling[0]
-    if wfc.dtype==np.float64:
-      rhs = np.empty(dim_x,dtype=np.float64)
-    else:
-      rhs = np.empty(dim_x,dtype=np.complex128)
-    if self.tab_boundary_condition[0]=='periodic':
-      rhs[0]       = -tunneling * (wfc[dim_x-1] + wfc[1]) + self.disorder[0] * wfc[0]
-      rhs[dim_x-1] = -tunneling * (wfc[dim_x-2] + wfc[0]) + self.disorder[dim_x-1] * wfc[dim_x-1]
-    else:
-      rhs[0]       = -tunneling * wfc[1]       + self.disorder[0]       * wfc[0]
-      rhs[dim_x-1] = -tunneling * wfc[dim_x-2] + self.disorder[dim_x-1] * wfc[dim_x-1]
-    rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + self.disorder[1:dim_x-1] * wfc[1:dim_x-1]
-    return rhs
+#    print('inside apply_h_1d')
+#    dim_x = self.tab_dim[0]
+#    tunneling = self.tab_tunneling[0]
+#    boundary = self.tab_boundary_condition[0]
+#    disorder = self.disorder
+#    return apply_h_1d_noself(dim_x,tunneling,boundary,disorder,wfc)
+#    try:
+#      import numba
+#    apply_h_1d_noself = numba.jit(_apply_h_1d_noself,cache=True)
+#    except ImportError:
+#    apply_h_1d_noself = _apply_h_1d_noself
+    return apply_h_1d_numba(self.tab_dim[0], self.tab_tunneling[0], self.tab_boundary_condition[0], self.disorder, wfc)
 
   def apply_h_2d(self, wfc):
+#   try:
+#     import numba
+#     apply_h_2d_noself = numba.jit(nopython=True,fastmath=True,cache=True)(_apply_h_2d_noself)
+#   except ImportError:
+#     apply_h_2d_noself = _apply_h_2d_noself
+    return apply_h_2d_numba(self.tab_dim[0], self.tab_dim[1], self.tab_tunneling[0], self.tab_tunneling[1], self.tab_boundary_condition[0], self.tab_boundary_condition[1], self.disorder, wfc)
 #    print('apply_h_2d')
-    local_wfc = wfc.ravel()
-    dim_x = self.tab_dim[0]
-    dim_y = self.tab_dim[1]
-    if wfc.dtype==np.float64:
-      rhs = np.empty(dim_x*dim_y,dtype=np.float64)
-    else:
-      rhs = np.empty(dim_x*dim_y,dtype=np.complex128)
-    b_x = self.tab_boundary_condition[0]
-    b_y = self.tab_boundary_condition[1]
-    tunneling_x = self.tab_tunneling[0]
-    tunneling_y = self.tab_tunneling[1]
-
-  # The code propagates along the x axis, computing one vector (along y) at each iteration
-  # To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
-  # To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
-  # Create the 3 temporary vectors
-    if wfc.dtype==np.float64:
-      p_old=np.zeros(dim_y+2,dtype=np.float64)
-      p_current=np.zeros(dim_y+2,dtype=np.float64)
-      p_new=np.zeros(dim_y+2,dtype=np.float64)
-    else:
-      p_old=np.zeros(dim_y+2,dtype=np.complex128)
-      p_current=np.zeros(dim_y+2,dtype=np.complex128)
-      p_new=np.zeros(dim_y+2,dtype=np.complex128)
-  # If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
-    if b_x=='periodic':
-      p_current[1:dim_y+1]=local_wfc[(dim_x-1)*dim_y:dim_x*dim_y]
-  # Initialize the next row, which will become the current row in the first iteration of the loop
-    p_new[1:dim_y+1]=local_wfc[0:dim_y]
-  # If periodic boundary condition along y, copy the first and last components
-    if b_y=='periodic':
-      p_new[0]=p_new[dim_y]
-      p_new[dim_y+1]=p_new[1]
-    for i in range(dim_x):
-      p_temp=p_old
-      p_old=p_current
-      p_current=p_new
-      p_new=p_temp
-      if i<dim_x-1:
-  # The generic row
-        p_new[1:dim_y+1]=local_wfc[(i+1)*dim_y:(i+2)*dim_y]
-      else:
-  # If in last row, put in p_new the first row if periodic along x, 0 otherwise )
-        if b_x=='periodic':
-          p_new[1:dim_y+1]=local_wfc[0:dim_y]
-        else:
-          p_new[1:dim_y+1]=0.0
-  # If periodic boundary condition along y, copy the first and last components
-      if b_y=='periodic':
-        p_new[0]=p_new[dim_y]
-        p_new[dim_y+1]=p_new[1]
-      i_low=i*dim_y
-      i_high=i_low+dim_y
-  # Ready to treat the current row
-      rhs[i_low:i_high] = self.disorder[i,0:dim_y]*p_current[1:dim_y+1] - tunneling_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - tunneling_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1])
-    return rhs
 
   def apply_h_generic(self,wfc):
 #    print('inside generic_apply_h')
@@ -689,3 +647,132 @@ class Hamiltonian(Geometry):
 #  print(script_tunneling,script_disorder[0:10])
     #return script_tunneling, script_disorder
     return
+
+#@numba.jit("c16[:](i4,f8,types.unicode_type,f8[:],c16[:])",nopython=True,fastmath=True,boundscheck=False,cache=True,nogil=True)
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def apply_h_1d_numba(dim_x,tunneling,boundary,disorder,wfc):
+#  if wfc.dtype==np.float64:
+#    rhs = np.empty(dim_x,dtype=np.float64)
+#  else:
+#    rhs = np.empty(dim_x,dtype=np.complex128)
+#  print('apply_h_1d')
+  rhs = np.empty_like(wfc)
+  if boundary=='periodic':
+    rhs[0]       = -tunneling * (wfc[dim_x-1] + wfc[1]) + disorder[0] * wfc[0]
+    rhs[dim_x-1] = -tunneling * (wfc[dim_x-2] + wfc[0]) + disorder[dim_x-1] * wfc[dim_x-1]
+  else:
+    rhs[0]       = -tunneling * wfc[1]       + disorder[0]       * wfc[0]
+    rhs[dim_x-1] = -tunneling * wfc[dim_x-2] + disorder[dim_x-1] * wfc[dim_x-1]
+  rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + disorder[1:dim_x-1] * wfc[1:dim_x-1]
+  return rhs
+
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def apply_h_1d_so_numba(dim_x, tunneling, boundary, disorder, scaled_spin_orbit_interaction, sigma_x, sigma_y, sigma_z, scaled_alpha, wfc):
+#  print('apply_h_1d_so',scaled_spin_orbit_interaction)
+#  scaled_spin_orbit_interaction = -scaled_spin_orbit_interaction
+  t_plus_plus = tunneling+0.5j*scaled_spin_orbit_interaction+scaled_alpha
+  t_plus_minus = tunneling+0.5j*scaled_spin_orbit_interaction-scaled_alpha
+  t_minus_plus = tunneling-0.5j*scaled_spin_orbit_interaction+scaled_alpha
+  t_minus_minus = tunneling-0.5j*scaled_spin_orbit_interaction-scaled_alpha
+  sigma_plus = sigma_x+1j*sigma_y
+  sigma_minus = sigma_x-1j*sigma_y
+  diagonal_contribution = 2.0*scaled_alpha+sigma_z
+  rhs = np.empty_like(wfc)
+  hs_dim=2*dim_x
+
+  rhs[2:hs_dim-2:2] =   (disorder[1:dim_x-1]+diagonal_contribution)*wfc[2:hs_dim-2:2] \
+                      - (t_minus_plus)*wfc[0:hs_dim-4:2] \
+                      - (t_plus_plus)*wfc[4:hs_dim:2] \
+                      + (sigma_plus)*wfc[3:hs_dim-1:2]
+  rhs[3:hs_dim-1:2] =   (disorder[1:dim_x-1]-diagonal_contribution)*wfc[3:hs_dim-2:2] \
+                      - (t_plus_minus)*wfc[1:hs_dim-4:2] \
+                      - (t_minus_minus)*wfc[5:hs_dim:2] \
+                      + (sigma_minus)*wfc[2:hs_dim-2:2]
+  if boundary=='periodic':
+    rhs[0]        =     (disorder[0]+diagonal_contribution)*wfc[0] \
+                      - (t_minus_plus)*wfc[hs_dim-2] \
+                      - (t_plus_plus)*wfc[2] \
+                      + (sigma_plus)*wfc[1]
+    rhs[1]        =     (disorder[0]-diagonal_contribution)*wfc[1] \
+                      - (t_plus_minus)*wfc[hs_dim-1] \
+                      - (t_minus_minus)*wfc[3] \
+                      + (sigma_minus)*wfc[0]
+    rhs[hs_dim-2] =     (disorder[dim_x-1]+diagonal_contribution)*wfc[hs_dim-2] \
+                      - (t_minus_plus)*wfc[hs_dim-4] \
+                      - (t_plus_plus)*wfc[0] \
+                      + (sigma_plus)*wfc[hs_dim-1]
+    rhs[hs_dim-1] =     (disorder[dim_x-1]-diagonal_contribution)*wfc[hs_dim-1] \
+                      - (t_plus_minus)*wfc[hs_dim-3] \
+                      - (t_minus_minus)*wfc[1] \
+                      + (sigma_minus)*wfc[hs_dim-2]
+  else:
+    rhs[0]        =     (disorder[0]+diagonal_contribution)*wfc[0] \
+                      - (t_plus_plus)*wfc[2] \
+                      + (sigma_plus)*wfc[1]
+    rhs[1]        =     (disorder[0]-diagonal_contribution)*wfc[1] \
+                      - (t_minus_minus)*wfc[3] \
+                      + (sigma_minus)*wfc[0]
+    rhs[hs_dim-2] =     (disorder[dim_x-1]+diagonal_contribution)*wfc[hs_dim-2] \
+                      - (t_minus_plus)*wfc[hs_dim-4] \
+                      + (sigma_plus)*wfc[hs_dim-1]
+    rhs[hs_dim-1] =     (disorder[dim_x-1]-diagonal_contribution)*wfc[hs_dim-1] \
+                      - (t_plus_minus)*wfc[hs_dim-3] \
+                      + (sigma_minus)*wfc[hs_dim-2]
+  return rhs
+
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def apply_h_2d_numba(dim_x, dim_y, tunneling_x, tunneling_y, b_x, b_y, disorder, wfc):
+#    print('apply_h_2d')
+    local_wfc = wfc.ravel()
+    rhs = np.empty_like(local_wfc)
+#    if wfc.dtype==np.float64:
+#      rhs = np.empty(dim_x*dim_y,dtype=np.float64)
+#    else:
+#      rhs = np.empty(dim_x*dim_y,dtype=np.complex128)
+  # The code propagates along the x axis, computing one vector (along y) at each iteration
+  # To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
+  # To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
+  # Create the 3 temporary vectors
+    p_old=np.zeros(dim_y+2,dtype=wfc.dtype)
+    p_current=np.zeros(dim_y+2,dtype=wfc.dtype)
+    p_new=np.zeros(dim_y+2,dtype=wfc.dtype)
+#   if wfc.dtype==np.float64:
+#     p_old=np.zeros(dim_y+2,dtype=np.float64)
+#      p_current=np.zeros(dim_y+2,dtype=np.float64)
+#      p_new=np.zeros(dim_y+2,dtype=np.float64)
+#    else:
+#      p_old=np.zeros(dim_y+2,dtype=np.complex128)
+#      p_current=np.zeros(dim_y+2,dtype=np.complex128)
+#      p_new=np.zeros(dim_y+2,dtype=np.complex128)
+  # If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
+    if b_x=='periodic':
+      p_current[1:dim_y+1]=local_wfc[(dim_x-1)*dim_y:dim_x*dim_y]
+  # Initialize the next row, which will become the current row in the first iteration of the loop
+    p_new[1:dim_y+1]=local_wfc[0:dim_y]
+  # If periodic boundary condition along y, copy the first and last components
+    if b_y=='periodic':
+      p_new[0]=p_new[dim_y]
+      p_new[dim_y+1]=p_new[1]
+    for i in range(dim_x):
+      p_temp=p_old
+      p_old=p_current
+      p_current=p_new
+      p_new=p_temp
+      if i<dim_x-1:
+  # The generic row
+        p_new[1:dim_y+1]=local_wfc[(i+1)*dim_y:(i+2)*dim_y]
+      else:
+  # If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+        if b_x=='periodic':
+          p_new[1:dim_y+1]=local_wfc[0:dim_y]
+        else:
+          p_new[1:dim_y+1]=0.0
+  # If periodic boundary condition along y, copy the first and last components
+      if b_y=='periodic':
+        p_new[0]=p_new[dim_y]
+        p_new[dim_y+1]=p_new[1]
+      i_low=i*dim_y
+      i_high=i_low+dim_y
+  # Ready to treat the current row
+      rhs[i_low:i_high] = disorder[i,0:dim_y]*p_current[1:dim_y+1] - tunneling_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - tunneling_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1])
+    return rhs

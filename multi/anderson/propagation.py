@@ -16,6 +16,7 @@ import numpy.ctypeslib as ctl
 import anderson
 import copy
 import sys
+import numba
 
 from anderson.wavefunction import Wavefunction
 
@@ -126,13 +127,14 @@ def chebyshev_step_generic_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, 
 #  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
   ntot = H.hs_dim
   if add_real:
-    psi_old[0:ntot] = c1*H.sparse_matrix.dot(psi[0:ntot])-c2*psi[0:ntot]+c_coef*wfc[0:ntot]-psi_old[0:ntot]
-    psi_old[ntot:2*ntot] = c1*H.sparse_matrix.dot(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
+    psi_old[0:ntot] = c1*H.apply_h(psi[0:ntot])-c2*psi[0:ntot]+c_coef*wfc[0:ntot]-psi_old[0:ntot]
+    psi_old[ntot:2*ntot] = c1*H.apply_h(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[ntot:2*ntot]-psi_old[ntot:2*ntot]
   else:
-    psi_old[0:ntot] = c1*H.sparse_matrix.dot(psi[0:ntot])-c2*psi[0:ntot]-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
-    psi_old[ntot:2*ntot] = c1*H.sparse_matrix.dot(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
+    psi_old[0:ntot] = c1*H.apply_h(psi[0:ntot])-c2*psi[0:ntot]-c_coef*wfc[ntot:2*ntot]-psi_old[0:ntot]
+    psi_old[ntot:2*ntot] = c1*H.apply_h(psi[ntot:2*ntot])-c2*psi[ntot:2*ntot]+c_coef*wfc[0:ntot]-psi_old[ntot:2*ntot]
   return
 
+"""
 def chebyshev_step_1d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('wfc',wfc.shape,wfc.dtype)
 #  print('psi',psi.shape,psi.dtype)
@@ -151,39 +153,72 @@ def chebyshev_step_1d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, ta
     psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
   psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
   return
+"""
 
-def chebyshev_step_1d_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
-  c3=tab_c3[0]
-  dim_x = H.tab_dim[0]
-  if add_real:
-    if H.tab_boundary_condition[0]=='periodic':
-      psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[dim_x]-psi_old[dim_x]
-      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
-    else:
-      psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])+c_coef*wfc[0]-psi_old[0]
-      psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x]
-      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
-    psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
-    psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
-  else:
-    if H.tab_boundary_condition[0]=='periodic':
-      psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])-c_coef*wfc[dim_x]-psi_old[0]
-      psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[0]-psi_old[dim_x]
-      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-    else:
-      psi_old[0] = (c1*H.disorder[0]-c2)*psi[0]-c3*(psi[1])-c_coef*wfc[dim_x]-psi_old[0]
-      psi_old[dim_x] = (c1*H.disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x]
-      psi_old[dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
-      psi_old[2*dim_x-1] = (c1*H.disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
-    psi_old[1:dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
-    psi_old[dim_x+1:2*dim_x-1] = (c1*H.disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+def chebyshev_step_1d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+#  print('wfc',wfc.shape,wfc.dtype)
+#  print('psi',psi.shape,psi.dtype)
+#  print('psi_old',psi_old.shape,psi_old.dtype)
+#  print('disorder',H.disorder.shape)
+#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  chebyshev_step_1d_complex_numba(H.tab_dim[0], H.tab_boundary_condition[0], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
   return
 
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def chebyshev_step_1d_complex_numba(dim_x, boundary, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+#  print('wfc',wfc.shape,wfc.dtype)
+#  print('psi',psi.shape,psi.dtype)
+#  print('psi_old',psi_old.shape,psi_old.dtype)
+#  print('disorder',H.disorder.shape)
+#  print('in',wfc[0],psi[0],psi_old[0],c_coef,one_or_two,add_real)
+  if not(add_real):
+    c_coef*=1j
+  c3=tab_c3[0]
+  if boundary=='periodic':
+    psi_old[0]       = (c1*disorder[0]-c2)      *psi[0]      -c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]      -psi_old[0]
+    psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+  else:
+    psi_old[0]       = (c1*disorder[0]-c2)      *psi[0]      -c3*(psi[1])      +c_coef*wfc[0]      -psi_old[0]
+    psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+  psi_old[1:dim_x-1] = (c1*disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+  return
 
+def chebyshev_step_1d_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+  chebyshev_step_1d_real_numba(H.tab_dim[0], H.tab_boundary_condition[0], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
+  return
+
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def chebyshev_step_1d_real_numba(dim_x, boundary, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+  c3=tab_c3[0]
+  if add_real:
+    if boundary=='periodic':
+      psi_old[0] = (c1*disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])+c_coef*wfc[0]-psi_old[0]
+      psi_old[dim_x] = (c1*disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[dim_x]-psi_old[dim_x]
+      psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      psi_old[2*dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+    else:
+      psi_old[0] = (c1*disorder[0]-c2)*psi[0]-c3*(psi[1])+c_coef*wfc[0]-psi_old[0]
+      psi_old[dim_x] = (c1*disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[dim_x]-psi_old[dim_x]
+      psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[dim_x-1]
+      psi_old[2*dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[2*dim_x-1]-psi_old[2*dim_x-1]
+    psi_old[1:dim_x-1] = (c1*disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[1:dim_x-1]
+    psi_old[dim_x+1:2*dim_x-1] = (c1*disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+  else:
+    if boundary=='periodic':
+      psi_old[0] = (c1*disorder[0]-c2)*psi[0]-c3*(psi[1]+psi[dim_x-1])-c_coef*wfc[dim_x]-psi_old[0]
+      psi_old[dim_x] = (c1*disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1]+psi[2*dim_x-1])+c_coef*wfc[0]-psi_old[dim_x]
+      psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[0]+psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+      psi_old[2*dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[dim_x]+psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+    else:
+      psi_old[0] = (c1*disorder[0]-c2)*psi[0]-c3*(psi[1])-c_coef*wfc[dim_x]-psi_old[0]
+      psi_old[dim_x] = (c1*disorder[0]-c2)*psi[dim_x]-c3*(psi[dim_x+1])+c_coef*wfc[0]-psi_old[dim_x]
+      psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1]-c3*(psi[dim_x-2])-c_coef*wfc[2*dim_x-1]-psi_old[dim_x-1]
+      psi_old[2*dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[2*dim_x-1]-c3*(psi[2*dim_x-2])+c_coef*wfc[dim_x-1]-psi_old[2*dim_x-1]
+    psi_old[1:dim_x-1] = (c1*disorder[1:dim_x-1]-c2)*psi[1:dim_x-1]-c3*(psi[2:dim_x]+psi[0:dim_x-2])-c_coef*wfc[dim_x+1:2*dim_x-1]-psi_old[1:dim_x-1]
+    psi_old[dim_x+1:2*dim_x-1] = (c1*disorder[1:dim_x-1]-c2)*psi[dim_x+1:2*dim_x-1]-c3*(psi[dim_x+2:2*dim_x]+psi[dim_x:2*dim_x-2])+c_coef*wfc[1:dim_x-1]-psi_old[dim_x+1:2*dim_x-1]
+  return
+
+"""
 def chebyshev_step_2d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('using chebyshev_step_2d_complex')
 # Specific code for dimension 2
@@ -235,18 +270,73 @@ def chebyshev_step_2d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, ta
 #        psi_old[i*dim_y:(i+1)*dim_y] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i*dim_y:(i+1)*dim_y] - psi_old[i*dim_y:(i+1)*dim_y]
     psi_old[i_low:i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
   return
+"""
+def chebyshev_step_2d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+  chebyshev_step_2d_complex_numba(H.tab_dim[0], H.tab_dim[1], H.tab_boundary_condition[0], H.tab_boundary_condition[1], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
+  return
 
-
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def chebyshev_step_2d_complex_numba(dim_x, dim_y, b_x, b_y, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+#  print('using chebyshev_step_2d_complex')
+# Specific code for dimension 2
+  if not(add_real):
+    c_coef*=1j
+  c3_x=tab_c3[0]
+  c3_y=tab_c3[1]
+# The code propagates along the x axis, computing one vector (along y) at each iteration
+# To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
+# To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
+# Create the 3 temporary vectors
+  p_old=np.zeros(dim_y+2,dtype=np.complex128)
+  p_current=np.zeros(dim_y+2,dtype=np.complex128)
+  p_new=np.zeros(dim_y+2,dtype=np.complex128)
+# If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
+  if b_x=='periodic':
+    p_current[1:dim_y+1]=psi[(dim_x-1)*dim_y:dim_x*dim_y]
+# Initialize the next row, which will become the current row in the first iteration of the loop
+  p_new[1:dim_y+1]=psi[0:dim_y]
+# If periodic boundary condition along y, copy the first and last components
+  if b_y=='periodic':
+    p_new[0]=p_new[dim_y]
+    p_new[dim_y+1]=p_new[1]
+  for i in range(dim_x):
+    p_temp=p_old
+    p_old=p_current
+    p_current=p_new
+    p_new=p_temp
+    if i<dim_x-1:
+# The generic row
+      p_new[1:dim_y+1]=psi[(i+1)*dim_y:(i+2)*dim_y]
+    else:
+# If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+      if b_x=='periodic':
+        p_new[1:dim_y+1]=psi[0:dim_y]
+      else:
+        p_new[1:dim_y+1]=0.0
+# If periodic boundary condition along y, copy the first and last components
+    if b_y=='periodic':
+      p_new[0]=p_new[dim_y]
+      p_new[dim_y+1]=p_new[1]
+    i_low=i*dim_y
+    i_high=i_low+dim_y
+# Ready to treat the current row
+#        psi_old[i*dim_y:(i+1)*dim_y] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i*dim_y:(i+1)*dim_y] - psi_old[i*dim_y:(i+1)*dim_y]
+    psi_old[i_low:i_high] = (c1*disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
+#  p_old=None
+#  p_current=None
+#  p_new=None
+  return
 
 def chebyshev_step_2d_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+  chebyshev_step_2d_real_numba(H.tab_dim[0], H.tab_dim[1], H.tab_boundary_condition[0], H.tab_boundary_condition[1], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
+  return
+
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def chebyshev_step_2d_real_numba(dim_x, dim_y, b_x, b_y, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 # Specific code for dimension 2
   c3_x=tab_c3[0]
   c3_y=tab_c3[1]
-  dim_x = H.tab_dim[0]
-  dim_y = H.tab_dim[1]
   ntot = dim_x*dim_y
-  b_x = H.tab_boundary_condition[0]
-  b_y = H.tab_boundary_condition[1]
 # The code propagates along the x axis, computing one vector (along y) at each iteration
 # To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x row, the previous and the next rows
 # To simplify the code, the temporary vectors have 2 additional components, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
@@ -294,11 +384,11 @@ def chebyshev_step_2d_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c
 # Ready to treat the current row
 #        psi_old[i*dim_y:(i+1)*dim_y] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i*dim_y:(i+1)*dim_y] - psi_old[i*dim_y:(i+1)*dim_y]
     if add_real:
-      psi_old[i_low:i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
-      psi_old[ntot+i_low:ntot+i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[dim_y+3:2*dim_y+3] - c3_y*(p_current[dim_y+4:2*dim_y+4]+ p_current[dim_y+2:2*dim_y+2]) - c3_x*(p_old[dim_y+3:2*dim_y+3]+p_new[dim_y+3:2*dim_y+3]) + c_coef*wfc[ntot+i_low:ntot+i_high] - psi_old[ntot+i_low:ntot+i_high]
+      psi_old[i_low:i_high] = (c1*disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
+      psi_old[ntot+i_low:ntot+i_high] = (c1*disorder[i,0:dim_y]-c2)*p_current[dim_y+3:2*dim_y+3] - c3_y*(p_current[dim_y+4:2*dim_y+4]+ p_current[dim_y+2:2*dim_y+2]) - c3_x*(p_old[dim_y+3:2*dim_y+3]+p_new[dim_y+3:2*dim_y+3]) + c_coef*wfc[ntot+i_low:ntot+i_high] - psi_old[ntot+i_low:ntot+i_high]
     else:
-      psi_old[i_low:i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) - c_coef*wfc[ntot+i_low:ntot+i_high] - psi_old[i_low:i_high]
-      psi_old[ntot+i_low:ntot+i_high] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[dim_y+3:2*dim_y+3] - c3_y*(p_current[dim_y+4:2*dim_y+4]+ p_current[dim_y+2:2*dim_y+2]) - c3_x*(p_old[dim_y+3:2*dim_y+3]+p_new[dim_y+3:2*dim_y+3]) + c_coef*wfc[i_low:i_high] - psi_old[ntot+i_low:ntot+i_high]
+      psi_old[i_low:i_high] = (c1*disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) - c_coef*wfc[ntot+i_low:ntot+i_high] - psi_old[i_low:i_high]
+      psi_old[ntot+i_low:ntot+i_high] = (c1*disorder[i,0:dim_y]-c2)*p_current[dim_y+3:2*dim_y+3] - c3_y*(p_current[dim_y+4:2*dim_y+4]+ p_current[dim_y+2:2*dim_y+2]) - c3_x*(p_old[dim_y+3:2*dim_y+3]+p_new[dim_y+3:2*dim_y+3]) + c_coef*wfc[i_low:i_high] - psi_old[ntot+i_low:ntot+i_high]
 #  print('no_cffi psi_old',psi_old[dim_x],psi_old[dim_x+1],psi_old[2*dim_x-2],psi_old[2*dim_x-1])
 #  print('no_cffi psi    ',psi[dim_x],psi[dim_x+1],psi[2*dim_x-2],psi[2*dim_x-1])
 #  print('no_cffi wfc    ',wfc[dim_x],wfc[dim_x+1],wfc[2*dim_x-2],wfc[2*dim_x-1])

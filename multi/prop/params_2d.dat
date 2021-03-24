@@ -61,8 +61,8 @@ teta_measurement = 0.0
 method = che
 #accuracy = 1.e-8
 #accurate_bounds = True
-#data_layout = real
-data_layout = complex
+data_layout = real
+#data_layout = complex
 # Total duration of the propagation
 t_max = 1000.
 # Elementary time step
@@ -81,7 +81,7 @@ density = True
 #dispersion_position = True
 #dispersion_position2 = True
 #dispersion_momentum = True
-#dispersion_energy = True
+dispersion_energy = True
 #dispersion_variance = True
 #wavefunction = True
 #wavefunction_momentum = True
