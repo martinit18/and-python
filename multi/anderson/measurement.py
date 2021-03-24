@@ -413,7 +413,8 @@ class Measurement(Geometry):
       psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
       density = psi_momentum.real**2+psi_momentum.imag**2
       if self.spin_one_half:
-        norm = 1.0/H.delta_vol
+# Inverse of elementary volume in momentum space
+        norm = H.delta_vol*H.ntot/(2.0*np.pi)
       else:
         norm = np.sum(density)
       for i in range(psi.dimension):
