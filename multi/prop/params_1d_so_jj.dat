@@ -54,7 +54,7 @@ k_0_over_2_pi_2 = 0.25
 sigma_0_1 = 10.0
 sigma_0_2 = 10.0
 teta = 0.0
-teta_measurement = 0.0
+teta_measurement = 0.78504
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
@@ -64,7 +64,7 @@ method = che
 #data_layout = real
 data_layout = complex
 # Total duration of the propagation
-t_max = 1000.
+t_max = 10.
 # Elementary time step
 delta_t = 2.5
 #want_ctypes = False
@@ -73,23 +73,23 @@ delta_t = 2.5
 n_config = 1
 
 [Measurement]
-delta_t_dispersion = 20.0
-delta_t_density = 1000.
-delta_t_spectral_function = 100.
+delta_t_dispersion = 10.0
+delta_t_density = 10.
+delta_t_spectral_function = 10.
 density = True
-#density_momentum = True
+density_momentum = True
 dispersion_position = True
-#dispersion_position2 = True
-#dispersion_momentum = True
+dispersion_position2 = True
+dispersion_momentum = True
 dispersion_energy = True
-#dispersion_variance = True
-#wavefunction = True
-#wavefunction_momentum = True
-#autocorrelation = True
-#g1 = True
+dispersion_variance = True
+wavefunction = True
+wavefunction_momentum = True
+autocorrelation = True
+g1 = True
 use_mkl_fft = True
 #spectral_function = True
-#overlap = True
+overlap = True
 
 [Spectral]
 range = 20.0

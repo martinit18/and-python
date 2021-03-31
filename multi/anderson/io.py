@@ -753,10 +753,14 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
 #    anderson.io.output_density('density_final.dat',measurement.density_final,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
     for i in range(measurement.tab_t_measurement_density.size):
       anderson.io.output_density('density_intermediate_'+str(i)+'.dat',measurement.density_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='density')
+      if measurement.spin_one_half:
+        anderson.io.output_density('density_intermediate2_'+str(i)+'.dat',measurement.density_intermediate2[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.grid_position,data_type='density')
   if (measurement.measure_density_momentum):
 #    anderson.io.output_density('density_momentum_final.dat',measurement.density_momentum_final,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='density_momentum')
     for i in range(measurement.tab_t_measurement_density.size):
       anderson.io.output_density('density_momentum_intermediate_'+str(i)+'.dat',measurement.density_momentum_intermediate[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.frequencies,data_type='density_momentum')
+      if measurement.spin_one_half:
+        anderson.io.output_density('density_momentum_intermediate2_'+str(i)+'.dat',measurement.density_momentum_intermediate2[i],measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_density[i])+' \n',tab_abscissa=measurement.frequencies,data_type='density_momentum')
   if (measurement.measure_wavefunction):
     anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
     anderson.io.output_density('wavefunction_final.dat',measurement.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
@@ -766,6 +770,8 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
     anderson.io.output_density('temporal_autocorrelation.dat',measurement.tab_autocorrelation,measurement,tab_abscissa=measurement.tab_t_measurement_dispersion,header_string=header_string,data_type='autocorrelation')
   if (measurement.measure_dispersion_position or measurement.measure_dispersion_momentum or measurement.measure_dispersion_energy):
     anderson.io.output_dispersion('dispersion.dat',measurement.tab_dispersion,measurement.tab_strings,header_string)
+    if measurement.spin_one_half:
+      anderson.io.output_dispersion('dispersion2.dat',measurement.tab_dispersion_2,measurement.tab_strings,header_string)
   if (measurement.measure_g1):
 #    anderson.io.output_density('g1_final.dat',measurement.g1,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='g1')
     for i in range(measurement.tab_t_measurement_density.size):
