@@ -355,7 +355,7 @@ class Measurement(Geometry):
       self.density_momentum_intermediate /= n_config
       if self.spin_one_half:
         self.density_momentum_intermediate2 /= n_config
-       if self.extended:
+      if self.extended:
 #        self.density_momentum_final[1] = np.sqrt(np.abs(self.density_momentum_final[1]-self.density_momentum_final[0]**2)/n_config)
         self.density_momentum_intermediate[:,1] = np.sqrt(np.abs(self.density_momentum_intermediate[:,1]-self.density_momentum_intermediate[:,0]**2)/n_config)
         if self.spin_one_half:
