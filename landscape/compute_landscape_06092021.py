@@ -202,9 +202,6 @@ if __name__ == "__main__":
   dim_x = int(system_size/delta_x+0.5)
     # Renormalize delta_x so that the system size is exactly what is wanted and split in an integer number of sites
   delta_x = system_size/dim_x
-  beta=0.2
-  energy_min=targeted_energy*(1.0-beta)
-  energy_max=targeted_energy*(1.0+beta)   
     #V0=0.025
     #disorder_strength = np.sqrt(V0)
   mkl.set_num_threads(1)
@@ -229,16 +226,7 @@ if __name__ == "__main__":
   energy = np.zeros(number_of_energy_levels)
   tab_wfc = np.zeros((dim_x,number_of_energy_levels))
   energy, tab_wfc = diagonalization.compute_wavefunction(0, H, k=number_of_energy_levels)
-  print('Energy = ',energy, energy_min, energy_max)
-  if energy[number_of_energy_levels-1] < energy_max:
-    j_max = number_of_energy_levels
-  else:  
-    j_max = min(np.argmax(energy>energy_max),number_of_energy_levels)
-  if energy[0] > energy_min:
-    j_min = 0
-  else:  
-    j_min = np.argmax(energy>energy_min)
-  print('Levels taken in to account: from ',j_min,' to ',j_max-1)
+  print('Energy = ',energy)
 #  tab_wfc2 = np.zeros((dim_x,1),dtype=np.complex128)
 #  tab_wfc2[:,0]=initial_state.wfc
 #  np.savetxt('toto.dat',np.abs(tab_wfc2[:,0])**2)
@@ -371,11 +359,9 @@ if __name__ == "__main__":
   if plot_global:
     my_cmap='seismic'
     my_cmap='jet'
-# Sum all Wigner functions between j_min and j_max
-    if j_max<=j_min:
-      sys.exit('No state in the energy interval')  
-    global_wigner = np.sum(tab_wigner[:,:,j_min:j_max],axis=2)/(j_max-j_min)
-    global_density = np.sum(tab_wfc**2,axis=1)/(j_max-j_min)
+# Sum all Wigner functions
+    global_wigner = np.sum(tab_wigner,axis=2)/number_of_energy_levels
+    global_density = np.sum(tab_wfc**2,axis=1)/number_of_energy_levels
     np.savetxt('global_wigner.dat',global_wigner)
     fig, axs = plt.subplots(3,sharex=True)
 #    fig.subplots_adjust(hspace=0.5)
