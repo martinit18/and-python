@@ -137,11 +137,12 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       Wavefunction = config['Wavefunction']
       all_options_ok=True
       initial_state_type = Wavefunction.get('initial_state')
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet","point"]: all_options_ok=False
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
-      if initial_state_type in ["plane_wave","gaussian_wave_packet"]:
+      tab_chirp = list()
+      if initial_state_type in ["plane_wave","gaussian_wave_packet","chirped_wave_packet"]:
         for i in range(dimension):
           if not config.has_option('Wavefunction','k_0_over_2_pi_'+str(i+1)): all_options_ok=False
 #        tab_k_0.append(2.0*math.pi*
@@ -152,6 +153,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           if initial_state_type != "plane_wave":
             if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
             tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
+            if initial_state_type == "chirped_wave_packet":
+              tab_chirp.append(Wavefunction.getfloat('chirp_'+str(i+1),0.0))
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a single point, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
@@ -282,6 +285,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     initial_state_type = None
     tab_k_0 = None
     tab_sigma_0 = None
+    tab_chirp = None
     teta = None
     teta_measurement = None
     method = None
@@ -332,7 +336,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Spin' in my_list_of_sections:
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
-      initial_state_type, tab_k_0, tab_sigma_0, teta, teta_measurement = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, teta, teta_measurement))
+      initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t))
     if 'Measurement' in my_list_of_sections:
@@ -365,6 +369,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0,initial_lhs_state)
     if (initial_state.type=='gaussian_wave_packet'):
       anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0,initial_lhs_state)
+    if (initial_state.type=='chirped_wave_packet'):
+      anderson.wavefunction.Wavefunction.chirped(initial_state,tab_k_0,tab_sigma_0,tab_chirp,initial_lhs_state)
     if (initial_state.type=='point'):
       anderson.wavefunction.Wavefunction.point(initial_state,initial_lhs_state)
     return_list.append(initial_state)
@@ -464,6 +470,11 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
         if initial_state.type == 'gaussian_wave_packet':
           params_string += \
                   'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'
+        if initial_state.type == 'chirped_wave_packet':
+          params_string += \
+                  'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'\
+                 +'chirp_'+str(i+1)+'                              = '+str(initial_state.tab_chirp[i])+'\n'
+                     
     if H.spin_one_half:
       params_string += \
                   'teta                                 = '+str(initial_state.teta)+' \n'\

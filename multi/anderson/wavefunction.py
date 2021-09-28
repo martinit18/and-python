@@ -37,6 +37,30 @@ class Wavefunction(Geometry):
       self.wfc = psi
     return
 
+  def chirped(self,tab_k_0,tab_sigma_0,tab_chirp,initial_lhs_state=None):
+    self.tab_k_0 = tab_k_0
+    self.tab_sigma_0 = tab_sigma_0
+    self.tab_chirp = tab_chirp
+    grid_position = np.meshgrid(*self.grid_position,indexing='ij')
+    tab_phase = np.zeros(self.tab_dim)
+    tab_amplitude = np.zeros(self.tab_dim)
+#    print(tab_position[0].shape)
+#    print(tab_position[1].shape)
+    for i in range(len(grid_position)):
+      tab_phase += self.tab_k_0[i]*grid_position[i]+self.tab_chirp[i]*grid_position[i]**2
+      tab_amplitude += (grid_position[i]/self.tab_sigma_0[i])**2
+# The next two lines are to avoid too small values of abs(psi[i])
+# which slow down the calculation
+    threshold = 100.
+    tab_amplitude =np.where(tab_amplitude>threshold,threshold,tab_amplitude)
+    psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
+    psi = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+    if self.spin_one_half:
+      self.wfc = np.multiply.outer(psi,initial_lhs_state)
+    else:
+      self.wfc = psi
+    return
+
   def plane_wave(self,tab_k_0,initial_lhs_state=None):
 #    self.type = 'Plane wave'
     self.tab_k_0 = tab_k_0
