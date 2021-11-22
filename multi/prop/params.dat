@@ -65,6 +65,7 @@ n_config = 8
 delta_t_dispersion = 2000.0
 delta_t_density = 2000.
 delta_t_spectral_function = 2000.
+potential = True
 #first_measurement = 0
 #density = True
 density_momentum = True

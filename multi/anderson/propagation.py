@@ -569,6 +569,8 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
   if not no_init:
 #  print('start gen disorder',timeit.default_timer())
     H.generate_disorder(seed=i_seed+1234)
+    measurement.perform_measurement_potential(H)
+#    print(measurement.potential)
 #  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
 #    if H.dimension>2 or (propagation.accurate_bounds and propagation.method=='che') or propagation.method=='ode' or (measurement.measure_dispersion_energy) or H.spin_one_half:
     H.generate_sparse_matrix()
@@ -692,7 +694,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
         measurement.perform_measurement_dispersion(j_dispersion, H, psi, init_state_autocorr)
       if measurement.tab_time[i,2]==1:
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
-        measurement.perform_measurement_density(j_density,psi)
+        measurement.perform_measurement_density(j_density, psi)
         j_density+=1
       timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
       if measurement.tab_time[i,3]==1:

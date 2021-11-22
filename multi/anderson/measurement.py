@@ -12,12 +12,18 @@ import copy
 from anderson.geometry import Geometry
 
 class Measurement(Geometry):
-  def __init__(self, geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement=0.0,  measure_density=False, measure_density_momentum=False, measure_autocorrelation=False, measure_dispersion_position=False, measure_dispersion_position2=False, measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False, measure_extended=False, measure_g1=False, measure_overlap=False, measure_spectral_function=False, use_mkl_fft=True, remove_hot_pixel=False):
+  def __init__(self, geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement=0.0,\
+               measure_potential=False, measure_potential_correlation=False, measure_density=False, measure_density_momentum=False, measure_autocorrelation=False,\
+               measure_dispersion_position=False, measure_dispersion_position2=False,\
+               measure_dispersion_momentum=False, measure_dispersion_energy=False,measure_wavefunction=False, measure_wavefunction_momentum=False,\
+               measure_extended=False, measure_g1=False, measure_overlap=False, measure_spectral_function=False, use_mkl_fft=True, remove_hot_pixel=False):
     super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta, spin_one_half=geometry.spin_one_half)
     self.delta_t_dispersion = delta_t_dispersion
     self.delta_t_density = delta_t_density
     self.delta_t_spectral_function = delta_t_spectral_function
     self.teta_measurement = teta_measurement
+    self.measure_potential = measure_potential
+    self.measure_potential_correlation = measure_potential_correlation
     self.measure_density = measure_density
     self.measure_density_momentum = measure_density_momentum
     self.measure_autocorrelation = measure_autocorrelation
@@ -166,6 +172,10 @@ class Measurement(Geometry):
   # What follows is the code for the intermediate times
       self.tab_t_measurement_density = self.tab_time[self.tab_time[:,2]==1.0,0]
   #    print(self.tab_t_measurement_density)
+      if self.measure_potential:
+        self.potential = np.zeros(dim_density)
+      if self.measure_potential_correlation:
+        self.potential_correlation = np.zeros(dim_density)
       dim_density.insert(0,number_of_measurements_density)
       if self.measure_density:
         self.density_intermediate = np.zeros(dim_density)
@@ -180,6 +190,10 @@ class Measurement(Geometry):
 
 
   def merge_measurement(self,measurement):
+    if self.measure_potential:
+      self.potential += measurement.potential
+    if self.measure_potential_correlation:
+      self.potential_correlation += measurement.potential_correlation
     if self.measure_density:
 #      print(measurement.density_final.shape)
 #      print(self.density_final.shape)
@@ -257,6 +271,14 @@ class Measurement(Geometry):
     except ImportError:
       print("mpi4py is not found!")
       return
+    if self.measure_potential:
+      toto = np.empty_like(self.potential)
+      comm.Reduce(self.potential,toto)
+      self.potential = np.copy(toto)
+    if self.measure_potential_correlation:
+      toto = np.empty_like(self.potential_correlation)
+      comm.Reduce(self.potential_correlation,toto)
+      self.potential_correlation = np.copy(toto)
     if self.measure_density:
 #      toto = np.empty_like(self.density_final)
 #      comm.Reduce(self.density_final,toto)
@@ -340,6 +362,12 @@ class Measurement(Geometry):
     return
 
   def normalize(self,n_config):
+    if self.measure_potential:
+ #     self.density_final /= n_config
+      self.potential /= n_config
+    if self.measure_potential_correlation:
+ #     self.density_final /= n_config
+      self.potential_correlation /= n_config
     if self.measure_density:
  #     self.density_final /= n_config
       self.density_intermediate /= n_config
@@ -567,6 +595,14 @@ class Measurement(Geometry):
     if self.measure_g1:
       self.g1_intermediate[i_tab,:] = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(local_psi.wfc)*np.conj(np.fft.fftn(local_psi.wfc))))*psi.delta_vol
     return
+  
+  def perform_measurement_potential(self, H):
+    if self.measure_potential:
+      self.potential = H.disorder - H.diagonal
+    if self.measure_potential_correlation:
+#      self.potential_correlation = H.disorder - H.diagonal
+      self.potential_correlation= np.real(np.fft.fftshift(np.fft.ifftn(np.fft.fftn(H.disorder-H.diagonal)*np.conj(np.fft.fftn(H.disorder-H.diagonal)))))*H.delta_vol
+    return
 
   def perform_measurement_final(self, psi, init_state_autocorr):
 #    if self.spin_one_half:
@@ -595,3 +631,4 @@ class Measurement(Geometry):
 #      print(self.overlap)
     return
 
+    

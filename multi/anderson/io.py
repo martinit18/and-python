@@ -193,6 +193,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       delta_t_dispersion = Measurement.getfloat('delta_t_dispersion',delta_t)
       delta_t_density = Measurement.getfloat('delta_t_density',t_max)
       delta_t_spectral_function = Measurement.getfloat('delta_t_spectral_function',t_max)
+      measure_potential = Measurement.getboolean('potential',False)
+      measure_potential_correlation = Measurement.getboolean('potential_correlation',False)
       measure_density = Measurement.getboolean('density',False)
       measure_density_momentum = Measurement.getboolean('density_momentum',False)
       measure_autocorrelation = Measurement.getboolean('autocorrelation',False)
@@ -298,6 +300,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     delta_t_dispersion = None
     delta_t_density = None
     delta_t_spectral_function = None
+    measure_potential = None
+    measure_potential_correlation = None
     measure_density = None
     measure_density_momentum = None
     measure_autocorrelation = None
@@ -331,27 +335,42 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 
   if mpi_version:
-    n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength = comm.bcast((disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength))
+    n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = \
+      comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
+    disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength = \
+      comm.bcast((disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength))
     if 'Spin' in my_list_of_sections:
-      spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
+      spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
+        comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
-      initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement = comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement))
+      initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement = \
+        comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t))
     if 'Measurement' in my_list_of_sections:
-      delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
+      delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_potential, measure_potential_correlation, \
+        measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, \
+        measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, \
+        measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = \
+      comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_potential, measure_potential_correlation, \
+        measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, \
+        measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, \
+        measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
     if 'Diagonalization' in my_list_of_sections:
-      diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
+      diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = \
+        comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
       spectre_min, spectre_max, spectre_resolution  = comm.bcast((spectre_min, spectre_max, spectre_resolution))
     if 'Lyapounov' in my_list_of_sections:
-      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
+      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = \
+        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
 
   geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, spin_one_half)
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength,non_diagonal_disorder_strength=non_diagonal_disorder_strength, b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+  H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, \
+      disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, non_diagonal_disorder_strength=non_diagonal_disorder_strength, \
+      b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
   if spin_one_half:
     H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z, alpha=alpha)
   return_list = [geometry, H]
@@ -399,7 +418,14 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Define the structure of the temporal integration
     propagation = anderson.propagation.Temporal_Propagation(t_max, delta_t, method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
     return_list.append(propagation)
-    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement=teta_measurement, measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, measure_spectral_function=measure_spectral_function, use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
+    measurement = anderson.measurement.Measurement(geometry, delta_t_dispersion, delta_t_density, delta_t_spectral_function, \
+      teta_measurement=teta_measurement, measure_potential=measure_potential, measure_potential_correlation=measure_potential_correlation, \
+      measure_density=measure_density, measure_density_momentum=measure_density_momentum, measure_autocorrelation=measure_autocorrelation, \
+      measure_dispersion_position=measure_dispersion_position, measure_dispersion_position2=measure_dispersion_position2, \
+      measure_dispersion_momentum=measure_dispersion_momentum, measure_dispersion_energy=measure_dispersion_energy, \
+      measure_wavefunction=measure_wavefunction, measure_wavefunction_momentum=measure_wavefunction_momentum, \
+      measure_extended=measure_extended,measure_g1=measure_g1, measure_overlap=measure_overlap, measure_spectral_function=measure_spectral_function, \
+      use_mkl_fft=use_mkl_fft, remove_hot_pixel=remove_hot_pixel)
     measurement_global = copy.deepcopy(measurement)
 #  print(measurement.measure_density,measurement.measure_autocorrelation,measurement.measure_dispersion,measurement.measure_dispersion_momentum)
 #    print(delta_t,propagation.delta_t)
@@ -535,6 +561,14 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
 #  print(data.shape)
 #  print(tab_abscissa)
   if file_type=='savetxt':
+    if data_type=='potential':
+      column_1='Position'
+      column_2='Disordered potential'
+      specific_string='Disordered potential\n'
+    if data_type=='potential_correlation':
+      column_1='Relative position'
+      column_2='Disordered potential correlation function'
+      specific_string='Disordered potential correlation function\n'
     if data_type=='density':
       column_1='Position'
       column_2='Density'
@@ -608,19 +642,29 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
 #    print(specific_string)
     next_column = 1
     dimension = geometry.dimension
-    if data_type in ['density','density_momentum']:
+    if data_type in ['potential','potential_correlation','density','density_momentum']:
 #      print(data.ndim,data.shape)
 # The simple case where there is only 1d data
       if dimension==1:
+        if data_type=='potential':
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
+        if data_type=='potential_correlation':
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
         if data_type=='density':
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
         if data_type=='density_momentum':
           header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
+        print('toto', data.ndim)
         if data.ndim==1:
-          if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
-            list_of_columns.append(tab_abscissa[0])
-            tab_strings.append('Column '+str(next_column)+': '+column_1)
-            next_column += 1
+          print('tototo')
+          if tab_abscissa!=[]:
+            print('totototo')
+            if data_type=='potential_correlation':
+              list_of_columns.append(tab_abscissa[0]-0.5*geometry.tab_delta[0])
+            else:
+              list_of_columns.append(tab_abscissa[0])
+          tab_strings.append('Column '+str(next_column)+': '+column_1)
+          next_column += 1
           list_of_columns.append(data)
           tab_strings.append('Column '+str(next_column)+': '+column_2)
           next_column += 1
@@ -642,6 +686,14 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       if dimension==2:
  # Add at the beginning of the file minimal info describing the data
         if data_type=='density':
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
+                       +header_string
+        if data_type=='potential':
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
+                       +header_string
+        if data_type=='potential_correlation':
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
                        +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
                        +header_string
@@ -690,7 +742,7 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
           next_column += 1
         array_to_print=np.column_stack(list_of_columns)
       if dimension==2:
-        if data_type=='wavefunction' or data_type=='g1':
+        if data_type in ['wavefunction','g1']:
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
                        +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
                        +header_string
@@ -759,6 +811,12 @@ def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data n
   return
 
 def print_measurements_final(measurement,initial_state=None,header_string='Origin of data not specified'):
+  if (measurement.measure_potential):
+#    print(measurement.potential)
+    anderson.io.output_density('potential.dat',measurement.potential,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='potential')
+  if (measurement.measure_potential_correlation):
+    print(measurement.potential_correlation)
+    anderson.io.output_density('potential_correlation.dat',measurement.potential_correlation,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='potential_correlation')
   if (measurement.measure_density):
 #      print(measurement.grid_position)
 #    anderson.io.output_density('density_final.dat',measurement.density_final,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
