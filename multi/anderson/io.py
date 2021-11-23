@@ -654,11 +654,11 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
         if data_type=='density_momentum':
           header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
-        print('toto', data.ndim)
+#        print('toto', data.ndim)
         if data.ndim==1:
-          print('tototo')
+#          print('tototo')
           if tab_abscissa!=[]:
-            print('totototo')
+#            print('totototo')
             if data_type=='potential_correlation':
               list_of_columns.append(tab_abscissa[0]-0.5*geometry.tab_delta[0])
             else:
@@ -815,7 +815,7 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
 #    print(measurement.potential)
     anderson.io.output_density('potential.dat',measurement.potential,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='potential')
   if (measurement.measure_potential_correlation):
-    print(measurement.potential_correlation)
+#    print(measurement.potential_correlation)
     anderson.io.output_density('potential_correlation.dat',measurement.potential_correlation,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='potential_correlation')
   if (measurement.measure_density):
 #      print(measurement.grid_position)
