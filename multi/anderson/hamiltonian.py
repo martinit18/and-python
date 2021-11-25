@@ -87,19 +87,23 @@ class Hamiltonian(Geometry):
       return
 # Build mask for correlated potentials
     if disorder_type=='regensburg':
-      self.generate = 'simple mask'
+      self.generate = 'simple mask'    
       self.mask = np.zeros(tab_dim)
       tab_k = list()
       for i in range(dimension):
         toto = np.zeros(tab_dim[i])
         half_size = tab_dim[i]//2+1
-        toto[0:half_size] = -0.25*(np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
-        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
+# Old code which does not work too well when the correlation length is shorter than the spatial grid spacing        
+#        toto[0:half_size] = -0.25*(np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
+#        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
+        toto[0:half_size] = -0.5*(np.arange(half_size)*self.tab_delta[i]/self.correlation_length)**2  
+        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]     
         tab_k.append(toto)
       tab_distance = np.meshgrid(*tab_k,indexing='ij')
       for i in range(dimension):
          self.mask += tab_distance[i]
       self.mask = np.exp(self.mask)
+      self.mask = np.sqrt(np.fft.fftn(self.mask))
       self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
 #      print(self.mask)
       return
