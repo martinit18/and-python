@@ -61,6 +61,7 @@ class Measurement(Geometry):
     self.tab_i_measurement[number_of_measurements-1]=number_of_time_steps
     self.tab_t_measurement[number_of_measurements-1]=t_max
     """
+#    print("Inside prepare_measurement, is_spectral_function = ",is_spectral_function, is_inner_spectral_function)
     if is_spectral_function:
       self.tab_time = np.zeros((spectral_function.n_pts_autocorr+1,4))
       self.tab_time[:,0] = delta_t*np.arange(spectral_function.n_pts_autocorr+1)
@@ -71,6 +72,7 @@ class Measurement(Geometry):
       self.tab_t_measurement_spectral_function = np.array([0.0])
       if not is_inner_spectral_function:
         self.tab_spectrum = np.zeros(2*spectral_function.n_pts_autocorr+1)
+#        print(self.tab_spectrum)
 #    tab_time[0:dim_tab_time_propagation,1] = 1
     else:
       dim_tab_time_propagation = int(t_max/delta_t+0.999)
@@ -602,7 +604,7 @@ class Measurement(Geometry):
       self.potential = H.disorder - H.diagonal
     if self.measure_potential_correlation:
 #      self.potential_correlation = H.disorder - H.diagonal
-      self.potential_correlation= np.real(np.fft.fftshift(np.fft.ifftn(np.fft.fftn(H.disorder-H.diagonal)*np.conj(np.fft.fftn(H.disorder-H.diagonal)))))*H.delta_vol
+      self.potential_correlation= np.real(np.fft.fftshift(np.fft.ifftn(np.fft.fftn(H.disorder-H.diagonal)*np.conj(np.fft.fftn(H.disorder-H.diagonal)))))/H.disorder.size
     return
 
   def perform_measurement_final(self, psi, init_state_autocorr):
