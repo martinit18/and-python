@@ -172,10 +172,6 @@ class Measurement(Geometry):
   # What follows is the code for the intermediate times
       self.tab_t_measurement_density = self.tab_time[self.tab_time[:,2]==1.0,0]
   #    print(self.tab_t_measurement_density)
-      if self.measure_potential:
-        self.potential = np.zeros(self.tab_dim)
-      if self.measure_potential_correlation:
-        self.potential_correlation = np.zeros(self.tab_dim)
       dim_density.insert(0,number_of_measurements_density)
       if self.measure_density:
         self.density_intermediate = np.zeros(dim_density)
@@ -186,6 +182,11 @@ class Measurement(Geometry):
         self.density_momentum_intermediate = np.zeros(dim_density)
         if self.spin_one_half:
           self.density_momentum_intermediate2 = np.zeros(dim_density)
+    if self.measure_potential:
+      self.potential = np.zeros(self.tab_dim)
+    if self.measure_potential_correlation:
+      self.potential_correlation = np.zeros(self.tab_dim)
+#    print(self.measure_potential,self.measure_potential_correlation)  
     return
 
 

@@ -567,7 +567,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #  print(i_seed,no_init)
 #  print(measurement.tab_time)
   if not no_init:
-#  print('start gen disorder',timeit.default_timer())
+#    print('start gen disorder',timeit.default_timer())
     H.generate_disorder(seed=i_seed+1234)
     measurement.perform_measurement_potential(H)
 #    print(measurement.potential)

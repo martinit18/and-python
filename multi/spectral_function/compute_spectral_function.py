@@ -109,13 +109,12 @@ def main():
 # Can be in any order
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranteed
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Spectral','Spin']
-  geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
-
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Measurement','Propagation','Spectral','Spin']
+  geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global,_,_,_,n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
-
-
+#  print(measurement.measure_potential)
+#  print(measurement.potential)
   if rank==0:
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
 

@@ -401,7 +401,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
     return_list.append(propagation_spectral)
     return_list.append(spectral_function)
-    measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, use_mkl_fft=use_mkl_fft)
+    measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, \
+      measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, \
+      measure_potential=measure_potential, measure_potential_correlation=measure_potential_correlation, use_mkl_fft=use_mkl_fft)
     measurement_spectral_global = copy.deepcopy(measurement_spectral)
     measurement_spectral.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local)
 #  print(measurement.density_final.shape)
