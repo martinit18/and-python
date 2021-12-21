@@ -243,6 +243,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           spectre_max =  0.5*e_range
       if not config.has_option('Spectral','resolution'): all_options_ok = False
       spectre_resolution = Spectral.getfloat('resolution')
+      multiplicative_factor_for_interaction_in_spectral_function = Spectral.getfloat('multiplicative_factor_for_interaction',0.0)
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Spectral section of the parameter file, there must be a resolution and either an energy interval [e_min,e_max] or an energy range e_range, I stop!\n')
       if not config.has_section('Propagation'):
@@ -325,7 +326,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     number_of_eigenvalues = None
     spectre_min = None
     spectre_max = None
-    spectre_resolution = None
+    spectre_resolution = None  
+    multiplicative_factor_for_interaction_in_spectral_function = None
     e_min = None
     e_max = None
     number_of_e_steps = None
@@ -360,7 +362,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = \
         comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
-      spectre_min, spectre_max, spectre_resolution  = comm.bcast((spectre_min, spectre_max, spectre_resolution))
+      spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function = \
+        comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function))
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = \
         comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
@@ -398,7 +401,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   if 'Spectral' in my_list_of_sections:
 #    measure_spectral_function_local = not 'Measurement' in my_list_of_sections
     measure_spectral_function_local = True
-    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution)
+    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function)
     propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
     return_list.append(propagation_spectral)
     return_list.append(spectral_function)
@@ -542,8 +545,9 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if measurement.measure_spectral_function:
       params_string += \
                   'minimum energy for spectral function = '+str(spectral_function.e_min)+'\n'\
-                  'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
-                 +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'
+                 +'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
+                 +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'\
+                 +'multiplicative factor for interaction= '+str(spectral_function.multiplicative_factor_for_interaction)+'\n'  
   if not diagonalization == None:
     params_string += \
                   'targeted_energy                      = '+str(diagonalization.targeted_energy)+'\n'\

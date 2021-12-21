@@ -34,7 +34,8 @@ V0 = 0.2
 
 [Nonlinearity]
 # g is the nonlinear interaction
-g = 0.0
+g = 0.
+g_over_volume = 0.1
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
@@ -42,7 +43,7 @@ initial_state = plane_wave
 #initial_state = gaussian_wave_packet
 #initial_state = point
 # make sure that k_0_over_2_pi_i*size_i is an integer
-k_0_over_2_pi_1 = 0.159
+k_0_over_2_pi_1 = 0.1
 k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
 sigma_0_1 = 5.0
@@ -59,7 +60,7 @@ t_max = 1200.0
 delta_t = 5.0
 
 [Averaging]
-n_config = 1
+n_config = 64
 
 [Measurement]
 delta_t_dispersion = 5.0
@@ -83,6 +84,8 @@ spectral_function = False
 # or the range variable, in which case the interval is [-range/2,range/2]
 # [e_min,e_max] has precedence over range if both are specified
 range = 100.0
-resolution = 0.05
+resolution = 0.01
 e_min=-1.
-e_max=5.
+e_max=119.
+# Multiplicative factor for the interaction coefficient
+multiplicative_factor_for_interaction = 0.0

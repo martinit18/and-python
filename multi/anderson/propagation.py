@@ -497,7 +497,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
 
 
 class Spectral_function:
-  def __init__(self,e_min,e_max,e_resolution):
+  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function):
     e_range = e_max - e_min
     e_middle = 0.5*(e_max+e_min)
     self.n_pts_autocorr = int(0.5*e_range/e_resolution+0.5)
@@ -507,6 +507,7 @@ class Spectral_function:
     self.delta_t = 2.0*np.pi/(e_resolution*(2*self.n_pts_autocorr+1))
     self.t_max = self.delta_t*self.n_pts_autocorr
     self.e_resolution = e_resolution
+    self.multiplicative_factor_for_interaction = multiplicative_factor_for_interaction_in_spectral_function
     return
 
   def spectral_function_from_temporal_autocorrelation(self,tab_autocorrelation):
@@ -536,7 +537,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 # When the initial state is a plane wave, \overline{|\psi(r,t)|^2} is simply g/V that is a constant shift in energy
 #  print('inside compute_spectral_function')
   save_interaction = H.interaction
-  H.interaction=0.0
+  H.interaction*=spectral_function.multiplicative_factor_for_interaction
 #  print(H.interaction)
 #  print(propagation.delta_t,propagation.t_max)
 #  print(initial_state.wfc[0])
