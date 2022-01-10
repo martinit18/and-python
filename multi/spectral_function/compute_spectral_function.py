@@ -123,6 +123,7 @@ def main():
 # Here starts the loop over disorder configurations
   for i in range(n_config):
  #   print(measurement.tab_spectrum)
+ # Measure the spectral by propagation
     measurement.tab_spectrum = anderson.propagation.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, propagation, measurement, spectral_function, my_timing)
  #   print(measurement.tab_spectrum)
     measurement_global.merge_measurement(measurement)
