@@ -545,19 +545,26 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
       H.generate_sparse_matrix()
       H.energy_range(accurate=propagation.accurate_bounds)     
   save_interaction = H.interaction
-  save_disorder = H.disorder
+  save_disorder = copy.deepcopy(H.disorder)
+#  print(save_disorder)
+#  save_disorder = H.disorder
   H.interaction = 0.0
-  H.disorder = save_disorder + save_interaction*spectral_function.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+  H.disorder = H.disorder + save_interaction*spectral_function.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+  initial_state_2 = copy.deepcopy(initial_state)
 #  print(H.disorder[0,0])
 #  print(np.sum(H.disorder))
 #  print(save_disorder.dtype,initial_state.wfc.dtype)
 #  print(H.interaction)
 #  print(propagation.delta_t,propagation.t_max)
-#  print(initial_state.wfc[0])
-  gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation, measurement, timing, build_disorder=False)
-#  print(initial_state.wfc[0])
+#  print(initial_state_2.wfc-initial_state.wfc)
+#  print(initial_state.wfc[0,0])
+  gpe_evolution(i_seed, geometry, initial_state_2, H, propagation, propagation, measurement, timing, build_disorder=False)
+#  print(initial_state_2.wfc-initial_state.wfc)
+#  print(initial_state.wfc[0,0])
   H.interaction = save_interaction
-  H.disorder = save_disorder
+  H.disorder = copy.deepcopy(save_disorder)
+#  H.disorder = save_disorder
+  initial_state = copy.deepcopy(initial_state_2)
 #  print(H.disorder[0,0])
 #  print(np.sum(H.disorder))
 #  print(H.interaction)
