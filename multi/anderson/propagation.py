@@ -32,12 +32,10 @@ class Temporal_Propagation:
     self.accuracy = accuracy
     self.accurate_bounds = accurate_bounds
 # Is there a full specific Chebyshev implementation?
-    self.has_specific_full_chebyshev_routine = False
-    self.chebyshev_propagation = chebyshev_propagation_generic
+#    self.has_specific_full_chebyshev_routine = False
     if not H.spin_one_half and self.want_ctypes:
       try:
         self.has_specific_full_chebyshev_routine = True
-        self.chebyshev_propagation = chebyshev_propagation_ctypes
         self.chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
         if self.data_layout=='real':
           self.chebyshev_ctypes_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
@@ -65,9 +63,12 @@ class Temporal_Propagation:
         if H.seed == 0 :
           print("\nWarning, no chebyshev C library found, this uses the slow Python version!\n")
     self.use_ctypes = self.has_specific_full_chebyshev_routine and self.want_ctypes
-
-# Is there a specific routine for a Chebyshev step?
-# In general, there is no no specific routine
+    if self.use_ctypes:
+      self.chebyshev_propagation = chebyshev_propagation_ctypes
+    else:  
+      self.chebyshev_propagation = chebyshev_propagation_generic
+ # Is there a specific routine for a Chebyshev step?
+# In general, there is no specific routine
     self.has_specific_chebyshev_step_routine = False
     self.chebyshev_step = eval("chebyshev_step_generic_"+self.data_layout)
 # There are few specific cases for a specialized routine is available

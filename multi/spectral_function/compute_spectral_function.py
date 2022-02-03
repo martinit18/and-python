@@ -111,6 +111,7 @@ def main():
 # Must be consistent otherwise disaster guaranteed
   my_list_of_sections = ['Wavefunction','Nonlinearity','Measurement','Propagation','Spectral','Spin']
   geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global,_,_,_,n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+#  print('toto')
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
 #  print(measurement.measure_potential)

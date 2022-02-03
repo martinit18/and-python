@@ -18,7 +18,7 @@ boundary_condition_3 = periodic
 boundary_condition_4 = periodic
 
 [Spin]
-spin_one_half = True
+spin_one_half = False
 gamma = 0.2
 Omega = 0.4
 beta = 0.0
@@ -27,8 +27,8 @@ h = 0.0
 
 [Disorder]
 #  Various disorder types can be used
-type = anderson_uniform
-#type = anderson_gaussian
+#type = anderson_uniform
+type = anderson_gaussian
 # type = regensburg
 #type = konstanz
 # type = singapore
@@ -68,7 +68,7 @@ delta_t = 0.6
 #want_cffi = False
 
 [Averaging]
-n_config = 1000
+n_config = 100
 
 [Measurement]
 delta_t_measurement = 40.2
@@ -91,7 +91,7 @@ resolution = 0.01
 
 [Diagonalization]
 #method = lapack
-targeted_energy = 0.0
+targeted_energy = -1.0
 IPR_min = 0.0
 IPR_max = 0.04
 number_of_bins = 200
