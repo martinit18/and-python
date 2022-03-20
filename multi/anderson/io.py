@@ -713,6 +713,22 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
           array_to_print = data[:,:]
         if data.ndim==3:
           array_to_print=data[0,:,:]
+      if dimension==3:
+ # Add at the beginning of the file minimal info describing the data
+        if data_type in ['density','potential','potential_correlation']:
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
+                       +str(geometry.tab_dim[2])+' '+str(geometry.tab_delta[2])+'\n'\
+                       +header_string
+        if data_type=='density_momentum':
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(2.0*np.pi/(geometry.tab_dim[1]*geometry.tab_delta[1]))+'\n'\
+                       +str(geometry.tab_dim[2])+' '+str(2.0*np.pi/(geometry.tab_dim[2]*geometry.tab_delta[2]))+'\n'\
+                       +header_string
+        if data.ndim==3:
+          array_to_print = data[:,:,:]
+        if data.ndim==4:
+          array_to_print=data[0,:,:,:]
     if data_type in ['wavefunction','wavefunction_momentum','g1']:
       if dimension==1:
         if data_type=='g1' or data_type=='wavefunction':
@@ -760,6 +776,19 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
                        +str(geometry.tab_dim[1])+' '+str(2.0*np.pi/(geometry.tab_dim[1]*geometry.tab_delta[1]))+'\n'\
                        +header_string
         array_to_print=data[:,:]
+      if dimension==3:
+        if data_type in ['wavefunction','g1']:
+          header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
+                       +str(geometry.tab_dim[2])+' '+str(geometry.tab_delta[2])+'\n'\
+                       +header_string
+#          print(header_string)
+        if data_type=='wavefunction_momentum':
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'\
+                       +str(geometry.tab_dim[1])+' '+str(2.0*np.pi/(geometry.tab_dim[1]*geometry.tab_delta[1]))+'\n'\
+                       +str(geometry.tab_dim[2])+' '+str(2.0*np.pi/(geometry.tab_dim[2]*geometry.tab_delta[2]))+'\n'\
+                       +header_string
+        array_to_print=data[:,:,:]
     if data_type in ['autocorrelation']:
       list_of_columns.append(tab_abscissa)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
@@ -810,7 +839,31 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
 #    array_to_print=np.column_stack(list_of_columns)
 #    print(list_of_columns)
 #    print(tab_strings)
-    np.savetxt(file,array_to_print,header=header_string+specific_string+'\n'.join(tab_strings)+'\n')
+    my_save_routine(file,array_to_print,header=header_string+specific_string+'\n'.join(tab_strings)+'\n')
+#    np.savetxt(file,array_to_print,header=header_string+specific_string+'\n'.join(tab_strings)+'\n')
+  return
+
+def my_save_routine(file,array_to_print,header='\n'):
+  dimension = array_to_print.ndim
+  if dimension>3: 
+    print('I do not know how to print an array of dimension larger than 3')
+  if dimension<3:
+    np.savetxt(file,array_to_print,header=header)
+  if dimension==3:
+    with open(file, 'w') as outfile:
+# I'm writing a header here just for the sake of readability
+# Any line starting with "#" will be ignored by numpy.loadtxt
+      outfile.write('# Array shape: {0}\n'.format(array_to_print.shape))
+      i_header = 0
+# Iterating through a ndimensional array produces slices along
+# the last axis. This is equivalent to data[:,:,i] in this case
+      for data_slice in array_to_print:
+        if i_header==0:
+          np.savetxt(outfile, data_slice,header=header+'Slice 0')
+         
+        else:
+          np.savetxt(outfile, data_slice,header='Slice '+str(i_header))
+        i_header+=1
   return
 
 def output_dispersion(file,tab_data,tab_strings,general_string='Origin of data not specified'):

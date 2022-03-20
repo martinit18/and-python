@@ -32,7 +32,7 @@ class Temporal_Propagation:
     self.accuracy = accuracy
     self.accurate_bounds = accurate_bounds
 # Is there a full specific Chebyshev implementation?
-#    self.has_specific_full_chebyshev_routine = False
+    self.has_specific_full_chebyshev_routine = False
     if not H.spin_one_half and self.want_ctypes:
       try:
         self.has_specific_full_chebyshev_routine = True
@@ -80,6 +80,10 @@ class Temporal_Propagation:
     if H.dimension == 2 and not H.spin_one_half:
       self.has_specific_chebyshev_step_routine = True
       self.chebyshev_step = eval("chebyshev_step_2d_"+self.data_layout)
+# Standard 3d system
+    if H.dimension == 3 and not H.spin_one_half:
+      self.has_specific_chebyshev_step_routine = True
+      self.chebyshev_step = eval("chebyshev_step_3d_"+self.data_layout)
     return
 
   def compute_chebyshev_coefficients(self,accuracy,timing):
@@ -119,6 +123,8 @@ def chebyshev_step_generic_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c
     c_coef*=1j
 # Generic code uses the sparse multiplication
   psi_old[:] = c1*H.apply_h(psi)-c2*psi[:]+c_coef*wfc[:]-psi_old[:]
+#  print('psi',psi)
+#  print('psi_old',psi_old)  
   return
 
 def chebyshev_step_generic_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
@@ -395,6 +401,84 @@ def chebyshev_step_2d_real_numba(dim_x, dim_y, b_x, b_y, disorder, wfc, psi, psi
 #  print('no_cffi wfc    ',wfc[dim_x],wfc[dim_x+1],wfc[2*dim_x-2],wfc[2*dim_x-1])
 #  print('no_cffi wfc_dec',wfc[0],wfc[1],wfc[dim_x-2],wfc[dim_x-1])
 # ,H.two_over_delta_e,H.two_e0_over_delta_e,H.tab_tunneling[0],c_coef,one_or_two,add_real)
+  return
+
+def chebyshev_step_3d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+  chebyshev_step_3d_complex_numba(H.tab_dim[0], H.tab_dim[1], H.tab_dim[2], H.tab_boundary_condition[0], H.tab_boundary_condition[1],  H.tab_boundary_condition[2], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
+  return
+
+@numba.jit(nopython=True,fastmath=True,cache=True)
+def chebyshev_step_3d_complex_numba(dim_x, dim_y, dim_z, b_x, b_y, b_z, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+#  print('using chebyshev_step_3d_complex')
+  if not(add_real):
+    c_coef*=1j
+  c3_x=tab_c3[0]
+  c3_y=tab_c3[1]
+  c3_z=tab_c3[2]
+  dim_transverse = dim_y*dim_z
+# The code propagates along the x axis, computing one vector (along y and z) at each iteration
+# To decrase the number of memory accesses, 3 temporary vectors are used, containing the current x plane, the previous and the next planes
+# To simplify the code, the temporary vectors have 2 additional components in each direction, set to zero for fixed boundary conditions and to the wrapped values for periodic boundary conditions
+# Create the 3 temporary vectors
+  p_old=np.zeros((dim_y+2)*(dim_z+2),dtype=np.complex128)
+  p_current=np.zeros((dim_y+2)*(dim_z+2),dtype=np.complex128)
+  p_new=np.zeros((dim_y+2)*(dim_z+2),dtype=np.complex128)
+# If periodic boundary conditions along x, initialize p_current to the last plane, otherwise 0
+  if b_x=='periodic':
+    for j in range(dim_y):
+      p_current[(j+1)*(dim_z+2)+1:(j+2)*(dim_z+2)-1]=psi[(dim_x-1)*dim_transverse+j*dim_z:(dim_x-1)*dim_transverse+(j+1)*dim_z]
+# Initialize the next plane, which will become the current plane in the first iteration of the loop
+  for j in range(dim_y):
+      p_new[(j+1)*(dim_z+2)+1:(j+2)*(dim_z+2)-1]=psi[j*dim_z:(j+1)*dim_z]
+# If periodic boundary condition along y, copy the first and last row along z
+  if b_y=='periodic':
+    p_new[1:dim_z+1]=p_new[(dim_y)*(dim_z+2)+1:(dim_y+1)*(dim_z+2)-1]
+    p_new[(dim_y+1)*(dim_z+2)+1:(dim_y+2)*(dim_z+2)-1]=p_new[dim_z+3:2*dim_z+3]
+# If periodic boundary condition along z, copy the first and last row along y
+  if b_z=='periodic':
+    p_new[dim_z+2:(dim_y+1)*(dim_z+2):dim_z+2]=p_new[2*dim_z+2:(dim_y+1)*(dim_z+2)+dim_z:dim_z+2]
+    p_new[2*dim_z+3:(dim_y+1)*(dim_z+2)+dim_z+1:dim_z+2]=p_new[dim_z+3:(dim_y+1)*(dim_z+2)+1:dim_z+2] 
+# this is the main loop for propagation along the x direction    
+  for i in range(dim_x):
+    p_temp=p_old
+    p_old=p_current
+    p_current=p_new
+    p_new=p_temp
+    if i<dim_x-1:
+# The generic plane
+      for j in range(dim_y):
+        p_new[(j+1)*(dim_z+2)+1:(j+2)*(dim_z+2)-1]=psi[(i+1)*dim_transverse+j*dim_z:(i+1)*dim_transverse+(j+1)*dim_z]
+    else:
+# If in last plane, put in p_new the first plane if periodic along x, 0 otherwise )
+      if b_x=='periodic':
+        for j in range(dim_y):
+          p_new[(j+1)*(dim_z+2)+1:(j+2)*(dim_z+2)-1]=psi[j*dim_z:(j+1)*dim_z]
+      else:
+        for j in range(dim_y):
+          p_new[(j+1)*(dim_z+2)+1:(j+2)*(dim_z+2)-1]=0.0
+# If periodic boundary condition along y, copy the first and last row along z
+    if b_y=='periodic':
+      p_new[1:dim_z+1]=p_new[(dim_y)*(dim_z+2)+1:(dim_y+1)*(dim_z+2)-1]
+      p_new[(dim_y+1)*(dim_z+2)+1:(dim_y+2)*(dim_z+2)-1]=p_new[dim_z+3:2*dim_z+3]
+# If periodic boundary condition along z, copy the first and last row along y
+    if b_z=='periodic':
+      p_new[dim_z+2:(dim_y+1)*(dim_z+2):dim_z+2]=p_new[2*dim_z+2:(dim_y+1)*(dim_z+2)+dim_z:dim_z+2]
+      p_new[2*dim_z+3:(dim_y+1)*(dim_z+2)+dim_z+1:dim_z+2]=p_new[dim_z+3:(dim_y+1)*(dim_z+2)+1:dim_z+2] 
+    for j in range(dim_y):  
+      i_low=i*dim_transverse+j*dim_z
+      i_high=i_low+dim_z
+# Ready to treat the current row
+#        psi_old[i*dim_y:(i+1)*dim_y] = (c1*H.disorder[i,0:dim_y]-c2)*p_current[1:dim_y+1] - c3_y*(p_current[2:dim_y+2]+ p_current[0:dim_y]) - c3_x*(p_old[1:dim_y+1]+p_new[1:dim_y+1]) + c_coef*wfc[i*dim_y:(i+1)*dim_y] - psi_old[i*dim_y:(i+1)*dim_y]
+      psi_old[i_low:i_high] = (c1*disorder[i,j,0:dim_z]-c2)*p_current[(j+1)*(dim_z+2)+1:(j+1)*(dim_z+2)+dim_z+1]\
+        - c3_y*(p_current[(j+2)*(dim_z+2)+1:(j+2)*(dim_z+2)+dim_z+1]+ p_current[j*(dim_z+2)+1:j*(dim_z+2)+dim_z+1])\
+        - c3_z*(p_current[(j+1)*(dim_z+2)+2:(j+1)*(dim_z+2)+dim_z+2]+ p_current[(j+1)*(dim_z+2):(j+1)*(dim_z+2)+dim_z])\
+        - c3_x*(p_old[(j+1)*(dim_z+2)+1:(j+1)*(dim_z+2)+dim_z+1]+p_new[(j+1)*(dim_z+2)+1:(j+1)*(dim_z+2)+dim_z+1])\
+        + c_coef*wfc[i_low:i_high] - psi_old[i_low:i_high]
+#  p_old=None
+#  p_current=None
+#  p_new=None
+#  print('psi',psi)
+#  print('psi_old',psi_old)  
   return
 
 def chebyshev_propagation_ctypes(wfc, H, propagation, timing):
