@@ -6,6 +6,8 @@ Created on Sun Nov 22 19:30:03 2020
 @author: delande
 """
 import numpy as np
+#import math
+import itertools
 from anderson.geometry import Geometry
 
 class Wavefunction(Geometry):
@@ -93,6 +95,69 @@ class Wavefunction(Geometry):
  #   print(self.wfc.shape)
  #   print(self.wfc)
     return
+  
+  def multi_point(self,initial_lhs_state=None,seed=0):
+# This creates an initial state with several delta peaks in configuration space
+# These points are locatedon a multidimensional regular rectangular array
+# so that there is at least distance "minimum_distance" (in length units, not numer of sites)
+# between points
+# Currently works only when there is no spin-orbit
+# Array A is an array of integer sequences
+# A[i] will contain the indices along durection i where delta-peaks are put
+    self.seed = seed
+    if self.use_mkl_random:
+      try:
+        import mkl_random
+      except ImportError:
+        self.use_mkl_random=False
+        print('No mkl_random found; Fallback to Numpy random')
+    if self.use_mkl_random:
+      mkl_random.RandomState(77777, brng='SFMT19937')
+      mkl_random.seed(seed,brng='SFMT19937')
+      my_random_normal = mkl_random.standard_normal
+    else:
+      np.random.seed(seed)
+      my_random_normal = np.random.standard_normal
+#    print(self.use_mkl_random,self.seed)  
+    A = np.empty(self.dimension,dtype=object)
+    for i in range(self.dimension):
+# If the minimum distance is too small (=0 when not set), only a single point is used      
+      if (self.minimum_distance<self.tab_delta[i]):
+        A[i] = [0]
+      else:
+# Number of points along axis i where a delta peak is put, always smaller than the total number of sites         
+        num_steps = np.int(np.floor(self.tab_dim[i]*self.tab_delta[i]/self.minimum_distance))
+        if num_steps>0:
+# The integer step in indexing along axis i        
+          step = np.int(np.ceil(self.tab_dim[i]/num_steps))          
+#          print(num_steps,step)
+# The sequence of indices along axis i
+          A[i] = range(0,step*num_steps,step)
+        else:
+          A[i]=[0]
+#      print(i,A[i])
+# This creates the tuple of point indices where a delta-peak is put 
+    aa = tuple(prod for prod in itertools.product(*A))
+    my_sum = 0.0
+    my_random_sequence = my_random_normal(2*len(aa))
+    my_sum = np.sum(my_random_sequence**2)
+    normalization_factor = 1.0/(self.delta_vol*np.sqrt(my_sum))
+    j=0
+#    print(aa) 
+# Normalize so that the norm of the initial state is unity
+#    normalization_factor = 1.0/(self.delta_vol*np.sqrt(len(aa)))
+# Write the delta-peaks in the wavefunction 
+    for x in aa:
+#      print(x) 
+#      self.wfc[x] = normalization_factor
+      self.wfc[x] = my_random_sequence[2*j:2*j+2].view(np.complex128)*normalization_factor
+      j += 1
+#      my_sum += np.abs(self.wfc[x])**2
+#    normalization_factor = 1.0/(self.delta_vol*np.sqrt(my_sum))  
+#    for x in aa:
+#      self.wfc[x] *= normalization_factor
+#    print(self.wfc.ravel()[0])
+    return 
 
   def overlap(self, other_wavefunction):
 #    return np.sum(self.wfc*np.conj(other_wavefunction.wfc))*self.delta_x

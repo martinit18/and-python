@@ -137,7 +137,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       Wavefunction = config['Wavefunction']
       all_options_ok=True
       initial_state_type = Wavefunction.get('initial_state')
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point"]: all_options_ok=False
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point","multi_point"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
@@ -155,6 +155,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
             tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
             if initial_state_type == "chirped_wave_packet":
               tab_chirp.append(Wavefunction.getfloat('chirp_'+str(i+1),0.0))
+      if initial_state_type in ["multi_point"]:
+        minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
+        randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
+      else:
+        minimum_distance = 0.0
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a single point, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
@@ -286,6 +291,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     alpha = None
     interaction_strength = None
     initial_state_type = None
+    minimum_distance = None
+    randomize_initial_state = None
     tab_k_0 = None
     tab_sigma_0 = None
     tab_chirp = None
@@ -345,8 +352,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
         comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
-      initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement = \
-        comm.bcast((initial_state_type, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement))
+      initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement = \
+        comm.bcast((initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t))
     if 'Measurement' in my_list_of_sections:
@@ -395,6 +402,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       anderson.wavefunction.Wavefunction.chirped(initial_state,tab_k_0,tab_sigma_0,tab_chirp,initial_lhs_state)
     if (initial_state.type=='point'):
       anderson.wavefunction.Wavefunction.point(initial_state,initial_lhs_state)
+    if (initial_state.type=='multi_point'):
+      initial_state.minimum_distance = minimum_distance
+      initial_state.randomize_initial_state = randomize_initial_state
+      initial_state.use_mkl_random = use_mkl_random
+      anderson.wavefunction.Wavefunction.multi_point(initial_state,initial_lhs_state)
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
@@ -494,9 +506,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'Number of processes                  = '+str(nprocs)+'\n'\
                  +'Number of realizations per proc      = '+str(n_config)+'\n'
   if not initial_state == None:
+#    print(initial_state.type)
     params_string += \
                   'Initial state                        = '+initial_state.type+'\n'
-    if initial_state.type != 'point':
+    if initial_state.type in ['plane_wave','gaussian_wave_packet','chirped_wave_packet']: 
       for i in range(H.dimension):
         params_string += \
                   'k_0_'+str(i+1)+'                                = '+str(initial_state.tab_k_0[i])+'\n'
@@ -507,7 +520,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
           params_string += \
                   'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'\
                  +'chirp_'+str(i+1)+'                              = '+str(initial_state.tab_chirp[i])+'\n'
-                     
+    if initial_state.type == 'multi_point':
+      params_string += \
+                  'minimum distance between points      = '+str(initial_state.minimum_distance)+'\n'\
+                 +'randomize_initial_state              = '+str(initial_state.randomize_initial_state)+'\n'   
     if H.spin_one_half:
       params_string += \
                   'teta                                 = '+str(initial_state.teta)+' \n'\
@@ -910,7 +926,7 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
   if measurement.measure_spectral_function:
 #    print(measurement.tab_t_measurement_spectral_function.size)
 #    print(measurement.tab_spectrum)
-    if initial_state.type == 'point':
+    if initial_state.type in ['point','multi_point']:
       base_string='density_of_states'
       data_type='density_of_states'
     else:
