@@ -156,8 +156,12 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
             if initial_state_type == "chirped_wave_packet":
               tab_chirp.append(Wavefunction.getfloat('chirp_'+str(i+1),0.0))
       if initial_state_type in ["multi_point"]:
-        minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
-        randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
+        if spin_one_half:
+          print('multi_point initial state is not yet implemented for spin-orbit systems, I switch to point initial state')
+          initial_state_type = "point"
+        else:  
+          minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
+          randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       else:
         minimum_distance = 0.0
       if not all_options_ok:
@@ -470,10 +474,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
 #  print(spectral_function)
-  params_string = 'Disorder type                        = '+H.disorder_type+'\n'\
-                 +'Correlation length                   = '+str(H.correlation_length)+'\n'\
-                 +'Dimension                            = '+str(H.dimension)+'\n'\
-                 +'use MKL random number generator      = '+str(H.use_mkl_random)+'\n'
+  params_string = 'Dimension                            = '+str(H.dimension)+'\n'
   volume = 1.0
   for i in range(H.dimension):
     volume *= H.tab_dim[i]*H.tab_delta[i]
@@ -481,16 +482,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'Size_'+str(i+1)+'                               = '+str(H.tab_dim[i]*H.tab_delta[i])+'\n'\
                  +'delta_'+str(i+1)+'                              = '+str(H.tab_delta[i])+'\n'\
                  +'N_'+str(i+1)+'                                  = '+str(H.tab_dim[i])+'\n'\
-                 +'Boundary_Condition_'+str(i+1)+'                 = '+H.tab_boundary_condition[i]+'\n'\
+                 +'Boundary_Condition_'+str(i+1)+'                 = '+H.tab_boundary_condition[i]+'\n'
+  params_string += \
+                  'Volume                               = '+str(volume)+'\n'\
                  +'1/mass                               = '+str(H.one_over_mass)+'\n'
-  params_string += \
-                  'Volume                               = '+str(volume)+'\n'
-  params_string += \
-                  'V0                                   = '+str(H.disorder_strength)+'\n'
-  if H.disorder_type=='nice':
-    params_string += \
-                  'Non diagonal disorder strength       = '+str(H.non_diagonal_disorder_strength)+'\n'\
-                 +'Number of non diagonal channels      = '+str(H.b)+'\n'
   if H.spin_one_half:
     params_string += \
                   'Spin 1/2                             = True\n'\
@@ -499,6 +494,18 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'beta (sigma_y)                       = '+str(H.sigma_y)+'\n'\
                  +'delta (sigma_z/2)                    = '+str(2.0*H.sigma_z)+'\n'\
                  +'h (p^2 sigma_z)                      = '+str(H.alpha)+'\n'
+  params_string += \
+                  'Disorder type                        = '+H.disorder_type+'\n'\
+                 +'use MKL random number generator      = '+str(H.use_mkl_random)+'\n'
+  params_string += \
+                  'V0                                   = '+str(H.disorder_strength)+'\n'
+  if H.disorder_type not in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']:
+    params_string += \
+                 +'Correlation length                   = '+str(H.correlation_length)+'\n'                 
+  if H.disorder_type=='nice':
+    params_string += \
+                  'Non diagonal disorder strength       = '+str(H.non_diagonal_disorder_strength)+'\n'\
+                 +'Number of non diagonal channels      = '+str(H.b)+'\n'
   params_string += \
                   'g                                    = '+str(H.interaction)+'\n'\
                  +'g_over_volume                        = '+str(H.interaction/volume)+'\n'\

@@ -7,6 +7,7 @@ Created on Sun Nov 22 19:30:03 2020
 """
 import numpy as np
 #import math
+import sys
 import itertools
 from anderson.geometry import Geometry
 
@@ -104,6 +105,9 @@ class Wavefunction(Geometry):
 # Currently works only when there is no spin-orbit
 # Array A is an array of integer sequences
 # A[i] will contain the indices along durection i where delta-peaks are put
+# This routine should not be called with spin-orbit coupling
+    if self.spin_one_half:
+      sys.exit("muti_point initial state not yet implemented for spin-orbit systems, I stop!")
     self.seed = seed
     if self.use_mkl_random:
       try:
