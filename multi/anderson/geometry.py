@@ -35,14 +35,12 @@ class Geometry:
     self.frequencies = []
     for i in range(dimension):
       self.frequencies.append(np.fft.fftshift(np.fft.fftfreq(tab_dim[i],d=tab_delta[i]/(2.0*np.pi))))
-# Local Hilbert space dimension
     self.tab_extended_dim = copy.deepcopy(tab_dim)
     self.spin_one_half = spin_one_half
     if spin_one_half:
+# Local Hilbert space dimension
       self.lhs_dim = 2
       self.tab_extended_dim.append(self.lhs_dim)
-# Total Hilbert space dimension
-      self.hs_dim = self.lhs_dim*self.ntot
     else:
       self.lhs_dim = 1
 # Total Hilbert space dimension

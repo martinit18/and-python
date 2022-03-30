@@ -682,6 +682,10 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #    print('  accurate bounds',H.e_min,H.e_max)
 #    H.energy_range(accurate=False)
 #    print('inaccurate bounds',H.e_min,H.e_max)
+  if initial_state.type == 'multi_point' and initial_state.randomize_initial_state == True:
+#    print('multi_point initial state, randomized')
+    anderson.wavefunction.Wavefunction.multi_point(initial_state,seed=i_seed+2345)
+#    print(initial_state.wfc.ravel()[0])
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
   else:
