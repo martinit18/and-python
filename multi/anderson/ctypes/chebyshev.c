@@ -848,6 +848,9 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   dim_transverse = dim_y*dim_z;
   
 // If periodic boundary conditions along x, initialize p_current to the last plane, otherwise 0
+  for (j=0;j<dim_y;j++) {
+    pos_psi = (dim_x-1)*dim_transverse+j*dim_z;
+    pos_current = (j+1)*(dim_z+2)+1;
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
 #else
@@ -859,14 +862,14 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
 #pragma GCC ivdep
 #endif
 #endif
-  for (j=0;j<dim_y;j++) {
-    pos_psi = (dim_x-1)*dim_transverse+j*dim_z;
-    pos_current = (j+1)*(dim_z+2)+1;
     for (k=0;k<dim_z;k++) {
       p_current[pos_current+k] = b_x*psi[pos_psi+k];
     }  
   }
 // Initialize the next plane, which will become the current plane in the first iteration of the loop
+  for (j=0;j<dim_y;j++) {
+    pos_psi = j*dim_z;
+    pos_new = (j+1)*(dim_z+2)+1;
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
 #else
@@ -878,9 +881,6 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
 #pragma GCC ivdep
 #endif
 #endif
-  for (j=0;j<dim_y;j++) {
-    pos_psi = j*dim_z;
-    pos_new = (j+1)*(dim_z+2)+1;
     for (k=0;k<dim_z;k++) {
       p_new[pos_new+k] = psi[pos_psi+k];
     }  
@@ -890,6 +890,17 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   pos_new_2 = dim_y*(dim_z+2)+1;
   pos_new_3 = (dim_y+1)*(dim_z+2)+1;
   pos_new_4 = dim_z+3;
+#ifdef __clang__
+#pragma clang loop vectorize(enable) interleave(enable)
+#else
+#ifdef __ICC
+//#pragma vector aligned
+#pragma vector always
+#pragma ivdep
+#else      
+#pragma GCC ivdep
+#endif
+#endif
   for (k=0;k<dim_z;k++) {
     p_new[pos_new_1+k] = b_y*p_new[pos_new_2+k];
     p_new[pos_new_3+k] = b_y*p_new[pos_new_4+k];
@@ -899,6 +910,17 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   pos_new_2 = 2*dim_z+2;
   pos_new_3 = 2*dim_z+3;
   pos_new_4 = dim_z+3;
+#ifdef __clang__
+#pragma clang loop vectorize(enable) interleave(enable)
+#else
+#ifdef __ICC
+//#pragma vector aligned
+#pragma vector always
+#pragma ivdep
+#else      
+#pragma GCC ivdep
+#endif
+#endif
   for (k=0;k<dim_z;k++) {
     p_new[pos_new_1+k*(dim_z+2)] = b_z*p_new[pos_new_2+k*(dim_z+2)];
     p_new[pos_new_3+k*(dim_z+2)] = b_z*p_new[pos_new_4+k*(dim_z+2)];
@@ -912,6 +934,9 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
     p_new=p_temp;
     if (i<dim_x-1) {
 // The generic plane
+      for (j=0;j<dim_y;j++) {
+        pos_psi = (i+1)*dim_transverse+j*dim_z;
+        pos_new = (j+1)*(dim_z+2)+1;
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
 #else
@@ -923,15 +948,15 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
 #pragma GCC ivdep
 #endif
 #endif 
-      for (j=0;j<dim_y;j++) {
-        pos_psi = (i+1)*dim_transverse+j*dim_z;
-        pos_new = (j+1)*(dim_z+2)+1;
         for (k=0;k<dim_z;k++) {
           p_new[pos_new+k] = psi[pos_psi+k];
         }  
       }     
     } else {
 // If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+      for (j=0;j<dim_y;j++) {
+        pos_psi = j*dim_z;
+        pos_new = (j+1)*(dim_z+2)+1;
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
 #else
@@ -943,9 +968,6 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
 #pragma GCC ivdep
 #endif
 #endif
-      for (j=0;j<dim_y;j++) {
-        pos_psi = j*dim_z;
-        pos_new = (j+1)*(dim_z+2)+1;
         for (k=0;k<dim_z;k++) {
           p_new[pos_new+k] = b_x*psi[pos_psi+k];
         }  
@@ -956,6 +978,17 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
     pos_new_2 = dim_y*(dim_z+2)+1;
     pos_new_3 = (dim_y+1)*(dim_z+2)+1;
     pos_new_4 = dim_z+3;
+#ifdef __clang__
+#pragma clang loop vectorize(enable) interleave(enable)
+#else
+#ifdef __ICC
+//#pragma vector aligned
+#pragma vector always
+#pragma ivdep
+#else      
+#pragma GCC ivdep
+#endif
+#endif
     for (k=0;k<dim_z;k++) {
       p_new[pos_new_1+k] = b_y*p_new[pos_new_2+k];
       p_new[pos_new_3+k] = b_y*p_new[pos_new_4+k];
@@ -965,6 +998,17 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
     pos_new_2 = 2*dim_z+2;
     pos_new_3 = 2*dim_z+3;
     pos_new_4 = dim_z+3;
+#ifdef __clang__
+#pragma clang loop vectorize(enable) interleave(enable)
+#else
+#ifdef __ICC
+//#pragma vector aligned
+#pragma vector always
+#pragma ivdep
+#else      
+#pragma GCC ivdep
+#endif
+#endif
     for (k=0;k<dim_z;k++) {
       p_new[pos_new_1+k*(dim_z+2)] = b_z*p_new[pos_new_2+k*(dim_z+2)];
       p_new[pos_new_3+k*(dim_z+2)] = b_z*p_new[pos_new_4+k*(dim_z+2)];
@@ -972,12 +1016,12 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
     for (j=0;j<dim_y;j++) {      
       i_low=i*dim_transverse+j*dim_z;
       pos_current_1 = (j+1)*(dim_z+2)+1;
-      pos_current_2 = (j+2)*(dim_z+2)+1;
-      pos_current_3 = j*(dim_z+2)+1;
-      pos_current_4 = (j+1)*(dim_z+2)+2;
-      pos_current_5 = (j+1)*(dim_z+2);
-      pos_old = (j+1)*(dim_z+2)+1;
-      pos_new = (j+1)*(dim_z+2)+1;
+//      pos_current_2 = (j+2)*(dim_z+2)+1;
+//      pos_current_3 = j*(dim_z+2)+1;
+//      pos_current_4 = (j+1)*(dim_z+2)+2;
+//      pos_current_5 = (j+1)*(dim_z+2);
+//      pos_old = (j+1)*(dim_z+2)+1;
+//      pos_new = (j+1)*(dim_z+2)+1;
   
 // Ready to treat the current row
       if (add_real) {
@@ -993,12 +1037,18 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
 #endif
 #endif
         for (k=0; k<dim_z; k++) {
-          psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
+/*          psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
             - c3_y*(p_current[pos_current_2+k]+ p_current[pos_current_3+k]) 
             - c3_z*(p_current[pos_current_4+k]+ p_current[pos_current_5+k])
             - c3_x*(p_old[pos_old+k]+p_new[pos_new+k]) 
-            + c_coef*wfc[i_low+k] - psi_old[i_low+k];
-        }  
+            + c_coef*wfc[i_low+k] - psi_old[i_low+k];*/
+          psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[pos_current_1] 
+            - c3_y*(p_current[pos_current_1-dim_z-2]+ p_current[pos_current_1+dim_z+2]) 
+            - c3_z*(p_current[pos_current_1+1]+ p_current[pos_current_1-1])
+            - c3_x*(p_old[pos_current_1]+p_new[pos_current_1]) 
+            + c_coef*wfc[i_low] - psi_old[i_low];
+          i_low++;  
+          pos_current_1++;        }  
       } else {
 #ifdef __clang__
 #pragma clang loop vectorize(enable) interleave(enable)
@@ -1012,11 +1062,18 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
 #endif
 #endif
         for (k=0; k<dim_z; k++) {
-          psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
+ /*        psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
             - c3_y*(p_current[pos_current_2+k]+ p_current[pos_current_3+k]) 
             - c3_z*(p_current[pos_current_4+k]+ p_current[pos_current_5+k])
             - c3_x*(p_old[pos_old+k]+p_new[pos_new+k]) 
-            + I*c_coef*wfc[i_low+k] - psi_old[i_low+k];
+            + I*c_coef*wfc[i_low+k] - psi_old[i_low+k]; */
+          psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[pos_current_1] 
+            - c3_y*(p_current[pos_current_1-dim_z-2]+ p_current[pos_current_1+dim_z+2]) 
+            - c3_z*(p_current[pos_current_1+1]+ p_current[pos_current_1-1])
+            - c3_x*(p_old[pos_current_1]+p_new[pos_current_1]) 
+            + I*c_coef*wfc[i_low] - psi_old[i_low];
+          i_low++;  
+          pos_current_1++;
         }  
       }
     }    
