@@ -164,6 +164,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       else:
         minimum_distance = 0.0
+        randomize_initial_state = None
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a single point, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
