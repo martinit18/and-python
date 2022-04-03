@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 200.
-size_2 = 200.
+size_1 = 20.
+size_2 = 20.
 size_3 = 5.
 size_4 = 1.
 # Spatial discretization
@@ -16,11 +16,19 @@ boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
 
+[Spin]
+#spin_one_half = True
+gamma = 0.4
+beta = 0.0
+Omega = 0.4
+delta = 0.4
+h = 0.0
+
 [Disorder]
 #  Various disorder types can be used
-# type = anderson
-type = anderson_gaussian
-# type = regensburg
+#type = anderson_uniform
+#type = anderson_gaussian
+type = regensburg
 # type = konstanz
 # type = singapore
 # type = speckle
@@ -28,53 +36,62 @@ use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 0.135
+V0 = 0.1
 
 [Nonlinearity]
 # g is the nonlinear interaction
-g = 0.0
+g_over_volume = 0.0
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
 #initial_state = gaussian_wave_packet
+#initial_state = point
 # make sure that k_0_over_2_pi_i*size_i is an integer
-k_0_over_2_pi_1 = 0.1
-k_0_over_2_pi_2 = 0.0
+k_0_over_2_pi_1 = 0.125
+k_0_over_2_pi_2 = 0.25
 # Size of Gaussian wavepacket
 sigma_0_1 = 10.0
 sigma_0_2 = 10.0
+teta = 0.0
+teta_measurement = 0.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
 #accuracy = 1.e-8
 #accurate_bounds = True
-#data_layout = real
-data_layout = complex
+data_layout = real
+#data_layout = complex
 # Total duration of the propagation
-t_max = 281.4
+t_max = 1000.
 # Elementary time step
-delta_t = 0.6
-#want_cffi = False
+delta_t = 1.0
+#want_ctypes = False
 
 [Averaging]
-n_config = 10
+n_config = 100
 
 [Measurement]
-delta_t_measurement = 40.2
-#first_measurement = 0
-#density = True
-density_momentum = True
+delta_t_dispersion = 200.0
+delta_t_density = 1000.
+delta_t_spectral_function = 100.
+potential = True
+potential_correlation = True
+density = True
+#density_momentum = True
 #dispersion_position = True
 #dispersion_position2 = True
 #dispersion_momentum = True
-#dispersion_energy = True
+dispersion_energy = True
 #dispersion_variance = True
 #wavefunction = True
 #wavefunction_momentum = True
-#autocorrelation = True
+#autocorrqelation = True
+g1 = True
 use_mkl_fft = True
+#spectral_function = True
+#overlap = True
 
 [Spectral]
 range = 20.0

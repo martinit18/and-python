@@ -47,7 +47,7 @@ import anderson
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Compute IPR of eigenstates')
+  parser = argparse.ArgumentParser(description='Compute rbar vs. energy')
   parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
   args = parser.parse_args()
   parameter_file = args.filename.name
@@ -75,11 +75,15 @@ def main():
 
 # Parse parameter file and prepare the useful objects:
 # H for the Hamiltonian of the system
-# diagonalization for exact (or sparse) diagonalization
-  geometry, H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization','Spin'])
-
+# propagation for the propagation scheme
+# measurement for the measurement scheme
+# measurement_global is used to gather (average) the results for several disorder configurations
+  H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization'])
+# Force lapack diagonalization
+  diagonalization.method = 'lapack'
+  diagonalization.number_of_eigenvalues = H.ntot
   t1=time.perf_counter()
-  my_timing=anderson.timing.Timing()
+  timing=anderson.Timing()
 
   if rank==0:
 
@@ -87,47 +91,56 @@ def main():
 # At this point, it it not yet known whether there is a C implementation available
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
 
-  number_of_eigenvalues = diagonalization.number_of_eigenvalues
-  tab_IPR = np.zeros(n_config*number_of_eigenvalues)
-  tab_energy = np.zeros(n_config*number_of_eigenvalues)
+  tab_r = np.zeros(H.ntot-2)
+  tab_energy = np.zeros(H.ntot-2)
+  emin=0.0
+#  emax=2.0
+  emax=4.0
+  nsteps=50
+  header_string += 'emin                            = '+str(emin)+'\nemax                            = '+str(emax)+'\nnumber of energy steps          = '+str(nsteps)+'\n\n'
+  estep = (emax-emin)/nsteps
+  tab_num = np.zeros(nsteps,dtype=int)
+  tab_hist_r = np.zeros(nsteps)
+  tab_middle_energy = np.arange(start=emin,stop=emax,step=estep)+0.5*estep
 
   # Here starts the loop over disorder configurations
   for i in range(n_config):
-    tab_energy[i*number_of_eigenvalues:(i+1)*number_of_eigenvalues], tab_IPR[i*number_of_eigenvalues:(i+1)*number_of_eigenvalues] = diagonalization.compute_IPR(i+rank*n_config, H)
-
+    tab_energy, tab_r = diagonalization.compute_tab_r(i+rank*n_config, H)
+# accumulate r values in an energy-dependent array
+    for j in range(H.ntot-2):
+      k = int((tab_energy[j]-emin)/estep)
+      k = max(k,0)
+      k = min(k,nsteps-1)
+      tab_num[k]+=1
+      tab_hist_r[k]+=tab_r[j]
+  for k in range(nsteps):
+    tab_hist_r[k]/=tab_num[k]
 #    H.generate_full_matrix()
 #    print(H.generate_full_complex_matrix(1.0j))
   if mpi_version:
     start_mpi_time = timeit.default_timer()
-    tab_energy_glob = np.zeros(n_config*nprocs*number_of_eigenvalues)
-    tab_IPR_glob = np.zeros(n_config*nprocs*number_of_eigenvalues)
-    comm.Gather(tab_energy,tab_energy_glob)
-    comm.Gather(tab_IPR,tab_IPR_glob)
-    my_timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+    tab_hist_r_glob = np.empty_like(tab_hist_r)
+    comm.Reduce(tab_hist_r,tab_hist_r_glob)
+    tab_hist_r_glob/=nprocs
+    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
   else:
-    tab_energy_glob = tab_energy
-    tab_IPR_glob = tab_IPR
+    tab_hist_r_glob = tab_hist_r
   t2=time.perf_counter()
-  my_timing.TOTAL_TIME = t2-t1
+  timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    my_timing.mpi_merge(comm)
+    timing.mpi_merge(comm)
   if rank==0:
 #    print(tab_energy_glob)
 #    print(tab_IPR_glob)
 #    print(tab_IPR_glob.shape)
-    header_string +='Minimum energy = '+str(np.min(tab_energy_glob))+'\nMaximum energy = '+str(np.max(tab_energy_glob))+'\n'
-    anderson.io.output_density('IPR.dat',tab_IPR_glob,H,header_string=header_string,tab_abscissa=None,data_type='IPR')
-    tab_histogram, bin_edges = np.histogram(tab_IPR_glob, bins=diagonalization.number_of_bins, range=(diagonalization.IPR_min,diagonalization.IPR_max), density=True)
-#    print(tab_histogram)
-#    print(bin_edges)
-    anderson.io.output_density('histogram_IPR.dat',tab_histogram,H,header_string=header_string,tab_abscissa=bin_edges[1:],data_type='histogram_IPR')
+    anderson.io.output_density('tab_rbar.dat',tab_hist_r_glob,H,header_string=header_string,tab_abscissa=tab_middle_energy,data_type='rbar')
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
-    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
+      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
+    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

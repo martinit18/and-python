@@ -1,19 +1,19 @@
 [System]
 # System size in natural units
-size = 1.e5
+size = 1200.
 # Spatial discretization
-delta_x = 0.25
+delta_x = 1.0
 # either periodic or open
 boundary_condition = open
 
 [Disorder]
 #  Various disorder types can be used
-# type = 'anderson_gaussian'
+type = anderson_uniform
 # type = 'regensburg'
 # type = 'konstanz'
 # type = 'singapore'
 # type = 'speckle'
-type = speckle
+# type = speckle
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
@@ -46,7 +46,7 @@ range = 20.0
 resolution = 0.02
 
 [Averaging]
-n_config = 8
+n_config = 100
 
 [Measurement]
 delta_t_measurement = 2.
@@ -60,7 +60,7 @@ autocorrelation = True
 extended = True
 
 [Diagonalization]
-method = sparse
+method = lapack
 targeted_energy = 0.6
 IPR_min = 0.0
 IPR_max = 0.01

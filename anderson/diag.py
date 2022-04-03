@@ -36,6 +36,19 @@ class Diagonalization:
 #  print('Energy=',w[index])
     return (w[index],IPR)
 
+  def compute_rbar(self, i, H):
+    H.generate_disorder(seed=i+1234)
+    if self.method=='lapack':
+      matrix = H.generate_full_matrix()
+#    print(matrix)
+      w = np.linalg.eigvalsh(matrix)
+      tab_r = np.zeros(H.dim_x-2)
+      for j in range(H.dim_x-2):
+        r = (w[j+2]-w[j+1])/(w[j+1]-w[j])
+        if r>1.0: r=1.0/r
+        tab_r[j] = r
+    return (w[1:H.dim_x-1],tab_r)
+
   def compute_wavefunction(self,i,H,k=4):
     H.generate_disorder(seed=i+1234)
     if self.method=='lapack':
