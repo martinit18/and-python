@@ -9,14 +9,15 @@ CC=icc
 # The following options are somehow dangerous (do not know why...)
 # -fargument-noalias-global -complex-limited-range -fargument-noalias -qopt-calloc
 #export CFLAGS=-Ofast -xHost -ftz -qopt-report=4 -qopt-report-phase=vec -finline -fno-alias -IPF-fp-relaxed -restrict 
-export CFLAGS=-Ofast -xCORE-AVX2 -mauto-arch=core-avx512 -ftz -qopt-report=4 -qopt-report-phase=vec 
+export CFLAGS=-Ofast -xCORE-AVX2 -mauto-arch=core-avx512 -ftz -qopt-report=4 -qopt-report-phase=vec -qopt-zmm-usage=high
 #export CFLAGS=-Ofast -xCORE-AVX2 -qopt-report=4 -qopt-report-phase=vec -ftz
 #export CFLAGS=-Ofast -xHost -qopt-report=4 -qopt-report-phase=vec -ftz
 endif
 
 ifeq ($(COMPILER),oneapi)
 CC=icx 
-CFLAGS=-Ofast -xHost 
+CFLAGS=-O3 -xskylake-avx512 -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
+CFLAGS=-Ofast -march=native  -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
 endif
 
 ifeq ($(COMPILER),gnu)

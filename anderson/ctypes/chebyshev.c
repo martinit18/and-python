@@ -7,6 +7,7 @@
 #else
 #include <math.h>
 #endif
+//#include <immintrin.h>
 #include <complex.h>
 #include <time.h>
 
@@ -129,33 +130,41 @@ double chebyshev_real(const int dimension, const int * restrict tab_dim, const i
   if (g_times_delta_t==0.0) {
     cos_phase=cos(e0_times_delta_t);
     sin_phase=sin(e0_times_delta_t);
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+ #ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
     for (i=0;i<ntot;i++) {
       wfc[i] = psi[i]*cos_phase+psi[i+ntot]*sin_phase;
       wfc[i+ntot] = psi[i+ntot]*cos_phase-psi[i]*sin_phase;
    }
   } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif 
     for (i=0;i<ntot;i++) {
       phase = g_times_delta_t*(psi[i]*psi[i]+psi[i+ntot]*psi[i+ntot]);
 //      phase=0.0;
@@ -266,32 +275,40 @@ double chebyshev_complex(const int dimension, const int * restrict tab_dim, cons
   if (g_times_delta_t==0.0) {
     complex_argument=cos(e0_times_delta_t)-I*sin(e0_times_delta_t);
 //    complex_argument = 1.0;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
     for (i=0;i<ntot;i++) {
       wfc[i] = psi[i]*complex_argument;
     }
   } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif 
     for (i=0;i<ntot;i++) {
       phase = g_times_delta_t*(creal(psi[i])*creal(psi[i])+cimag(psi[i])*cimag(psi[i]));
       nonlinear_phase = (nonlinear_phase > fabs(phase)) ? nonlinear_phase : fabs(phase);
@@ -339,60 +356,76 @@ inline void elementary_clenshaw_step_real_1d(const int dim_x, const int boundary
     }
   }
   if (add_real) {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+ #ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
     for (i=1;i<dim_x-1;i++) {
       psi_old[i]=(c1*disorder[i]-c2)*psi[i]-c3*(psi[i+1]+psi[i-1])+c_coef*wfc[i]-psi_old[i];
     }
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
     for (i=dim_x+1;i<2*dim_x-1;i++) {
       psi_old[i]=(c1*disorder[i-dim_x]-c2)*psi[i]-c3*(psi[i+1]+psi[i-1])+c_coef*wfc[i]-psi_old[i];
     }
   } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif      
     for (i=1;i<dim_x-1;i++) {
       psi_old[i]=(c1*disorder[i]-c2)*psi[i]-c3*(psi[i+1]+psi[i-1])-c_coef*wfc[i+dim_x]-psi_old[i];
     }
 //#pragma distribute_point
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
     for (i=dim_x+1;i<2*dim_x-1;i++) {
       psi_old[i]=(c1*disorder[i-dim_x]-c2)*psi[i]-c3*(psi[i+1]+psi[i-1])+c_coef*wfc[i-dim_x]-psi_old[i];
@@ -412,60 +445,76 @@ inline void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
   p_new = (double *) calloc ((2*dim_y+4),sizeof(double));
 
 // If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
   for (i=0;i<dim_y;i++) {
     p_current[i+1] = b_x*psi[i+(dim_x-1)*dim_y];
   }
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
   for (i=0;i<dim_y;i++) {
     p_current[dim_y+i+3] = b_x*psi[ntot+i+(dim_x-1)*dim_y];
   }
 
 // Initialize the next row, which will become the current row in the first iteration of the loop
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
   for (i=0;i<dim_y;i++) {
     p_new[i+1] = psi[i];
   }
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
   for (i=0;i<dim_y;i++) {
     p_new[dim_y+i+3] = psi[ntot+i];
@@ -484,62 +533,79 @@ inline void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
     p_new=p_temp;
     if (i<dim_x-1) {
 // The generic row
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0; j<dim_y; j++) {
         p_new[j+1]=psi[j+(i+1)*dim_y];
       }
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0; j<dim_y; j++) {
         p_new[j+dim_y+3]=psi[ntot+j+(i+1)*dim_y];
       }
     } else {
 // If in last row, put in p_new the first row if periodic along x, 0 otherwise )
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0;j<dim_y;j++) {
         p_new[j+1] = b_x*psi[j];
       }
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif
-      for (j=0;j<dim_y;j++) {
+for (j=0;j<dim_y;j++) {
         p_new[j+dim_y+3] = b_x*psi[ntot+j];
       }
     }
@@ -551,64 +617,80 @@ inline void elementary_clenshaw_step_real_2d(const int dim_x, const int dim_y, c
     i_low=i*dim_y;
 // Ready to treat the current row
     if (add_real) {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif
-      for (j=0; j<dim_y; j++) {
+        for (j=0; j<dim_y; j++) {
         psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + c_coef*wfc[i_low] - psi_old[i_low];
         i_low++;
       }
       i_low=ntot+i*dim_y;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0; j<dim_y; j++) {
         psi_old[i_low] = (c1*disorder[i_low-ntot]-c2)*p_current[j+dim_y+3] - c3_y*(p_current[j+dim_y+4]+ p_current[j+dim_y+2]) - c3_x*(p_old[j+dim_y+3]+p_new[j+dim_y+3]) + c_coef*wfc[i_low] - psi_old[i_low];
         i_low++;
       }
     } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif
-      for (j=0; j<dim_y; j++) {
+        for (j=0; j<dim_y; j++) {
         psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) - c_coef*wfc[ntot+i_low] - psi_old[i_low];
         i_low++;
       }
       i_low=ntot+i*dim_y;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0; j<dim_y; j++) {
         psi_old[i_low] = (c1*disorder[i_low-ntot]-c2)*p_current[j+dim_y+3] - c3_y*(p_current[j+dim_y+4]+ p_current[j+dim_y+2]) - c3_x*(p_old[j+dim_y+3]+p_new[j+dim_y+3]) + c_coef*wfc[i_low-ntot] - psi_old[i_low];
@@ -649,33 +731,41 @@ inline void elementary_clenshaw_step_complex_1d(const int dim_x, const int bound
     }
   }
   if (add_real) {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif
-    for (i=1;i<dim_x-1;i++) {
+      for (i=1;i<dim_x-1;i++) {
 //    printf("i %d\n",i);
       psi_old[i]=(c1*disorder[i]-c2)*psi[i]-c3*(psi[i+1]+psi[i-1])+c_coef*wfc[i]-psi_old[i];
     }
   } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif      
     for (i=1;i<dim_x-1;i++) {
       psi_old[i]=(c1*disorder[i]-c2)*psi[i]-c3*(psi[i+1]+psi[i-1])+I*c_coef*wfc[i]-psi_old[i];
     }
@@ -709,31 +799,39 @@ inline void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
   p_new = (double complex *) calloc ((dim_y+2),sizeof(double complex));
 
 // If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif  
   for (i=0;i<dim_y;i++) {
     p_current[i+1] = b_x*psi[i+(dim_x-1)*dim_y];
   }
 // Initialize the next row, which will become the current row in the first iteration of the loop
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
   for (i=0;i<dim_y;i++) {
     p_new[i+1] = psi[i];
@@ -750,34 +848,42 @@ inline void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
     p_new=p_temp;
     if (i<dim_x-1) {
 // The generic row
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif 
-      for (j=0; j<dim_y; j++) {
+        for (j=0; j<dim_y; j++) {
         p_new[j+1]=psi[j+(i+1)*dim_y];
       }
     } else {
 // If in last row, put in p_new the first row if periodic along x, 0 otherwise )
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
-#endif
-      for (j=0;j<dim_y;j++) {
+        for (j=0;j<dim_y;j++) {
         p_new[j+1] = b_x*psi[j];
       }
     }
@@ -787,32 +893,40 @@ inline void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y
     i_low=i*dim_y;
 // Ready to treat the current row
     if (add_real) {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0; j<dim_y; j++) {
         psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + c_coef*wfc[i_low] - psi_old[i_low];
         i_low++;
       }
     } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
 #endif
       for (j=0; j<dim_y; j++) {
         psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) + I*c_coef*wfc[i_low] - psi_old[i_low];
@@ -851,17 +965,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   for (j=0;j<dim_y;j++) {
     pos_psi = (dim_x-1)*dim_transverse+j*dim_z;
     pos_current = (j+1)*(dim_z+2)+1;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
     for (k=0;k<dim_z;k++) {
       p_current[pos_current+k] = b_x*psi[pos_psi+k];
     }  
@@ -870,17 +988,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   for (j=0;j<dim_y;j++) {
     pos_psi = j*dim_z;
     pos_new = (j+1)*(dim_z+2)+1;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
     for (k=0;k<dim_z;k++) {
       p_new[pos_new+k] = psi[pos_psi+k];
     }  
@@ -890,17 +1012,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   pos_new_2 = dim_y*(dim_z+2)+1;
   pos_new_3 = (dim_y+1)*(dim_z+2)+1;
   pos_new_4 = dim_z+3;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
   for (k=0;k<dim_z;k++) {
     p_new[pos_new_1+k] = b_y*p_new[pos_new_2+k];
     p_new[pos_new_3+k] = b_y*p_new[pos_new_4+k];
@@ -910,17 +1036,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   pos_new_2 = 2*dim_z+2;
   pos_new_3 = 2*dim_z+3;
   pos_new_4 = dim_z+3;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
   for (k=0;k<dim_z;k++) {
     p_new[pos_new_1+k*(dim_z+2)] = b_z*p_new[pos_new_2+k*(dim_z+2)];
     p_new[pos_new_3+k*(dim_z+2)] = b_z*p_new[pos_new_4+k*(dim_z+2)];
@@ -937,17 +1067,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
       for (j=0;j<dim_y;j++) {
         pos_psi = (i+1)*dim_transverse+j*dim_z;
         pos_new = (j+1)*(dim_z+2)+1;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif 
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
         for (k=0;k<dim_z;k++) {
           p_new[pos_new+k] = psi[pos_psi+k];
         }  
@@ -957,17 +1091,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
       for (j=0;j<dim_y;j++) {
         pos_psi = j*dim_z;
         pos_new = (j+1)*(dim_z+2)+1;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif               
         for (k=0;k<dim_z;k++) {
           p_new[pos_new+k] = b_x*psi[pos_psi+k];
         }  
@@ -978,17 +1116,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
     pos_new_2 = dim_y*(dim_z+2)+1;
     pos_new_3 = (dim_y+1)*(dim_z+2)+1;
     pos_new_4 = dim_z+3;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+ #ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
     for (k=0;k<dim_z;k++) {
       p_new[pos_new_1+k] = b_y*p_new[pos_new_2+k];
       p_new[pos_new_3+k] = b_y*p_new[pos_new_4+k];
@@ -998,17 +1140,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
     pos_new_2 = 2*dim_z+2;
     pos_new_3 = 2*dim_z+3;
     pos_new_4 = dim_z+3;
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif           
     for (k=0;k<dim_z;k++) {
       p_new[pos_new_1+k*(dim_z+2)] = b_z*p_new[pos_new_2+k*(dim_z+2)];
       p_new[pos_new_3+k*(dim_z+2)] = b_z*p_new[pos_new_4+k*(dim_z+2)];
@@ -1025,18 +1171,22 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   
 // Ready to treat the current row
       if (add_real) {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
-        for (k=0; k<dim_z; k++) {
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif            
+          for (k=0; k<dim_z; k++) {
 /*          psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
             - c3_y*(p_current[pos_current_2+k]+ p_current[pos_current_3+k]) 
             - c3_z*(p_current[pos_current_4+k]+ p_current[pos_current_5+k])
@@ -1050,17 +1200,21 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
           i_low++;  
           pos_current_1++;        }  
       } else {
-#ifdef __clang__
-#pragma clang loop vectorize(enable) interleave(enable)
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma clang loop vectorize(enable) 
+//  //#pragma unroll
 #else
-#ifdef __ICC
-//#pragma vector aligned
-#pragma vector always
-#pragma ivdep
-#else      
-#pragma GCC ivdep
-#endif
-#endif
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif          
         for (k=0; k<dim_z; k++) {
  /*        psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
             - c3_y*(p_current[pos_current_2+k]+ p_current[pos_current_3+k]) 
