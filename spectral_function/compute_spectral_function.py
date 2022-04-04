@@ -19,7 +19,7 @@ __version__ = "1.0"
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 # ____________________________________________________________________
 #
-# compute_prop.py
+# compute_spectral_function.py
 # Author: Dominique Delande
 # Release date: April, 27, 2020
 # License: GPL2 or later
@@ -28,11 +28,11 @@ Created on Fri Aug 16 17:05:10 2019
 
 @author: delande
 
-Disordered system in any dimension
+Disordered many-dimensional system
 Discretization in configuration space
-3-point discretization of the Laplace operator along each direction
+3-point discretization of the Laplace operator (in each direction)
 
-This program computes the temporal propagation of any initial state
+This program computes the spectral function (using Fourier transform of the temporal propagation)
 
 V0 (=disorder_strength) is the square root of the variance of the disorder
 sigma (=correlation_length) is the correlation length of the disorder
@@ -49,36 +49,31 @@ Various disorder types can be used, defined by the disorder_type variable:
   'real' is usually a bit faster.
   For data_layout == 'complex':
         wfc is assumed to be in format where
-        wfc[0:2*dim_x:2] contains the real part of the wavefunction and
-        wfc[1:2*dim_x:2] contains the imag part of the wavefunction.
+        wfc[0:2*ntot:2] contains the real part of the wavefunction and
+        wfc[1:2*ntot:2] contains the imag part of the wavefunction.
       For data_layout == 'real':
         wfc is assumed to be in format where
-        wfc[0:dim_x] contains the real part of the wavefunction and
-        wfc[dim_x:2*dim_x] contains the imag part of the wavefunction.
+        wfc[0:ntot] contains the real part of the wavefunction and
+        wfc[ntot:2*ntot] contains the imag part of the wavefunction.
 
 """
 
 import os
 import time
-#import math
+import math
 import numpy as np
 import getpass
-#import copy
-#import configparser
+import copy
+import configparser
 import sys
 import socket
 import argparse
-#sys.path.append('../')
 sys.path.append('/users/champ/delande/git/and-python/multi')
 sys.path.append('/home/lkb/delande/git/and-python/multi')
 import anderson
-#from anderson import propagation
-#from anderson import timing
-
-
 
 def main():
-  parser = argparse.ArgumentParser(description='Compute temporal propagation using the Gross-Pitaevskii or Schoedinger equation')
+  parser = argparse.ArgumentParser(description='Compute spectral function using the Gross-Pitaevskii or Schoedinger equation')
   parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
   args = parser.parse_args()
   parameter_file = args.filename.name
@@ -89,7 +84,7 @@ def main():
 # set mpi_string to something containing minimal MPI information
 # If not run inside MPI, nprocs=1 and rank=0
   mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.gethostname()+'\n'\
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
              +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
              +mpi_string+'\n'
@@ -97,7 +92,7 @@ def main():
   if rank==0:
     initial_time=time.asctime()
 #    hostname = os.uname()[1].split('.')[0]
-    print("Python script runs on machine : "+socket.gethostname())
+    print("Python script runs on machine : "+socket.getfqdn())
     print("Name of python script:  {}".format(os.path.abspath( __file__ )))
     print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
     print()
@@ -113,71 +108,46 @@ def main():
 # my_list_of_sections is the list of sections needed for this particular calculation
 # Can be in any order
 # The list determines the various structures returned by the routine
-# Must be consistent otherwise disaster guaranted
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral','Spin']
-  geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
-#  propagation.chebyshev_propagation = anderson.propagation.chebyshev_propagation_generic
-#  propagation.chebyshev_step = eval("anderson.propagation.chebyshev_step_generic_"+propagation.data_layout)
-#  H.apply_h = H.apply_h_generic
-
+# Must be consistent otherwise disaster guaranteed
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Measurement','Propagation','Spectral','Spin']
+  geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global,_,_,_,n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+#  print('toto')
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
+#  print(measurement.measure_potential)
+#  print(measurement.potential)
+  if rank==0:
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
 
-#  if rank==0:
-
-# Print various things for the initial state
-# At this point, it it not yet known whether there is a C implementation available
-  header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
 #  print(header_string)
-# Print the initial density and wavefunction
-#  anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-# Propagation for one realization of disorder
-#    print(propagation.delta_t,propagation.t_max,propagation_spectral.delta_t,propagation_spectral.t_max,)
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, propagation_spectral,measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function)
-# Add the current contribution to the sum of previous ones
+ #   print(measurement.tab_spectrum)
+ # Measure the spectral by propagation
+    measurement.tab_spectrum = anderson.propagation.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, propagation, measurement, spectral_function, my_timing)
+ #   print(measurement.tab_spectrum)
     measurement_global.merge_measurement(measurement)
-# The following lines just for generating and printing a single realization of disorder
-#   H.generate_disorder(i+rank*n_config+1234)
-#   print(H.disorder)
-#   np.savetxt('potential.dat',H.disorder-H.diagonal)
-# The following lines for computing the potential correlation function
-#   pot_correl += np.real(anderson.compute_correlation(H.disorder-H.diagonal,H.disorder-H.diagonal))
-# pot_correl /= n_config
-# np.savetxt('potential_correlation.dat',np.fft.fftshift(pot_correl))
-
-# Merge measured quantities in the various MPI processes
+#  print(measurement_global.tab_position)
+#
   if mpi_version:
     measurement_global.mpi_merge_measurement(comm,my_timing)
-
-# Calculation is essentially finished
-# It remains to output the results
   t2 = time.perf_counter()
   my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
     my_timing.mpi_merge(comm)
-
-#  remove_hot_pixel = True
-
+#    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
+#    toto = np.empty_like(measurement_global.tab_autocorrelation)
+#    comm.Reduce(measurement_global.tab_autocorrelation,toto,op=MPI.SUM)
+#    measurement_global.tab_autocorrelation = toto
+#    timing.CHE_TIME = comm.reduce(timing.CHE_TIME)
+#    global_timing=comm.reduce(timing)
+#    print(rank,global_timing.CHE_TIME)
+#    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
-# After the calculation, whether the C implementation has been used is known, hence recompute the header string
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
     measurement_global.normalize(n_config*nprocs)
-# Remove the hot pixel in momentum distribution if required
-    if measurement_global.remove_hot_pixel and measurement_global.measure_density_momentum and initial_state.type=='plane_wave':
-      index_to_remove = [0]
-#  initial_state.tab_k_0=[0.,0.]
-      for i in range(geometry.dimension):
-        index_to_remove.append(np.argmin(abs(geometry.frequencies[i]-initial_state.tab_k_0[i])))
-      measurement_global.density_momentum_final[tuple(index_to_remove)]=0.0
-      for i in range(measurement_global.tab_t_measurement_density.size):
-        measurement_global.density_momentum_intermediate[tuple([i]+index_to_remove)]=0.0
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function,timing=my_timing)
-#    print('header',header_string)
-#    tab_strings, tab_dispersion = measurement_global.normalize(n_config*nprocs)
-#    anderson.io.output_density('density_1.dat',measurement_global.density_intermediate[1],measurement_global,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='density')
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function, timing=my_timing)
     anderson.io.print_measurements_final(measurement_global,initial_state=initial_state,header_string=header_string)
 
 
@@ -201,5 +171,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-
-

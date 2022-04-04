@@ -1,62 +1,73 @@
 [System]
+dimension = 1
 # System size in natural units
-size = 20000.
+size_1 = 800.
+size_2 = 1.e1
 # Spatial discretization
-delta_x = 0.5
+delta_1 = 0.2
+delta_2 = 0.25
 # either periodic or open
-boundary_condition = periodic
+boundary_condition_1 = periodic
+boundary_condition_2 = open
 
 [Disorder]
 #  Various disorder types can be used
-# type = 'anderson_gaussian'
+type = anderson_uniform
+#type = anderson_gaussian
 # type = 'regensburg'
-type = konstanz
+# type = 'konstanz'
 # type = 'singapore'
 # type = 'speckle'
-#type = anderson_gaussian
-use_mkl_random = True
+# type = speckle
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 1.0
+V0 = 0.1
 
 [Nonlinearity]
 # g is the nonlinear interaction
-#g = 0.0
+g = 0.0
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
 # make sure that k_0_over_2_pi*my_system_size is an integer
-k_0_over_2_pi = 0.16
+k_0_over_2_pi_1 = 0.16
 #0.16
-
 # Size of Gaussian wavepacket
-sigma_0 = 10.0
+sigma_0_1 = 10.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
 data_layout = real
-#data_layout = complex
 # Total duration of the propagation
-t_max = 25.0
+t_max = 2000.
 # Elementary time step
-delta_t = 1.0
+delta_t = 2.
+
+[Spectral]
+range = 20.0
+resolution = 0.02
 
 [Averaging]
-n_config = 100
+n_config = 1
 
 [Measurement]
-delta_t_measurement = 1.0
+delta_t_measurement = 2.
 #first_measurement = 0
-#density = True
+density = True
 density_momentum = True
-#dispersion_position = True
-#dispersion_momentum = True
-#dispersion_energy = True
-#wavefunction_final = True
+dispersion = True
+dispersion_momentum = True
+wavefunction_final = True
 autocorrelation = True
-dispersion_variance = True
-use_mkl_fft = True
+extended = True
 
+[Diagonalization]
+method = sparse
+targeted_energy = 0.0
+number_of_eigenvalues = 50
+IPR_min = 0.0
+IPR_max = 0.01
+number_of_bins = 50

@@ -34,173 +34,100 @@ import os
 import time
 import math
 import numpy as np
+import copy
 import getpass
 import configparser
 import timeit
 import sys
+import socket
+import argparse
 sys.path.append('../')
-sys.path.append('/users/champ/delande/git/and-python/')
+sys.path.append('/users/champ/delande/git/and-python/multi')
 import anderson
 
 
+def main():
+  parser = argparse.ArgumentParser(description='Compute IPR of eigenstates')
+  parser.add_argument('filename', type=argparse.FileType('r'), help='name of the file containing parameters of the calculation')
+  args = parser.parse_args()
+  parameter_file = args.filename.name
 
+# Determine is the script is ran inside MPI
+# If yes, set the mpi_version to True, the  MPI communicator to comm, the number of
+# MPI processes to nprocs, the rank of the current process to rank, and
+# set mpi_string to something containing minimal MPI information
+# If not run inside MPI, nprocs=1 and rank=0
+  mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
+             +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
+             +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
+             +mpi_string+'\n'
 
-if __name__ == "__main__":
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
-             +'Name of python script: {}'.format(os.path.abspath( __file__ ))+'\n'\
-             +'Started on: {}'.format(time.asctime())+'\n'
-  try:
-# First try to detect if the python script is launched by mpiexec/mpirun
-# It can be done by looking at an environment variable
-# Unfortunaltely, this variable depends on the MPI implementation
-# For MPICH and IntelMPI, MPI_LOCALNRANKS can be checked for existence
-#   os.environ['MPI_LOCALNRANKS']
-# For OpenMPI, it is OMPI_COMM_WORLD_SIZE
-#   os.environ['OMPI_COMM_WORLD_SIZE']
-# In any case, when importing the module mpi4py, the MPI implementation for which
-# the module was created is unknown. Thus, no portable way...
-# The following line is for OpenMPI
-    os.environ['OMPI_COMM_WORLD_SIZE']
-# If no KeyError raised, the script has been launched by MPI,
-# I must thus import the mpi4py module
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    nprocs = comm.Get_size()
-    mpi_version = True
-    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
-  except KeyError:
-# Not launched by MPI, use sequential code
-    mpi_version = False
-    nprocs = 1
-    rank = 0
-    environment_string += 'Single processor version\n\n'
-  except ImportError:
-# Launched by MPI, but no mpi4py module available. Abort the calculation.
-    exit('mpi4py module not available! I stop!')
-
-  if (rank==0):
+  if rank==0:
     initial_time=time.asctime()
-    hostname = os.uname()[1].split('.')[0]
+#    hostname = os.uname()[1].split('.')[0]
+    print("Python script runs on machine : "+socket.getfqdn())
+    print("Name of python script:  {}".format(os.path.abspath( __file__ )))
+    print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
+    print()
     print("Python script started on: {}".format(initial_time))
-    print("{:>24}: {}".format('from',hostname))
-    print("Name of python script: {}".format(os.path.abspath( __file__ )))
-#    print("Number of available threads: {}".format(multiprocessing.cpu_count()))
-#    print("Number of disorder realizations: {}".format(n_config))
+    print()
 
-    timing=anderson.Timing()
-    t1=time.perf_counter()
+# Parse parameter file and prepare the useful objects:
+# H for the Hamiltonian of the system
+# diagonalization for exact (or sparse) diagonalization
+  geometry, H, diagonalization, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,['Diagonalization','Spin'])
 
-    config = configparser.ConfigParser()
-    config.read('params.dat')
-
-    Averaging = config['Averaging']
-    n_config = Averaging.getint('n_config',1)
-    n_config = (n_config+nprocs-1)//nprocs
-    print("Total number of disorder realizations: {}".format(n_config*nprocs))
-    print("Number of processes: {}".format(nprocs))
-
-    System = config['System']
-    system_size = System.getfloat('size')
-    delta_x = System.getfloat('delta_x')
-    boundary_condition = System.get('boundary_condition','periodic')
-
-    Disorder = config['Disorder']
-    disorder_type = Disorder.get('type','anderson gaussian')
-    correlation_length = Disorder.getfloat('sigma',0.0)
-    V0 = Disorder.getfloat('V0',0.0)
-    disorder_strength = V0
-    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
-
-    Diagonalization = config['Diagonalization']
-    diagonalization_method = Diagonalization.get('method','sparse')
-    targeted_energy = Diagonalization.getfloat('targeted_energy')
-    IPR_min = Diagonalization.getfloat('IPR_min',0.0)
-    IPR_max = Diagonalization.getfloat('IPR_max')
-    number_of_bins = Diagonalization.getint('number_of_bins')
-  else:
-    n_config = None
-    system_size = None
-    delta_x = None
-    boundary_condition = None
-    disorder_type = None
-    correlation_length = None
-    disorder_strength = None
-    use_mkl_random = None
-    diagonalization_method = None
-    targeted_energy = None
- #  n_config = comm.bcast(n_config,root=0)
-
-  if mpi_version:
-    n_config, system_size, delta_x,boundary_condition  = comm.bcast((n_config, system_size,delta_x,boundary_condition ))
-    disorder_type, correlation_length, use_mkl_random, disorder_strength = comm.bcast((disorder_type, correlation_length, use_mkl_random, disorder_strength))
-    diagonalization_method, targeted_energy = comm.bcast((diagonalization_method, targeted_energy))
-
-  timing=anderson.Timing()
   t1=time.perf_counter()
+  my_timing=anderson.timing.Timing()
 
-#  delta_x = comm.bcast(delta_x)
-#  print(rank,n_config,system_size,delta_x)
-    # Number of sites
-  dim_x = int(system_size/delta_x+0.5)
-    # Renormalize delta_x so that the system size is exactly what is wanted and split in an integer number of sites
-  delta_x = system_size/dim_x
+  if rank==0:
 
-  try:
-    import mkl
-    mkl.set_num_threads(1)
-    os.environ["MKL_NUM_THREADS"] = "1"
-  except:
-    pass
+# Print various things for the initial state
+# At this point, it it not yet known whether there is a C implementation available
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
 
-  assert boundary_condition in ['periodic','open'], "Boundary condition must be either 'periodic' or 'open'"
+  number_of_eigenvalues = diagonalization.number_of_eigenvalues
+  tab_IPR = np.zeros(n_config*number_of_eigenvalues)
+  tab_energy = np.zeros(n_config*number_of_eigenvalues)
 
-
-  # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
-  H = anderson.Hamiltonian(dim_x, delta_x, boundary_condition=boundary_condition, disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, use_mkl_random=use_mkl_random, interaction=0.0)
-  diagonalization = anderson.diag.Diagonalization(targeted_energy,diagonalization_method)
-
-  #comm.Bcast(H)
-  header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,diagonalization=diagonalization)
-
-  tab_IPR = np.zeros(n_config)
-  tab_energy = np.zeros(n_config)
   # Here starts the loop over disorder configurations
   for i in range(n_config):
-    tab_energy[i], tab_IPR[i] = diagonalization.compute_IPR(i+rank*n_config, H)
-#    print(IPR)
-  #  pool.apply_async(gpe_evolution, args)
-  #  print(str(i), file=final_pf)
-#  anderson.io.output_density('IPR'+str(rank)+'.dat',tab_IPR,tab_energy,header_string,print_type='IPR')
+    tab_energy[i*number_of_eigenvalues:(i+1)*number_of_eigenvalues], tab_IPR[i*number_of_eigenvalues:(i+1)*number_of_eigenvalues] = diagonalization.compute_IPR(i+rank*n_config, H)
 
+#    H.generate_full_matrix()
+#    print(H.generate_full_complex_matrix(1.0j))
   if mpi_version:
     start_mpi_time = timeit.default_timer()
-    tab_energy_glob = np.zeros(n_config*nprocs)
-    tab_IPR_glob = np.zeros(n_config*nprocs)
+    tab_energy_glob = np.zeros(n_config*nprocs*number_of_eigenvalues)
+    tab_IPR_glob = np.zeros(n_config*nprocs*number_of_eigenvalues)
     comm.Gather(tab_energy,tab_energy_glob)
     comm.Gather(tab_IPR,tab_IPR_glob)
-    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+    my_timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
   else:
     tab_energy_glob = tab_energy
     tab_IPR_glob = tab_IPR
   t2=time.perf_counter()
-  timing.TOTAL_TIME = t2-t1
+  my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
-    timing.mpi_merge(comm)
+    my_timing.mpi_merge(comm)
   if rank==0:
+#    print(tab_energy_glob)
+#    print(tab_IPR_glob)
 #    print(tab_IPR_glob.shape)
-    anderson.io.output_density('IPR.dat',tab_IPR_glob,tab_energy_glob,header_string,print_type='IPR')
-    tab_histogram, bin_edges = np.histogram(tab_IPR_glob, bins=number_of_bins, range=(IPR_min,IPR_max), density=True)
-#  print(tab_histogram)
-#  print(bin_edges)
-    anderson.io.output_density('histogram_IPR.dat',bin_edges[1:],tab_histogram,header_string,print_type='histogram_IPR')
-
+    header_string +='Minimum energy = '+str(np.min(tab_energy_glob))+'\nMaximum energy = '+str(np.max(tab_energy_glob))+'\n'
+    anderson.io.output_density('IPR.dat',tab_IPR_glob,H,header_string=header_string,tab_abscissa=None,data_type='IPR')
+    tab_histogram, bin_edges = np.histogram(tab_IPR_glob, bins=diagonalization.number_of_bins, range=(diagonalization.IPR_min,diagonalization.IPR_max), density=True)
+#    print(tab_histogram)
+#    print(bin_edges)
+    anderson.io.output_density('histogram_IPR.dat',tab_histogram,H,header_string=header_string,tab_abscissa=bin_edges[1:],data_type='histogram_IPR')
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-    print("Total_CPU time       = {0:.3f}".format(timing.TOTAL_TIME))
+      print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
+    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
-
+if __name__ == "__main__":
+  main()

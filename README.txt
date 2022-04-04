@@ -1,8 +1,16 @@
 # README
 # and-python project
-# Version 1.1
+# Version 3.0
 # Author: Dominique Delande
-# May, 13, 2020
+# October, 16, 2020
+
+WARNING: In this version, the following features are not yet implemented:
+* Lyapounov. Not implemented at all for multidimensional systems. C interface in 1d is obsolete.
+* Fast C versions of the most CPU intensive routines, using the ctypes interface are not implemented
+in dimension 3 and larger. 1d and 2d version are working well and are as fast as a pure C code.
+* The spectral function calculation is basically implemented, but requires some additional work and tests.
+Probably not working on Oct, 16, 2020, but should be fixed rapidly.
+* There are inconsistencies on which file is used for reading parameters. See section II.9
 
 I. Physics
 In this section, I discuss physics, leaving numerical methods and implementation
@@ -20,8 +28,7 @@ spectral function, total transmission across a sample,
 giving access to the localization length for the non-interacting (Schroedinger) 
 system. It is aimed at computing quantities averaged over disorder realizations,
 although it can also provide the statistical distributions of some quantities.
-The present version is limited to 1D systems, although it is designed for 
-easy extension to higher dimensions.
+The present version works in arbitrary dimension.
 
 I.2. How does it work?
 The Schroedinger or Gross-Pitaevskii is discretized on a regular grid in
@@ -44,6 +51,7 @@ only one eigenvalue is computed, but this is very easily changed in diag.py.
 This is only for non-interacting systems.
 
 I.4. Localization length (Lyapounov exponent)
+** Currently does not work for multidimensional systems **
 The transfer matrix method makes it possible to solve the Schroedinger equation
 at a given energy E (not necessarily an energy level) assuming some boundary 
 condition on the left side and propagating to the right side. The propagation 
@@ -91,7 +99,7 @@ Because of the sparse  structure of H, this can be computed efficiently.
 The number of terms in the series is roughly range(H)*dt, 
 where range(H)=E_max_E_min is the spectral range of the 
 Hamiltonian. This is valid when N is large, for smaller range(H)*dt, N has to be 
-taken slightly larger, with a minimum value of the order of 10. As the CPU time 
+taken slightly larger. As the CPU time 
 needed scales like N, the cost of propagating over a long time (by chaining many
 elementary Chebyshev propagations) is almost independent of the time step, provided
 range(H)*dt is >> 1. A basic rule of thumb is not to take time steps making N 
@@ -105,10 +113,15 @@ previously described Chebyshev expansion while the non-linear propagation
 approximation only if g is sufficiently small. Hence, the larger g, the smaller the 
 time step dt to be taken. This may be a drawback because the number N of terms in 
 the Chebyshev expansion may become small, implying a loss of efficiency.
-The program records tha maximum value of g\psi|^2dt reached during the all 
-propagation. A rule of thumb is that it should be smaller than 0.1. Sometimes, 
+The program records the maximum value of g|\psi|^2dt reached during the whole
+propagation (the so-called "maximum nonlinear phase"), and prints it. 
+A rule of thumb for systems where the disorder is stronger than interaction
+is that it should be smaller than 0.1. Sometimes, 
 it has been observed that smaller values, say 0.02-0.05, are needed for
-good convergence.
+good convergence. When the interaction is larger than the disorder, the density |\psi|^2
+is more uniform and larger values of the nonlinear phase can be used.
+In any case, it is always good to check the conservation of the total energy (setting 
+"dispersion_energy" to True in the parameter file.
 
 I.6. Spectral function
 The spectral function can be computed by Fourier transform of the autocorrelation
@@ -145,10 +158,12 @@ The list of modules used is:
   copy
   sys
   configparser
+  argparse
   timeit
   scipy.integrate.ode
   scipy.sparse.linalg
   scipy.special
+  ctypes
   anderson
   
 In addition, there are 3 optional modules: mkl, mkl_random and mkl_fft.
@@ -158,7 +173,9 @@ the program uses numpy.random. First tests seem to indicate that mkl_random is s
 If the mkl_fft module is present, most FFTs (the ones which use a lot of CPU time) 
 are performed using the MKL FFT routines. If not present, the program uses numpy.fft,
 which is a bit slower.
-All the modules are available using anaconda, which is recommended.
+All the modules are available using anaconda or miniforge, the later one being recommended.
+The ctypes module should also be made optional, but is not in this version.
+
 The last module "anderson" contains all the specific code of this software.
 
 II.2. The "anderson" module
@@ -196,7 +213,8 @@ the IPR of a single state using the compute_IPR routine.
 The diagonalization routine is either numpy.linalg.eigh (Lapack diagonalization)
 or scipy.sparse.linalg (Sparse diagonalization), which internally uses Arpack.
 Of course, sparse diagonalization is much faster for large matrices. It can easily
-go to matrices of size 1.e7, the main limitation being memory allocation.
+go to matrices of size 1.e7 in 1d, the main limitation being memory allocation.
+In 2d, it works quite well. Preliminary tests in 3d show that it does not behave too well.
 It should be good to explore the specialized module primme https://github.com/
 primme/primme, not available in conda, but easy to get using pip.
 Another interesting possibility would be to interface with Jadamilu.
@@ -224,10 +242,10 @@ There are basic examples in the files:
   diag/compute_IPR.py
   lyapounov/compute_lyapounov_vs_energy.py
   prop/compute_prop.py
-  aek0/compute_spectral_function.py
+  spectral_function/compute_spectral_function.py
 All these examples are supposed to run in few seconds.
 The structure is the same for each example:
-  1. Read parameters of the calculation in file params.dat (see section II.9)
+  1. Read parameters of the calculation in the parameter file (see section II.9)
   2. Prepare the Hamiltonian structure
   3. Prepare the calculation to be performed, including numpy arrays for the 
      results and the "header strings" for output (see section II.10)
@@ -237,37 +255,56 @@ The structure is the same for each example:
   7. Print a summary of CPU time and number of Flops.
 These examples can be used as templates for your own calculations.
 There should be comments in these files, but there are only few at the moment.
+How to launch these scripts is explained in sections II.9 (serial version) and II.12 (MPI version).
 
 II.9. Input parameters
-In the examples, the parameters are in a file name params.dat which is parsed
+In the examples, the parameters are read from a "parameter file".
+The present stage is a bit inconsistent. For temporal propagation, it is required
+to give as argument the name of the parameter file, i.e. something like:
+  python compute_prop.py my_parameter_file
+For other python scripts, the parameters are expected to be in the "params.dat" and the script is launched with e.g.
+  python compute_IPR.py
+In a future version, every script will require explicitly the name of the parameter file.
+The parameter file is parsed
 using the Python configparser module. Of course, it is always possible to
 define the various parameters using other methods, e.g. direct assignement at the
 beginning of the Python script or parsing a XML file (not implemented yet).
 Using the configparser module, the input file (typically params.dat) is divided
 in several sections, each section refering to a family of parameters. 
-For example, the params.dat file for the Lyapounov example is:
+For example, the parameter file params.dat for the spectral_function example is:
 
 #####################################################################
 [System]
+dimension = 2
 # System size in natural units
-size = 1.e4
+size_1 = 20.
+size_2 = 20.
+size_3 = 5.
+size_4 = 1.
 # Spatial discretization
-delta_x = 0.25
+delta_1 = 0.5
+delta_2 = 0.5
+delta_3 = 0.25
+delta_4 = 0.25
 # either periodic or open
-boundary_condition = open
+boundary_condition_1 = periodic
+boundary_condition_2 = periodic
+boundary_condition_3 = periodic
+boundary_condition_4 = periodic
 
 [Disorder]
 #  Various disorder types can be used
-type = anderson_gaussian
+# type = anderson
+# type = anderson_gaussian
 # type = regensburg
-# type = konstanz
+type = konstanz
 # type = singapore
 # type = speckle
-# Correlation length of disorder (ignored for discrete Anderson disorders)
-sigma = 1.591549431
+use_mkl_random = True
+# Correlation length of disorder
+sigma = 1.0
 # Disorder strength
-V0 = 0.01
-use_mkl_random = False
+V0 = 1.0
 
 [Nonlinearity]
 # g is the nonlinear interaction
@@ -276,78 +313,45 @@ g = 0.0
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
-# make sure that k_0_over_2_pi*my_system_size is an integer
-k_0_over_2_pi = 0.16
-#0.16
+#initial_state = gaussian_wave_packet
+# make sure that k_0_over_2_pi_i*size_i is an integer
+k_0_over_2_pi_1 = 0.0
+k_0_over_2_pi_2 = 0.0
 # Size of Gaussian wavepacket
-sigma_0 = 10.0
+sigma_0_1 = 10.0
+sigma_0_2 = 10.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
 method = che
-# Internally, the wavefunction can be stored either as a complex numpy array
-# or as a real numpy array (twice the size) containing the real parts
-# followed by the imaginary parts
-# real used to be a bit faster (10%), but, from May, 13, 2020, it is the reverse...
-data_layout = complex
+data_layout = real
+#data_layout = complex
 # Total duration of the propagation
-t_max = 2000.
+t_max = 25.0
 # Elementary time step
-delta_t = 2.
-
-[Spectral]
-# Range of energies covered
-range = 20.0
-# Resolution of the spectral function
-resolution = 0.02
+delta_t = 1.0
 
 [Averaging]
-n_config = 8
+n_config = 10000
 
 [Measurement]
-delta_t_measurement = 2.
-# Not presently used
+delta_t_measurement = 1.0
 #first_measurement = 0
-# Whether to measure the density in configuration space
 density = True
-# Whether to measure the density in momentum space
 density_momentum = True
-# Whether to measure <x(t)> and <x^2(t)>
 dispersion_position = True
-# Whether to measure <p(t)>
-dispersion_momentum = True
-# Whether to compute the total energy (should be constant)
-# and the nonlinear part of the energy (=0 if g=0)
-dispersion_energy = True
-# Whether to compute the average final wavefunction in configuration and momentum spaces
-wavefunction_final = True
-# Whether to compute the autocorrelation function <psi(0)|psi(t)>
-autocorrelation = True
-# Whether to compute the standard deviation (over disorder realizations) of
-# x(t), x^2(t), p(t), E_total(t) and E_nonlinear(t)
-# This is computed only for quantities whose average value is computed
+dispersion_position2 = True
+#dispersion_momentum = True
+#dispersion_energy = True
 dispersion_variance = True
+#wavefunction = True
+#wavefunction_momentum = True
+#autocorrelation = True
 use_mkl_fft = True
 
-[Diagonalization]
-method = sparse
-targeted_energy = 0.6
-# Characteristics of the histogram of the IPR values
-IPR_min = 0.0
-IPR_max = 0.01
-number_of_bins = 50
-
-[Lyapounov]
-# Minimum energy for which the Lyapounov is computed
-e_min = 0.0
-# Maximum energy for which the Lyapounov is computed
-e_max = 0.40
-number_of_e_steps = 20
-# Characteristics of the histogram of the Lyapounov values
-e_histogram = 0.22
-lyapounov_min = 0.0
-lyapounov_max = 0.02
-number_of_bins = 50
+[Spectral]
+range = 20.0
+resolution = 0.01
 #####################################################################
 
 The comments should be self-explanatory. 
@@ -361,7 +365,7 @@ The three obligatory sections are:
 
 WARNING: When MPI is used (see section II.12), the parameter n_config
 refers to the TOTAL number of configurations. This is different from
-the an1d_propxx.c programs, where it was the number of configurations
+the anxd_propxx.c programs, where it was the number of configurations
 per MPI process.
 
 Other sections are as follows:
@@ -395,7 +399,7 @@ At the moment, only ASCII human-readable files are used.
 In a next release, it is planned to add HDF5 outputs.
 The output files are produced by the numpy.savetxt routine. It consists in a header
 (using the "header" parameter of numpy.savetxt) followed by a series of lines, each 
-line containing at least two numerical values. For a temporal propagation, it can
+line containing at least two numerical values. For a 1D temporal propagation, it can
 be for example, time in column 1 and <x> in column 2.
 Normally, the header_string contains all the information on the content of each 
 column. The header is conveniently created using the output_string routine (in 
@@ -409,14 +413,79 @@ One can also print a complex function ('autocorrelation') or a complex
 wavefunction in configuration ('wavefunction') of momentum 
 ('wavefunction_momentum') space.
 The more specialized output_dispersion routine is for output of the various results
-of a temporal propagation, such as <x(t0>, <p(t)>, <E_total(t)>..., optionally
+of a temporal propagation, such as <x(t)>, <p(t)>, <E_total(t)>..., optionally
 with the standard deviation.
 
 II.11. C routines
 The most numerically intensive routines have been also written in C. They should
 be strictly equivalent to the corresponding Python routines.
-II.11.1 CFFI interface
-They use the CFFI interface. Basically, it defines a proper C-Python interface
+In the first versions, the CFFI interface between Python and C was used. 
+Starting from version 3.0, the ctypes interface is used. In a near future, it may be that
+the pybind11 interface between Python and C++ will be used.
+
+II.11.1 Ctypes interface
+The basic idea is to write a pure traditional C code implementing the calculation-intensive routines. 
+For the temporal propagation using the Chebyshev method, there is for exemple in "anderson/ctypes/chebyshev.c" a C routine defined by:
+  double chebyshev_real(const int dimension, const int * restrict tab_dim, const int max_order,  const int * restrict tab_boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old,  const double * restrict disorder, const double * restrict tab_coef, const double * tab_tunneling, const double two_over_delta_e, const double two_e0_over_delta_e, const double g_times_delta_t, const double e0_times_delta_t);
+The code is compiled using "make" with the Makefile in the "anderson/ctypes" directory.
+The GNU, clang and Intel compilers may be used, just by setting the COMPILER 
+environment variable (see in the Makefile). It seems that the Intel compiler
+gives the fastest code, it is thus recommended to use it if available.
+
+WARNING: The code is generated in a routine typically name chebyshev.so
+Depending on the options in the Makefile, it may run only on the specific machine where it has been compiled.
+If you encounter some error like "Illegal instruction", you have te recompile the C code.
+If using the Intel compiler on Linux, the code should be portable and optimized for all Intel/AMD architectures.
+
+On the python side, nothing has to be modified in the main script. Only the code inside the "anderson/propagation.py" file
+is modified to use C routines if available. For exemple, in the "gpe_evolution" routine, there are the following lines:
+    if propagation.want_ctypes:
+#      print('I want ctypes')
+      try:
+        chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
+        if propagation.data_layout=='real':
+          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_real') and    hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
+          chebyshev_ctypes_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+            ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
+            ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+          chebyshev_ctypes_lib.chebyshev_real.restype = ctypes.c_double
+        else:
+          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_complex') and hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_complex_'+str(H.dimension)+'d')
+          chebyshev_ctypes_lib.chebyshev_complex.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+            ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
+            ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+          chebyshev_ctypes_lib.chebyshev_complex.restype = ctypes.c_double
+        if propagation.use_ctypes == False:
+          chebyshev_ctypes_lib = None
+          if H.seed == 1234:
+            print("\nWarning, chebyshev C library found, but without routines for dimension "+str(H.dimension)+", this uses the slow Python version!\n")
+      except:
+        propagation.use_ctypes = False
+        chebyshev_ctypes_lib = None
+        if H.seed == 1234:
+          print("\nWarning, no chebyshev C library found, this uses the slow Python version!\n")
+    else:
+      propagation.use_ctypes = False
+      chebyshev_ctypes_lib = None
+
+which test if the proper routines exist in the "anderson/ctypes/chebyshev.so" library and, if succesful, defines the types of the arguments and return value of the useful routines. This uses the standard ctypes and numpy.ctypeslib modules.
+
+Then, in the chebyshev_step routine, the C code is called if it is available with:
+  nonlinear_phase = chebyshev_ctypes_lib.chebyshev_real(H.dimension, np.asarray(H.tab_dim,dtype=np.intc), max_order, H.array_boundary_condition,\
+        local_wfc, psi, psi_old, H.disorder.ravel(), propagation.tab_coef, np.asarray(H.tab_tunneling),\
+        H.two_over_delta_e, H.two_e0_over_delta_e, H.interaction*propagation.delta_t, H.medium_energy*propagation.delta_t)
+so that the conversion between Python and C variables and pointers is properly done.
+If the C code is not available, an equivalent Python code is used, but it is MUCH slower.
+ 
+At the moment, there are only the two routines chebyshev_real and chebyshev_complex in chebyshev.c 
+(the two routines correspond to the choice of the data_layout). These routines internally manage both the 1d and 2d cases.
+The 3d case will be added in a later version. 
+One routine could be developped for the calculation of the total energy as it is a
+bit costly. Computing <x>, <x^2>, <p>, <E_nonlinear> is significantly less
+expensive, thus a C version is not so important. 
+       
+II.11.2 Old CFFI interface
+The routines use the CFFI interface. Basically, it defines a proper C-Python interface
 and a C source code embedded in a Python wrapper.
 For example, the lyapounov_build.py file contains at the beginning:
   from cffi import FFI
@@ -451,7 +520,7 @@ and must be recompiled on each machine.
 The compilation also produces intermediate _lyapounov.c and _lyapounov.o files,
 which can be discarded.
 
-II.11.2 On the Python side, the compute_lyapounov method in the Lyapounov class 
+On the Python side, the compute_lyapounov method in the Lyapounov class 
 contains:
   try:
     from anderson._lyapounov import ffi,lib
@@ -469,50 +538,36 @@ When the routine is needed, the code looks like:
 which uses the CFFI version if available, the Python version in the core_lyapounov
 Python routine otherwise. 
 
-II.11.3 Routines with a C version
-There are two C codes in
-lyapounov_build.py: core_lyapounov_cffi 
-                    for the computation of the Lyapounov exponent
-chebyshev_build.py: chebyshev_clenshaw_real and chebyshev_clenshaw_complex
-                    for a single step of the Chebyshev propagation
-                    the two routines correspond to the choice of the data_layout
-One routine could be developped for the calculation of the total energy as it is a
-bit costly. Computing <x>, <x^2>, <p>, <E_nonlinear> is significantly less
-expensive, thus a C version is not so important. 
 
 II.12. Parallelism using MPI
 The code can be parallelized using MPI. The parallelization is only the trivial
 one over disorder realizations (no use of the Python multiprocessing module). 
 The reason is that it is both easier to program and slightly more efficient to use MPI.
 This however requires the mpi4py module, which is not always available (not by default
-on anaconda). Thus the code contains things like:
-  try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    nprocs = comm.Get_size()
-    mpi_version = True
-    environment_string += 'MPI version ran on '+str(nprocs)+' processes\n\n'
-  except ImportError:
-    mpi_version = False
-    nprocs = 1
-    rank = 0
-    environment_string += 'Single processor version\n\n'
+on anaconda and miniforge). Thus the code contains must contain near the beginning something like:
+
+  mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
+
+which checks whether the python script is called inside a MPI process. 
+If this is the case, mpi_version is True, the  MPI communicator is comm, the number of
+MPI processes is nprocs, the rank of the current process is rank, and
+mpi_string contains some minimal MPI information
+If not run inside MPI, mpi_version=False, comm=None, nprocs=1, rank=0 and mpi_string contains proper information
 
 The MPI version is launched using e.g.:
   mpiexec -n 8 python compute_prop.py
 If no mpi4py module is found, a standard sequential routine is used, which means
-that the same calculation is performed 8 time |-(.
+that the same calculation is performed 8 times |-(.
 
 If MPI is activated, all I/O is done on process 0. Input data (parsed from the input
 file) are broadcasted to other processes. Then, each process builds its own objects
 and works with the defined methods, like without MPI.
 After all configurations have been treated, the data are gathered/reduced on process 0,
 which performs the remaining calculation and the output.
-Altogether, it is no much change compared to the sequential code.
+Altogether, it is not much change compared to the sequential code.
 
 WARNING: When MPI is used, the parameter n_config refers to the TOTAL number of 
-configurations. This is different from the an1d_propxx.c programs, 
+configurations. This is different from the anxd_propxx.c programs, 
 where it was the number of configurations per MPI process.
   
   

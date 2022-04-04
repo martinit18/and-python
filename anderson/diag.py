@@ -11,9 +11,13 @@ import scipy.sparse.linalg as sparse_linalg
 # import scipy.sparse
 
 class Diagonalization:
-  def __init__(self,targeted_energy,method='sparse'):
+  def __init__(self,targeted_energy,method='sparse',number_of_eigenvalues=1,IPR_min=0.0,IPR_max=1.0,number_of_bins=1):
     self.targeted_energy = targeted_energy
     self.method = method
+    self.IPR_min = IPR_min
+    self.IPR_max = IPR_max
+    self.number_of_bins = number_of_bins
+    self.number_of_eigenvalues = number_of_eigenvalues
 
   def compute_IPR(self, i, H):
     H.generate_disorder(seed=i+1234)
@@ -22,40 +26,97 @@ class Diagonalization:
 #    print(matrix)
       w, v = np.linalg.eigh(matrix)
 #    print(w)
-      index = np.abs(w-self.targeted_energy).argmin()
+#      index = np.abs(w-self.targeted_energy).argmin()
+      index_array = np.argsort(abs(w-self.targeted_energy))
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
     if self.method=='sparse':
-      matrix = H.generate_sparse_matrix()
-# The following line is obviously less efficient
-#    matrix = H.generate_full_matrix()
-# The following line uses a CSR storage for the sparse matrix and is slightly less efficient
-#    matrix = scipy.sparse.csr_matrix(matrix)
-      w, v = sparse_linalg.eigsh(matrix,k=1,sigma=self.targeted_energy,mode='normal')
-      index = 0
-# The normalization (division by delta_x) ensures that IPR is roughly the inverse of the localization length
-    IPR = np.sum(v[:,index]**4)/(H.delta_x)
-#  print('Energy=',w[index])
-    return (w[index],IPR)
+      H.generate_sparse_matrix()
+      w, v = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal')
+      imin = 0
+      imax = self.number_of_eigenvalues
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        index_array = np.argsort(w)
+        w = w[index_array]
+        v = v[:,index_array]
+  # The normalization (division by delta_vol) ensures that IPR is roughly the inverse of the localization length
+    if H.spin_one_half:
+      IPR = np.sum(np.abs(v[:,imin:imax])**4,axis=0)/H.delta_vol
+    else:
+      IPR = np.sum(v[:,imin:imax]**4,axis=0)/H.delta_vol
+    return w[imin:imax], IPR
 
-  def compute_rbar(self, i, H):
+  def compute_tab_r(self, i, H):
     H.generate_disorder(seed=i+1234)
     if self.method=='lapack':
       matrix = H.generate_full_matrix()
 #    print(matrix)
       w = np.linalg.eigvalsh(matrix)
-      tab_r = np.zeros(H.dim_x-2)
-      for j in range(H.dim_x-2):
-        r = (w[j+2]-w[j+1])/(w[j+1]-w[j])
-        if r>1.0: r=1.0/r
-        tab_r[j] = r
-    return (w[1:H.dim_x-1],tab_r)
+      index_array = np.argsort(abs(w-self.targeted_energy))
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
+    if self.method=='sparse':
+      H.generate_sparse_matrix()
+#      print(H.sparse_matrix.dtype)
+#      matrix2 = H.generate_sparse_complex_matrix(1j)
+      w = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal',return_eigenvectors=False)
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        w = np.sort(w)
+      imin = 0
+      imax = self.number_of_eigenvalues
+    tab_r = np.zeros(imax-2-imin)
+    for j in range(imin,imax-2):
+      r = (w[j+2]-w[j+1])/(w[j+1]-w[j])
+      if r>1.0: r=1.0/r
+      tab_r[j-imin] = r
+    return (w[imin+1:imax-1],tab_r)
 
-  def compute_wavefunction(self,i,H,k=4):
+  def compute_wavefunction(self,i,H):
     H.generate_disorder(seed=i+1234)
     if self.method=='lapack':
       matrix = H.generate_full_matrix()
 #    print(matrix)
       w, v = np.linalg.eigh(matrix)
-#    print(w)
+      index_array = np.argsort(abs(w-self.targeted_energy))
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
+    if self.method=='sparse':
+      H.generate_sparse_matrix()
+      w, v = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal')
+      imin = 0
+      imax = self.number_of_eigenvalues
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        index_array = np.argsort(w)
+        w = w[index_array]
+        v = v[:,index_array]
+    return w[imin:imax],v[:,imin:imax]/np.sqrt(H.delta_vol)
+
+  def compute_full_spectrum(self,i,H):
+    H.generate_disorder(seed=i+1234)
+    matrix = H.generate_full_matrix()
+#    print(matrix)
+    w = np.linalg.eigvalsh(matrix)
+    return w
+
+  def compute_spectrum(self,i,H):
+    H.generate_disorder(seed=i+1234)
+    if self.method=='lapack':
+      matrix = H.generate_full_matrix()
+#    print(matrix)
+      w = np.linalg.eigvalsh(matrix)
+      index_array = np.argsort(abs(w-self.targeted_energy))
+#    print(index_array[0:self.number_of_eigenvalues])
+      imin = np.min(index_array[0:self.number_of_eigenvalues])
+      imax = np.max(index_array[0:self.number_of_eigenvalues])+1
+      return w[imin:imax]
+# Old, less efficient, code
+      """
 # identify the closest eigenvalue
       index = np.abs(w-self.targeted_energy).argmin()
       index_right = index+1
@@ -66,25 +127,16 @@ class Diagonalization:
           index_left -=1
         else:
           index_right += 1
-      return w[index_left+1:index_right],v[:,index_left+1:index_right]/np.sqrt(H.delta_x)
-
+      return w[index_left+1:index_right]
+      """
     if self.method=='sparse':
-      matrix = H.generate_sparse_matrix()
-# The following line is obviously less efficient
-#    matrix = H.generate_full_matrix()
-# The following line uses a CSR storage for the sparse matrix and is slightly less efficient
-#    matrix = scipy.sparse.csr_matrix(matrix)
-      w, v = sparse_linalg.eigsh(matrix,k=k,sigma=self.targeted_energy,mode='normal')
-#      print(w)
-#  print('Energy=',w[index])
-      return w,v/np.sqrt(H.delta_x)
+      H.generate_sparse_matrix()
+      w = sparse_linalg.eigsh(H.sparse_matrix,k=self.number_of_eigenvalues,sigma=self.targeted_energy,mode='normal',return_eigenvectors=False)
+# The sparse_linalg.eigsh is complete bullshit for complex hermitian matrices, it requires to sort the eigenvalues
+      if (H.spin_one_half):
+        w = np.sort(w)
+      return w
 
-  def compute_full_spectrum(self,i,H):
-    H.generate_disorder(seed=i+1234)
-    matrix = H.generate_full_matrix()
-#    print(matrix)
-    w, v = np.linalg.eigh(matrix)
-    return w
 
   def compute_landscape(self,i,H,initial_state,pivot):
     H.generate_disorder(seed=i+1234)
@@ -98,7 +150,7 @@ class Diagonalization:
 #    matrix = H.generate_full_matrix()
 # The following line uses a CSR storage for the sparse matrix and is slightly less efficient
 #    matrix = scipy.sparse.csr_matrix(matrix)
-      landscape = 1.0/np.abs(sparse_linalg.spsolve(matrix,initial_state.wfc))
+      landscape = 1.0/np.abs(sparse_linalg.spsolve(matrix,initial_state.wfc))+self.targeted_energy
     return landscape
 
   def compute_landscape_2(self,i,H,pivot):
