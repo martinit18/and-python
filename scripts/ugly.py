@@ -12,5 +12,5 @@ option = '-n 2000 -d 0.02 -m 0.1 -i 1.0 '
 for i in range(1,50):
   print(i)
   file_name = 'density_momentum_intermediate_'+str(i)+'.dat'
-  os.system("python /users/champ/delande/git/and-python/multi/scripts/my_extract_radial.py "+option+file_name)
-os.system("python /users/champ/delande/git/and-python/multi/scripts/my_extract_radial.py "+option+"density_momentum_final.dat")
+  os.system("python /users/champ/delande/git/and-python/scripts/my_extract_radial.py "+option+file_name)
+os.system("python /users/champ/delande/git/and-python/scripts/my_extract_radial.py "+option+"density_momentum_final.dat")

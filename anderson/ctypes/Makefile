@@ -10,8 +10,8 @@ CC=icc
 # -fargument-noalias-global -complex-limited-range -fargument-noalias -qopt-calloc
 #export CFLAGS=-Ofast -xHost -ftz -qopt-report=4 -qopt-report-phase=vec -finline -fno-alias -IPF-fp-relaxed -restrict 
 export CFLAGS=-Ofast -xCORE-AVX2 -mauto-arch=core-avx512 -ftz -qopt-report=4 -qopt-report-phase=vec 
-export CFLAGS=-Ofast -xCORE-AVX2 -qopt-report=4 -qopt-report-phase=vec -ftz
-export CFLAGS=-Ofast -xHost -qopt-report=4 -qopt-report-phase=vec -ftz
+#export CFLAGS=-Ofast -xCORE-AVX2 -qopt-report=4 -qopt-report-phase=vec -ftz
+#export CFLAGS=-Ofast -xHost -qopt-report=4 -qopt-report-phase=vec -ftz
 endif
 
 ifeq ($(COMPILER),oneapi)
