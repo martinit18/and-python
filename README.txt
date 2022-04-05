@@ -1,8 +1,8 @@
 # README
 # and-python project
-# Version 3.0
+# Version 3.1
 # Author: Dominique Delande
-# October, 16, 2020
+# April, 5, 2022
 
 WARNING: In this version, the following features are not yet implemented:
 * Lyapounov. Not implemented at all for multidimensional systems. C interface in 1d is obsolete.
