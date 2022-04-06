@@ -32,14 +32,10 @@ __version__ = "1.0"
 
 import os
 import time
-import math
 import numpy as np
-import copy
 import getpass
-import configparser
 import timeit
 import sys
-import socket
 import argparse
 sys.path.append('/home/lkb/delande/git/and-python')
 sys.path.append('/users/champ/delande/git/and-python')
@@ -58,7 +54,7 @@ def main():
 # set mpi_string to something containing minimal MPI information
 # If not run inside MPI, nprocs=1 and rank=0
   mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
-  environment_string='Script ran by '+getpass.getuser()+' on machine '+socket.getfqdn()+'\n'\
+  environment_string='Script ran by '+getpass.getuser()+' on machine '+os.uname()[1]+'\n'\
              +'Name of python script:  {}'.format(os.path.abspath( __file__ ))+'\n'\
              +'Name of parameter file: {}'.format(os.path.abspath(parameter_file))+'\n'\
              +mpi_string+'\n'
@@ -66,7 +62,7 @@ def main():
   if rank==0:
     initial_time=time.asctime()
 #    hostname = os.uname()[1].split('.')[0]
-    print("Python script runs on machine : "+socket.getfqdn())
+    print("Python script runs on machine : "+os.uname()[1])
     print("Name of python script:  {}".format(os.path.abspath( __file__ )))
     print("Name of parameter file: {}".format(os.path.abspath(parameter_file)))
     print()
