@@ -160,11 +160,12 @@ The list of modules used is:
   configparser
   argparse
   timeit
-  scipy.integrate.ode
-  scipy.sparse.linalg
+  scipy.integrate
+  scipy.sparse
   scipy.special
   ctypes
-  anderson
+  numba
+
   
 In addition, there are 3 optional modules: mkl, mkl_random and mkl_fft.
 The mkl module is only used to set the number of OpenMP threads, it is probably useless.
@@ -184,7 +185,7 @@ This module contains all the basic code for the calculations. It contains:
   diag.py for exact diagonalization routines
   io.py for input/output routines
   lyapounov.py for calculation of the Lyapounov exponent
-  propagation.py for temporal propagation
+  propagation.py for temporal propagation*
 
 II.3. Classes
 The code defines the following classes:
