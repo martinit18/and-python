@@ -65,7 +65,7 @@ class Temporal_Propagation:
     self.use_ctypes = self.has_specific_full_chebyshev_routine and self.want_ctypes
     if self.use_ctypes:
       self.chebyshev_propagation = chebyshev_propagation_ctypes
-    else:  
+    else:
       self.chebyshev_propagation = chebyshev_propagation_generic
  # Is there a specific routine for a Chebyshev step?
 # In general, there is no specific routine
@@ -124,7 +124,7 @@ def chebyshev_step_generic_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c
 # Generic code uses the sparse multiplication
   psi_old[:] = c1*H.apply_h(psi)-c2*psi[:]+c_coef*wfc[:]-psi_old[:]
 #  print('psi',psi)
-#  print('psi_old',psi_old)  
+#  print('psi_old',psi_old)
   return
 
 def chebyshev_step_generic_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
@@ -437,8 +437,8 @@ def chebyshev_step_3d_complex_numba(dim_x, dim_y, dim_z, b_x, b_y, b_z, disorder
 # If periodic boundary condition along z, copy the first and last row along y
   if b_z=='periodic':
     p_new[dim_z+2:(dim_y+1)*(dim_z+2):dim_z+2]=p_new[2*dim_z+2:(dim_y+1)*(dim_z+2)+dim_z:dim_z+2]
-    p_new[2*dim_z+3:(dim_y+1)*(dim_z+2)+dim_z+1:dim_z+2]=p_new[dim_z+3:(dim_y+1)*(dim_z+2)+1:dim_z+2] 
-# this is the main loop for propagation along the x direction    
+    p_new[2*dim_z+3:(dim_y+1)*(dim_z+2)+dim_z+1:dim_z+2]=p_new[dim_z+3:(dim_y+1)*(dim_z+2)+1:dim_z+2]
+# this is the main loop for propagation along the x direction
   for i in range(dim_x):
     p_temp=p_old
     p_old=p_current
@@ -463,8 +463,8 @@ def chebyshev_step_3d_complex_numba(dim_x, dim_y, dim_z, b_x, b_y, b_z, disorder
 # If periodic boundary condition along z, copy the first and last row along y
     if b_z=='periodic':
       p_new[dim_z+2:(dim_y+1)*(dim_z+2):dim_z+2]=p_new[2*dim_z+2:(dim_y+1)*(dim_z+2)+dim_z:dim_z+2]
-      p_new[2*dim_z+3:(dim_y+1)*(dim_z+2)+dim_z+1:dim_z+2]=p_new[dim_z+3:(dim_y+1)*(dim_z+2)+1:dim_z+2] 
-    for j in range(dim_y):  
+      p_new[2*dim_z+3:(dim_y+1)*(dim_z+2)+dim_z+1:dim_z+2]=p_new[dim_z+3:(dim_y+1)*(dim_z+2)+1:dim_z+2]
+    for j in range(dim_y):
       i_low=i*dim_transverse+j*dim_z
       i_high=i_low+dim_z
 # Ready to treat the current row
@@ -478,7 +478,7 @@ def chebyshev_step_3d_complex_numba(dim_x, dim_y, dim_z, b_x, b_y, b_z, disorder
 #  p_current=None
 #  p_new=None
 #  print('psi',psi)
-#  print('psi_old',psi_old)  
+#  print('psi_old',psi_old)
   return
 
 def chebyshev_propagation_ctypes(wfc, H, propagation, timing):
@@ -628,7 +628,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
     measurement.perform_measurement_potential(H)
     if propagation.method=='che':
       H.generate_sparse_matrix()
-      H.energy_range(accurate=propagation.accurate_bounds)     
+      H.energy_range(accurate=propagation.accurate_bounds)
   save_interaction = H.interaction
   save_disorder = copy.deepcopy(H.disorder)
 #  print(save_disorder)
@@ -636,6 +636,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
   H.interaction = 0.0
   H.disorder = H.disorder + save_interaction*spectral_function.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
   initial_state_2 = copy.deepcopy(initial_state)
+#  print('1',initial_state.type,initial_state_2.type)
 #  print(H.disorder[0,0])
 #  print(np.sum(H.disorder))
 #  print(save_disorder.dtype,initial_state.wfc.dtype)
@@ -650,6 +651,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
   H.disorder = copy.deepcopy(save_disorder)
 #  H.disorder = save_disorder
   initial_state = copy.deepcopy(initial_state_2)
+#  print('2',initial_state.type,initial_state_2.type)
 #  print(H.disorder[0,0])
 #  print(np.sum(H.disorder))
 #  print(H.interaction)
@@ -663,7 +665,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
   def solout(t,y):
     timing.N_SOLOUT+=1
     return None
-
+# print('0',initial_state.type)
   start_dummy_time=timeit.default_timer()
 #  dimension = H.dimension
 #  tab_dim = geometry.tab_dim
@@ -677,14 +679,14 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
     measurement.perform_measurement_potential(H)
     if propagation.method=='che':
       H.generate_sparse_matrix()
-      H.energy_range(accurate=propagation.accurate_bounds)     
+      H.energy_range(accurate=propagation.accurate_bounds)
 #    H.energy_range(accurate=True)
 #    print('  accurate bounds',H.e_min,H.e_max)
 #    H.energy_range(accurate=False)
 #    print('inaccurate bounds',H.e_min,H.e_max)
-  if initial_state.type == 'multi_point' and initial_state.randomize_initial_state == True:
+#  if initial_state.type == 'multi_point' and initial_state.randomize_initial_state == True:
 #    print('multi_point initial state, randomized')
-    anderson.wavefunction.Wavefunction.multi_point(initial_state,seed=i_seed+2345)
+#    anderson.wavefunction.Wavefunction.multi_point(initial_state,seed=i_seed+2345)
 #    print(initial_state.wfc.ravel()[0])
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
@@ -740,7 +742,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
   delta_t_old = -1.0
   tiny = 1.e-12
 #time evolution
-#  print(measurement.tab_time)  
+#  print(measurement.tab_time)
   for i in range(1,measurement.tab_time.shape[0]):
     if (propagation.method == 'ode'):
       start_ode_time = timeit.default_timer()
@@ -1121,4 +1123,3 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2
 # ,H.two_over_delta_e,H.two_e0_over_delta_e,H.tab_tunneling[0],c_coef,one_or_two,add_real)
   return
 """
-
