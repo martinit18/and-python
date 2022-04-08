@@ -211,6 +211,49 @@ class Wavefunction(Geometry):
         wfc_momentum = np.einsum(string[0:self.dimension]+','+string[i]+'->'+string[0:self.dimension],wfc_momentum,phase_factor)
       return np.fft.fftshift(wfc_momentum)
 
+  def convert_from_momentum_space_to_configuration_space(self,use_mkl_fft=True):
+#    psic_momentum = self.delta_x*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
+#   psic_momentum *= np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))
+#    return np.fft.fftshift(self.delta_x*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.dim_x)*np.pi*(1.0/self.dim_x-1.0))/np.sqrt(2.0*np.pi))
+# The conversion space->momentum is a bit tricky, here are the explanations:
+# Position x_i is discretized as x_k=(k+1/2-dim_x/2)delta_x for 0\leq k \lt dim_x
+# Momentum is discretized as p_l = l delta_p for 0 \leq l \lt dim_x and delta_p=2\pi/(dim_x*delta_x)
+# (more on negative momenta below)
+# The position->momentum transformation is defined by \psi(p) = 1/\sqrt{2\pi} \int_0^L \psi(x) \exp(-ipx) dx
+# where L=dim_x*delta_x is the system size.
+# An elementary calculation shows that, after discretization:
+# \psi(p_l) = delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1)) \sum_{k=0..dim_x-1} \psi(x_k) \exp{-2i\pi kl/dim_x}
+# The last sum is directly given by the routine np.fft.fft (or mkl_fft.fft) applied on self.wfc
+# After that, remains the multiplication by delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1))
+# Because of FFT, the momentum is also periodic, meaning that the l values above are not 0..dim_x-1, but rather
+# -dim_x/2..dim_x/2-1. At the exit of np.fft.fft, they are in the order 0,1,...dim_x/2-1,-dim_x/2,..,-1.
+# They are put back in the natural order -dim_x/2...dim_x/2-1 using the np.fft.fftshift routine.
+    if use_mkl_fft:
+      try:
+        import mkl_fft
+        my_fft = mkl_fft.fftn
+      except ImportError:
+        my_fft = np.fft.fftn
+    else:
+       my_fft = np.fft.fftn
+    wfc_momentum = self.delta_vol*my_fft(self.wfc)/(np.sqrt(2.0*np.pi)**self.dimension)
+# Limited to dimension 10
+    if (self.dimension>10):
+      print('too large dimension, phase factor for the wavefunction in momentum space is not computed')
+      return np.fft.fftshift(wfc_momentum)
+    else:
+# Multiplication by the proper phase factor is done consecutively along each direction
+# using the flexible einsum routine of Numpy
+      string = 'ijklmnopqr'
+# In 2d, the following two lines are a bit more efficient
+#      wfc_momentum = (wfc_momentum.T*np.exp(-1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0))).T
+#      wfc_momentum *= np.exp(-1j*np.arange(self.tab_dim[1])*np.pi*(1.0/self.tab_dim[1]-1.0))
+# This general case works in any dimension
+      for i in range(self.dimension):
+        phase_factor = np.exp(-1j*np.arange(self.tab_dim[i])*np.pi*(1.0/self.tab_dim[i]-1.0))
+        wfc_momentum = np.einsum(string[0:self.dimension]+','+string[i]+'->'+string[0:self.dimension],wfc_momentum,phase_factor)
+      return np.fft.fftshift(wfc_momentum)
+
 
   def energy(self, H):
 #    print(self.wfc.shape)
