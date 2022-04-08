@@ -159,7 +159,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         if spin_one_half:
           print('multi_point initial state is not yet implemented for spin-orbit systems, I switch to point initial state')
           initial_state_type = "point"
-        else:  
+        else:
           minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
           randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       else:
@@ -338,7 +338,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     number_of_eigenvalues = None
     spectre_min = None
     spectre_max = None
-    spectre_resolution = None  
+    spectre_resolution = None
     multiplicative_factor_for_interaction_in_spectral_function = None
     e_min = None
     e_max = None
@@ -502,7 +502,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'V0                                   = '+str(H.disorder_strength)+'\n'
   if H.disorder_type not in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']:
     params_string += \
-                 +'Correlation length                   = '+str(H.correlation_length)+'\n'                 
+                 +'Correlation length                   = '+str(H.correlation_length)+'\n'
   if H.disorder_type=='nice':
     params_string += \
                   'Non diagonal disorder strength       = '+str(H.non_diagonal_disorder_strength)+'\n'\
@@ -517,7 +517,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
 #    print(initial_state.type)
     params_string += \
                   'Initial state                        = '+initial_state.type+'\n'
-    if initial_state.type in ['plane_wave','gaussian_wave_packet','chirped_wave_packet']: 
+    if initial_state.type in ['plane_wave','gaussian_wave_packet','chirped_wave_packet']:
       for i in range(H.dimension):
         params_string += \
                   'k_0_'+str(i+1)+'                                = '+str(initial_state.tab_k_0[i])+'\n'
@@ -531,7 +531,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if initial_state.type == 'multi_point':
       params_string += \
                   'minimum distance between points      = '+str(initial_state.minimum_distance)+'\n'\
-                 +'randomize_initial_state              = '+str(initial_state.randomize_initial_state)+'\n'   
+                 +'randomize_initial_state              = '+str(initial_state.randomize_initial_state)+'\n'
     if H.spin_one_half:
       params_string += \
                   'teta                                 = '+str(initial_state.teta)+' \n'\
@@ -571,7 +571,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'minimum energy for spectral function = '+str(spectral_function.e_min)+'\n'\
                  +'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
                  +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'\
-                 +'multiplicative factor for interaction= '+str(spectral_function.multiplicative_factor_for_interaction)+'\n'  
+                 +'multiplicative factor for interaction= '+str(spectral_function.multiplicative_factor_for_interaction)+'\n'
   if not diagonalization == None:
     params_string += \
                   'targeted_energy                      = '+str(diagonalization.targeted_energy)+'\n'\
@@ -757,8 +757,8 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       if dimension==1:
         if data_type=='g1' or data_type=='wavefunction':
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'+header_string
-#        if data_type=='wavefunction_momentum':
-#          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
+        if data_type=='wavefunction_momentum':
+          header_string=str(geometry.tab_dim[0])+' '+str(2.0*np.pi/(geometry.tab_dim[0]*geometry.tab_delta[0]))+'\n'+header_string
 #        print(data.size,tab_abscissa[0].size)
 #        if tab_abscissa!=[] and data.size==tab_abscissa[0].size:
         if tab_abscissa!=[]:
@@ -869,7 +869,7 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
 
 def my_save_routine(file,array_to_print,header='\n'):
   dimension = array_to_print.ndim
-  if dimension>3: 
+  if dimension>3:
     print('I do not know how to print an array of dimension larger than 3')
   if dimension<3:
     np.savetxt(file,array_to_print,header=header)
@@ -884,7 +884,7 @@ def my_save_routine(file,array_to_print,header='\n'):
       for data_slice in array_to_print:
         if i_header==0:
           np.savetxt(outfile, data_slice,header=header+'Slice 0')
-         
+
         else:
           np.savetxt(outfile, data_slice,header='Slice '+str(i_header))
         i_header+=1
@@ -918,8 +918,8 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
   if (measurement.measure_wavefunction):
     anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
     anderson.io.output_density('wavefunction_final.dat',measurement.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
-#  if (measurement.measure_wavefunction_momentum):
-#    anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
+  if (measurement.measure_wavefunction_momentum):
+    anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
   if (measurement.measure_autocorrelation):
     anderson.io.output_density('temporal_autocorrelation.dat',measurement.tab_autocorrelation,measurement,tab_abscissa=measurement.tab_t_measurement_dispersion,header_string=header_string,data_type='autocorrelation')
   if (measurement.measure_dispersion_position or measurement.measure_dispersion_momentum or measurement.measure_dispersion_energy):

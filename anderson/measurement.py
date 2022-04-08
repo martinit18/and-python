@@ -154,8 +154,8 @@ class Measurement(Geometry):
         self.tab_nonlinear_energy = np.zeros(dim_dispersion)
       if self.measure_wavefunction:
         self.wfc =  np.zeros(self.tab_extended_dim,dtype=np.complex128)
-#      if self.measure_wavefunction_momentum:
-#        self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
+      if self.measure_wavefunction_momentum:
+        self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
       if self.measure_g1:
         self.g1 =  np.zeros(self.tab_dim,dtype=np.complex128)
         dim_g1 = self.tab_dim[:]
@@ -188,7 +188,7 @@ class Measurement(Geometry):
       self.potential = np.zeros(self.tab_dim)
     if self.measure_potential_correlation:
       self.potential_correlation = np.zeros(self.tab_dim)
-#    print(self.measure_potential,self.measure_potential_correlation)  
+#    print(self.measure_potential,self.measure_potential_correlation)
     return
 
 
@@ -256,8 +256,8 @@ class Measurement(Geometry):
         self.tab_nonlinear_energy[1] += measurement.tab_nonlinear_energy**2
     if self.measure_wavefunction:
       self.wfc += measurement.wfc
-#    if self.measure_wavefunction_momentum:
-#      self.wfc_momentum += measurement.wfc_momentum
+    if self.measure_wavefunction_momentum:
+      self.wfc_momentum += measurement.wfc_momentum
     if self.measure_g1:
       self.g1 +=  measurement.g1
       self.g1_intermediate += measurement.g1_intermediate
@@ -342,10 +342,10 @@ class Measurement(Geometry):
       toto = np.empty_like(self.wfc)
       comm.Reduce(self.wfc,toto)
       self.wfc = np.copy(toto)
-#    if self.measure_wavefunction_momentum:
-#      toto = np.empty_like(self.wfc_momentum)
-#      comm.Reduce(self.wfc_momentum,toto)
-#      self.wfc_momentum = np.copy(toto)
+    if self.measure_wavefunction_momentum:
+      toto = np.empty_like(self.wfc_momentum)
+      comm.Reduce(self.wfc_momentum,toto)
+      self.wfc_momentum = np.copy(toto)
     if self.measure_g1:
       toto = np.empty_like(self.g1)
       comm.Reduce(self.g1,toto)
@@ -489,8 +489,8 @@ class Measurement(Geometry):
         next_column += 1
     if self.measure_wavefunction:
       self.wfc /= n_config
-#    if self.measure_wavefunction_momentum:
-#      self.wfc_momentum /= n_config
+    if self.measure_wavefunction_momentum:
+      self.wfc_momentum /= n_config
     if self.measure_g1:
       self.g1 /= n_config
       self.g1_intermediate /= n_config
@@ -598,7 +598,7 @@ class Measurement(Geometry):
     if self.measure_g1:
       self.g1_intermediate[i_tab,:] = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(local_psi.wfc)*np.conj(np.fft.fftn(local_psi.wfc))))*psi.delta_vol
     return
-  
+
   def perform_measurement_potential(self, H):
     if self.measure_potential:
       self.potential = H.disorder - H.diagonal
@@ -619,19 +619,14 @@ class Measurement(Geometry):
 #      self.density_final = local_psi.wfc.real**2+local_psi.wfc.imag**2
     if self.measure_wavefunction:
       self.wfc = psi.wfc
-#    if self.measure_wavefunction_momentum:
-#      self.wfc_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
-#    if self.measure_density_momentum:
-#      if self.measure_wavefunction_momentum:
-#        self.density_momentum_final = self.wfc_momentum.real**2+self.wfc_momentum.imag**2
-#      else:
-#        psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
-#        self.density_momentum_final = psi_momentum.real**2+psi_momentum.imag**2
-#    if self.measure_g1:
-#      self.g1 = #np.fft.fftshift(np.fft.ifftn(np.fft.fftn(local_psi.wfc)*np.conj(np.fft.fftn(local_psi.wfc))))*local_psi.delta_vol
+    if self.measure_wavefunction_momentum:
+      self.wfc_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+# The following two lines are to check that when going back from momentum to configuration space, we end up with the initial wavefunction
+#      psi.wfc_momentum = self.wfc_momentum
+#      toto = psi.convert_from_momentum_space_to_configuration_space(self.use_mkl_fft)
+#      print(psi.wfc)
+#      print(toto)
     if self.measure_overlap:
       self.overlap = np.vdot(init_state_autocorr.wfc,psi.wfc)*psi.delta_vol
 #      print(self.overlap)
     return
-
-    
