@@ -124,12 +124,21 @@ def main():
 #  print(header_string)
 # Print the initial density and wavefunction
 #  anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
-
+# If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
+  if not  H.randomize_hamiltonian:
+    H.generate_disorder(seed=1234)
+    measurement.perform_measurement_potential(H)
+    if propagation.method=='che':
+      H.generate_sparse_matrix()
+      H.energy_range(accurate=propagation.accurate_bounds)
+# If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
+  if not initial_state.randomize_initial_state:
+    initial_state.prepare_initial_state(seed=2345) 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagation for one realization of disorder
 #    print(propagation.delta_t,propagation.t_max,propagation_spectral.delta_t,propagation_spectral.t_max,)
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, propagation_spectral,measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, propagation_spectral,measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function,build_disorder=H.randomize_hamiltonian,build_initial_state=initial_state.randomize_initial_state)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
 # The following lines just for generating and printing a single realization of disorder

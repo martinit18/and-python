@@ -17,9 +17,8 @@ class Wavefunction(Geometry):
     self.wfc = np.zeros(self.tab_extended_dim,dtype=np.complex128)
     return
 
-  def gaussian(self,tab_k_0,tab_sigma_0,initial_lhs_state=None):
-    self.tab_k_0 = tab_k_0
-    self.tab_sigma_0 = tab_sigma_0
+  def gaussian(self):
+
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
     tab_amplitude = np.zeros(self.tab_dim)
@@ -35,15 +34,12 @@ class Wavefunction(Geometry):
     psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
     psi = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
     if self.spin_one_half:
-      self.wfc = np.multiply.outer(psi,initial_lhs_state)
+      self.wfc = np.multiply.outer(psi,self.lhs_state)
     else:
       self.wfc = psi
     return
 
-  def chirped(self,tab_k_0,tab_sigma_0,tab_chirp,initial_lhs_state=None):
-    self.tab_k_0 = tab_k_0
-    self.tab_sigma_0 = tab_sigma_0
-    self.tab_chirp = tab_chirp
+  def chirped(self):
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
     tab_amplitude = np.zeros(self.tab_dim)
@@ -59,14 +55,13 @@ class Wavefunction(Geometry):
     psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
     psi = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
     if self.spin_one_half:
-      self.wfc = np.multiply.outer(psi,initial_lhs_state)
+      self.wfc = np.multiply.outer(psi,self.lhs_state)
     else:
       self.wfc = psi
     return
 
-  def plane_wave(self,tab_k_0,initial_lhs_state=None):
+  def plane_wave(self):
 #    self.type = 'Plane wave'
-    self.tab_k_0 = tab_k_0
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
 #    print(grid_position)
     tab_phase = np.zeros(self.tab_dim)
@@ -74,30 +69,30 @@ class Wavefunction(Geometry):
       tab_phase += self.tab_k_0[i]*grid_position[i]
     psi =  np.exp(1j*tab_phase)/np.sqrt(self.ntot*self.delta_vol)
     if self.spin_one_half:
-      if initial_lhs_state is None:
-        initial_lhs_state=np.ones(self.lhs_dim)/np.sqrt(self.lhs_dim)
-      self.wfc = np.multiply.outer(psi,initial_lhs_state)
+      if self.lhs_state is None:
+        self.lhs_state=np.ones(self.lhs_dim)/np.sqrt(self.lhs_dim)
+      self.wfc = np.multiply.outer(psi,self.lhs_state)
     else:
       self.wfc = psi
 #    print(self.wfc.shape)
 #    print(self.wfc)
     return
 
-  def point(self,initial_lhs_state=None):
+  def point(self):
 #    point = list()
 #    for i in range(self.dimension): point.append(0)
 #    point.append(':')
 #    print(point)
 #    print(tuple(point))
     if self.spin_one_half:
-      self.wfc.ravel()[0:initial_lhs_state.size] = initial_lhs_state[:]/self.delta_vol
+      self.wfc.ravel()[0:self.lhs_state.size] = self.lhs_state[:]/self.delta_vol
     else:
       self.wfc.ravel()[0] = 1.0/self.delta_vol
  #   print(self.wfc.shape)
  #   print(self.wfc)
     return
 
-  def multi_point(self,initial_lhs_state=None,seed=0):
+  def multi_point(self,seed=2345):
 # This creates an initial state with several delta peaks in configuration space
 # These points are locatedon a multidimensional regular rectangular array
 # so that there is at least distance "minimum_distance" (in length units, not numer of sites)
@@ -162,6 +157,19 @@ class Wavefunction(Geometry):
 #      self.wfc[x] *= normalization_factor
 #    print(self.wfc.ravel()[0])
     return
+
+  def prepare_initial_state(self,seed=2345):
+    if (self.type=='plane_wave'):
+      self.plane_wave()
+    if (self.type=='gaussian_wave_packet'):
+      self.gaussian()
+    if (self.type=='chirped_wave_packet'):
+      self.chirped()
+    if (self.type=='point'):
+      self.point()
+    if (self.type=='multi_point'):
+      self.multi_point(seed=seed)
+    return  
 
   def overlap(self, other_wavefunction):
 #    return np.sum(self.wfc*np.conj(other_wavefunction.wfc))*self.delta_x

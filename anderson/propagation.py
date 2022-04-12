@@ -616,13 +616,14 @@ class Spectral_function:
     return tab_spectrum
 
 
-def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, build_disorder=True):
+def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, build_disorder=True, build_initial_state=False):
 #  print(H.interaction,spectral_function.multiplicative_factor_for_interaction)
 # When computing the spectral function from the temporal autocorrelation, it is better to switch off the interaction, so that what is computed is <psi(t)|delta(E-H)|\psi(t)> without any non-linear term in the delta function
 # When the initial state is a plane wave, \overline{|\psi(r,t)|^2} is simply g/V that is a constant shift in energy
 #  print('inside compute_spectral_function')
 #  print(H.disorder[0,0])
 #  print(np.sum(H.disorder))
+#  print('Inside compute_spectral_function build_disorder = ',build_disorder,' seed = ',i_seed+1234)
   if build_disorder:
     H.generate_disorder(seed=i_seed+1234)
     measurement.perform_measurement_potential(H)
@@ -631,6 +632,8 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
       H.energy_range(accurate=propagation.accurate_bounds)
   save_interaction = H.interaction
   save_disorder = copy.deepcopy(H.disorder)
+  if build_initial_state:
+    initial_state.prepare_initial_state(seed=i_seed+2345)  
 #  print(save_disorder)
 #  save_disorder = H.disorder
   H.interaction = 0.0
@@ -644,7 +647,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 #  print(propagation.delta_t,propagation.t_max)
 #  print(initial_state_2.wfc-initial_state.wfc)
 #  print(initial_state.wfc[0,0])
-  gpe_evolution(i_seed, geometry, initial_state_2, H, propagation, propagation, measurement, timing, build_disorder=False)
+  gpe_evolution(i_seed, geometry, initial_state_2, H, propagation, propagation, measurement, timing, build_disorder=False, build_initial_state=build_initial_state)
 #  print(initial_state_2.wfc-initial_state.wfc)
 #  print(initial_state.wfc[0,0])
   H.interaction = save_interaction
@@ -660,11 +663,12 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 #  print(measurement.tab_spectrum)
   return spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
 
-def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_spectral, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, build_disorder=True):
+def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_spectral, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, build_disorder=True, build_initial_state=False):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
     return None
+#  print('Inside GPE build_disorder = ',build_disorder)
 # print('0',initial_state.type)
   start_dummy_time=timeit.default_timer()
 #  dimension = H.dimension
@@ -683,11 +687,11 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #    H.energy_range(accurate=True)
 #    print('  accurate bounds',H.e_min,H.e_max)
 #    H.energy_range(accurate=False)
-#    print('inaccurate bounds',H.e_min,H.e_max)
-#  if initial_state.type == 'multi_point' and initial_state.randomize_initial_state == True:
-#    print('multi_point initial state, randomized')
-#    anderson.wavefunction.Wavefunction.multi_point(initial_state,seed=i_seed+2345)
-#    print(initial_state.wfc.ravel()[0])
+#  print('inaccurate bounds',H.e_min,H.e_max)
+  if build_initial_state:
+#     print('multi_point initial state, randomized')
+     anderson.wavefunction.Wavefunction.prepare_initial_state(initial_state,seed=i_seed+2345)
+#     print(initial_state.wfc.ravel()[0])
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
   else:
@@ -736,7 +740,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #    print('Measure spectral function at time:',measurement.tab_time[0,0],j_spectral_function)
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
     measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(\
-      i_seed, geometry, initial_state, H, propagation_spectral, measurement_spectral, spectral_function, timing, build_disorder=False)
+      i_seed, geometry, initial_state, H, propagation_spectral, measurement_spectral, spectral_function, timing, build_disorder=False, build_initial_state=False)
 #    print('j_spectral_function = ',j_spectral_function)
     j_spectral_function+=1
   delta_t_old = -1.0

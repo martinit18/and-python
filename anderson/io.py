@@ -73,6 +73,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       my_abort(mpi_version,comm,'Parameter file does not have a Disorder section, I stop!\n')
     Disorder = config['Disorder']
     disorder_type = Disorder.get('type','anderson_gaussian')
+    randomize_hamiltonian = Disorder.getboolean('randomize_hamiltonian',True)
     if disorder_type=='nice' and dimension!=1:
       my_abort(mpi_version,comm,"The 'nice' disorder is implemented only in dimension 1, I stop!\n")
     correlation_length = Disorder.getfloat('sigma',0.0)
@@ -137,6 +138,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       Wavefunction = config['Wavefunction']
       all_options_ok=True
       initial_state_type = Wavefunction.get('initial_state')
+      randomize_initial_state = False
+      minimum_distance = 0.0
       if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point","multi_point"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
@@ -162,11 +165,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         else:
           minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
           randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
-      else:
-        minimum_distance = 0.0
-        randomize_initial_state = None
       if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a single point, I stop!\n')
+        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a point or multi_point, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
       teta_measurement = Wavefunction.getfloat('teta_measurement',0.0)
 #      print(teta,teta_measurement)
@@ -283,6 +283,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     tab_dim = None
     tab_boundary_condition = None
     disorder_type = None
+    randomize_hamiltonian = None
     correlation_length = None
     disorder_strength = None
     non_diagonal_disorder_strength = None
@@ -351,8 +352,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   if mpi_version:
     n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = \
       comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength = \
-      comm.bcast((disorder_type, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength))
+    disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength = \
+      comm.bcast((disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength))
     if 'Spin' in my_list_of_sections:
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
         comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
@@ -384,8 +385,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, spin_one_half)
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, \
-      disorder_type=disorder_type, correlation_length=correlation_length, disorder_strength=disorder_strength, non_diagonal_disorder_strength=non_diagonal_disorder_strength, \
+      disorder_type=disorder_type, randomize_hamiltonian=randomize_hamiltonian, correlation_length=correlation_length, disorder_strength=disorder_strength, non_diagonal_disorder_strength=non_diagonal_disorder_strength, \
       b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+#  print(H.randomize_hamiltonian)    
   if spin_one_half:
     H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z, alpha=alpha)
   return_list = [geometry, H]
@@ -394,24 +396,17 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   if 'Wavefunction' in my_list_of_sections:
     initial_state = anderson.wavefunction.Wavefunction(geometry)
     initial_state.type = initial_state_type
+    initial_state.randomize_initial_state = randomize_initial_state
     if spin_one_half:
-      initial_lhs_state = np.array([np.cos(teta),np.sin(teta)])
+      initial_state.lhs_state = np.array([np.cos(teta),np.sin(teta)])
       initial_state.teta = teta
     else:
-      initial_lhs_state = None
-    if (initial_state.type=='plane_wave'):
-      anderson.wavefunction.Wavefunction.plane_wave(initial_state,tab_k_0,initial_lhs_state)
-    if (initial_state.type=='gaussian_wave_packet'):
-      anderson.wavefunction.Wavefunction.gaussian(initial_state,tab_k_0,tab_sigma_0,initial_lhs_state)
-    if (initial_state.type=='chirped_wave_packet'):
-      anderson.wavefunction.Wavefunction.chirped(initial_state,tab_k_0,tab_sigma_0,tab_chirp,initial_lhs_state)
-    if (initial_state.type=='point'):
-      anderson.wavefunction.Wavefunction.point(initial_state,initial_lhs_state)
-    if (initial_state.type=='multi_point'):
-      initial_state.minimum_distance = minimum_distance
-      initial_state.randomize_initial_state = randomize_initial_state
-      initial_state.use_mkl_random = use_mkl_random
-      anderson.wavefunction.Wavefunction.multi_point(initial_state,initial_lhs_state)
+      initial_state.lhs_state = None
+    initial_state.minimum_distance = minimum_distance
+    initial_state.use_mkl_random = use_mkl_random
+    initial_state.tab_k_0 = tab_k_0
+    initial_state.tab_sigma_0 = tab_sigma_0
+    initial_state.tab_chirp = tab_chirp
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
@@ -475,115 +470,116 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
 #  print(spectral_function)
-  params_string = 'Dimension                            = '+str(H.dimension)+'\n'
+  params_string = 'Dimension                              = '+str(H.dimension)+'\n'
   volume = 1.0
   for i in range(H.dimension):
     volume *= H.tab_dim[i]*H.tab_delta[i]
     params_string += \
-                  'Size_'+str(i+1)+'                               = '+str(H.tab_dim[i]*H.tab_delta[i])+'\n'\
-                 +'delta_'+str(i+1)+'                              = '+str(H.tab_delta[i])+'\n'\
-                 +'N_'+str(i+1)+'                                  = '+str(H.tab_dim[i])+'\n'\
-                 +'Boundary_Condition_'+str(i+1)+'                 = '+H.tab_boundary_condition[i]+'\n'
+                  'Size_'+str(i+1)+'                                 = '+str(H.tab_dim[i]*H.tab_delta[i])+'\n'\
+                 +'delta_'+str(i+1)+'                                = '+str(H.tab_delta[i])+'\n'\
+                 +'N_'+str(i+1)+'                                    = '+str(H.tab_dim[i])+'\n'\
+                 +'Boundary_Condition_'+str(i+1)+'                   = '+H.tab_boundary_condition[i]+'\n'
   params_string += \
-                  'Volume                               = '+str(volume)+'\n'\
-                 +'1/mass                               = '+str(H.one_over_mass)+'\n'
+                  'Volume                                 = '+str(volume)+'\n'\
+                 +'1/mass                                 = '+str(H.one_over_mass)+'\n'
   if H.spin_one_half:
     params_string += \
-                  'Spin 1/2                             = True\n'\
-                 +'gamma (p sigma_z)                    = '+str(H.spin_orbit_interaction)+'\n'\
-                 +'Omega (sigma_x/2)                    = '+str(2.0*H.sigma_x)+'\n'\
-                 +'beta (sigma_y)                       = '+str(H.sigma_y)+'\n'\
-                 +'delta (sigma_z/2)                    = '+str(2.0*H.sigma_z)+'\n'\
-                 +'h (p^2 sigma_z)                      = '+str(H.alpha)+'\n'
+                  'Spin 1/2                               = True\n'\
+                 +'gamma (p sigma_z)                      = '+str(H.spin_orbit_interaction)+'\n'\
+                 +'Omega (sigma_x/2)                      = '+str(2.0*H.sigma_x)+'\n'\
+                 +'beta (sigma_y)                         = '+str(H.sigma_y)+'\n'\
+                 +'delta (sigma_z/2)                      = '+str(2.0*H.sigma_z)+'\n'\
+                 +'h (p^2 sigma_z)                        = '+str(H.alpha)+'\n'
   params_string += \
-                  'Disorder type                        = '+H.disorder_type+'\n'\
-                 +'use MKL random number generator      = '+str(H.use_mkl_random)+'\n'
+                  'Disorder type                          = '+H.disorder_type+'\n'\
+                 +'randomize disorder for each config     = '+str(H.randomize_hamiltonian)+'\n'\
+                 +'use MKL random number generator        = '+str(H.use_mkl_random)+'\n'
   params_string += \
-                  'V0                                   = '+str(H.disorder_strength)+'\n'
+                  'V0                                     = '+str(H.disorder_strength)+'\n'
   if H.disorder_type not in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']:
     params_string += \
-                 +'Correlation length                   = '+str(H.correlation_length)+'\n'
+                 +'Correlation length                     = '+str(H.correlation_length)+'\n'
   if H.disorder_type=='nice':
     params_string += \
-                  'Non diagonal disorder strength       = '+str(H.non_diagonal_disorder_strength)+'\n'\
-                 +'Number of non diagonal channels      = '+str(H.b)+'\n'
+                  'Non diagonal disorder strength         = '+str(H.non_diagonal_disorder_strength)+'\n'\
+                 +'Number of non diagonal channels        = '+str(H.b)+'\n'
   params_string += \
-                  'g                                    = '+str(H.interaction)+'\n'\
-                 +'g_over_volume                        = '+str(H.interaction/volume)+'\n'\
-                 +'Number of disorder realizations      = '+str(n_config*nprocs)+'\n'\
-                 +'Number of processes                  = '+str(nprocs)+'\n'\
-                 +'Number of realizations per proc      = '+str(n_config)+'\n'
+                  'g                                      = '+str(H.interaction)+'\n'\
+                 +'g_over_volume                          = '+str(H.interaction/volume)+'\n'\
+                 +'Number of disorder realizations        = '+str(n_config*nprocs)+'\n'\
+                 +'Number of processes                    = '+str(nprocs)+'\n'\
+                 +'Number of realizations per proc        = '+str(n_config)+'\n'
   if not initial_state == None:
 #    print(initial_state.type)
     params_string += \
-                  'Initial state                        = '+initial_state.type+'\n'
+                  'Initial state                          = '+initial_state.type+'\n'
     if initial_state.type in ['plane_wave','gaussian_wave_packet','chirped_wave_packet']:
       for i in range(H.dimension):
         params_string += \
-                  'k_0_'+str(i+1)+'                                = '+str(initial_state.tab_k_0[i])+'\n'
+                  'k_0_'+str(i+1)+'                                  = '+str(initial_state.tab_k_0[i])+'\n'
         if initial_state.type == 'gaussian_wave_packet':
           params_string += \
-                  'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'
+                  'sigma_0_'+str(i+1)+'                              = '+str(initial_state.tab_sigma_0[i])+'\n'
         if initial_state.type == 'chirped_wave_packet':
           params_string += \
-                  'sigma_0_'+str(i+1)+'                            = '+str(initial_state.tab_sigma_0[i])+'\n'\
-                 +'chirp_'+str(i+1)+'                              = '+str(initial_state.tab_chirp[i])+'\n'
+                  'sigma_0_'+str(i+1)+'                              = '+str(initial_state.tab_sigma_0[i])+'\n'\
+                 +'chirp_'+str(i+1)+'                                = '+str(initial_state.tab_chirp[i])+'\n'
     if initial_state.type == 'multi_point':
       params_string += \
-                  'minimum distance between points      = '+str(initial_state.minimum_distance)+'\n'\
-                 +'randomize_initial_state              = '+str(initial_state.randomize_initial_state)+'\n'
+                  'minimum distance between points        = '+str(initial_state.minimum_distance)+'\n'\
+                +'randomize initial state for each config = '+str(initial_state.randomize_initial_state)+'\n'
     if H.spin_one_half:
       params_string += \
-                  'teta                                 = '+str(initial_state.teta)+' \n'\
-                 +'teta_measurement                     = '+str(measurement.teta_measurement)+'\n'
+                  'teta                                   = '+str(initial_state.teta)+' \n'\
+                 +'teta_measurement                       = '+str(measurement.teta_measurement)+'\n'
   if not propagation == None:
     params_string += \
-                  'Integration Method                   = '+propagation.method+'\n'\
-                 +'accuracy                             = '+str(propagation.accuracy)+'\n'
+                  'Integration Method                     = '+propagation.method+'\n'\
+                 +'accuracy                               = '+str(propagation.accuracy)+'\n'
     if propagation.method=='che':
       params_string += \
-                  'accurate spectrum bounds             = '+str(propagation.accurate_bounds)+'\n'\
-                 +'use ctypes implementation            = '+str(propagation.use_ctypes)+'\n'\
-                 +'use specific full Chebyshev routine  = '+str(propagation.has_specific_full_chebyshev_routine)+'\n'\
-                 +'use specific Chebyshev step routine  = '+str(propagation.has_specific_chebyshev_step_routine)+'\n'\
-                 +'use specific H|psi> routine          = '+str(H.has_specific_apply_h_routine)+'\n'
+                  'accurate spectrum bounds               = '+str(propagation.accurate_bounds)+'\n'\
+                 +'use ctypes implementation              = '+str(propagation.use_ctypes)+'\n'\
+                 +'use specific full Chebyshev routine    = '+str(propagation.has_specific_full_chebyshev_routine)+'\n'\
+                 +'use specific Chebyshev step routine    = '+str(propagation.has_specific_chebyshev_step_routine)+'\n'\
+                 +'use specific H|psi> routine            = '+str(H.has_specific_apply_h_routine)+'\n'
       if not timing==None:
         params_string += \
-                  'maximum Chebyshev order              = '+str(timing.MAX_CHE_ORDER)+'\n'\
-                 +'maximum non-linear phase             = '+str(timing.MAX_NONLINEAR_PHASE)+'\n'
+                  'maximum Chebyshev order                = '+str(timing.MAX_CHE_ORDER)+'\n'\
+                 +'maximum non-linear phase               = '+str(timing.MAX_NONLINEAR_PHASE)+'\n'
     params_string += \
-                  'data layout                          = '+propagation.data_layout+'\n'\
-                 +'time step                            = '+str(propagation.delta_t)+'\n'\
-                 +'total time                           = '+str(propagation.t_max)+'\n'
+                  'data layout                            = '+propagation.data_layout+'\n'\
+                 +'time step                              = '+str(propagation.delta_t)+'\n'\
+                 +'total time                             = '+str(propagation.t_max)+'\n'
   if not measurement == None:
     params_string += \
-                  'time step for dispersion measurement = '+str(measurement.delta_t_dispersion)+'\n'\
-                 +'time step for density measurement    = '+str(measurement.delta_t_density)+'\n'\
-                 +'time step for spectral function      = '+str(measurement.delta_t_spectral_function)+'\n'
+                  'time step for dispersion measurement   = '+str(measurement.delta_t_dispersion)+'\n'\
+                 +'time step for density measurement      = '+str(measurement.delta_t_density)+'\n'\
+                 +'time step for spectral function        = '+str(measurement.delta_t_spectral_function)+'\n'
     if initial_state.type=='plane_wave':
       params_string += \
-                  'remove hot pixel in momentum density = '+str(measurement.remove_hot_pixel)+'\n'
+                  'remove hot pixel in momentum density   = '+str(measurement.remove_hot_pixel)+'\n'
     if measurement.measure_overlap:
       params_string += \
-                  '|overlap|**2 with initial state      = '+str(abs(measurement.overlap)**2)+'\n'
+                  '|overlap|**2 with initial state        = '+str(abs(measurement.overlap)**2)+'\n'
     if measurement.measure_spectral_function:
       params_string += \
-                  'minimum energy for spectral function = '+str(spectral_function.e_min)+'\n'\
-                 +'maximum energy for spectral function = '+str(spectral_function.e_max)+'\n'\
-                 +'energy resolution                    = '+str(spectral_function.e_resolution)+'\n'\
-                 +'multiplicative factor for interaction= '+str(spectral_function.multiplicative_factor_for_interaction)+'\n'
+                  'minimum energy for spectral function   = '+str(spectral_function.e_min)+'\n'\
+                 +'maximum energy for spectral function   = '+str(spectral_function.e_max)+'\n'\
+                 +'energy resolution                      = '+str(spectral_function.e_resolution)+'\n'\
+                 +'multiplicative factor for interaction  = '+str(spectral_function.multiplicative_factor_for_interaction)+'\n'
   if not diagonalization == None:
     params_string += \
-                  'targeted_energy                      = '+str(diagonalization.targeted_energy)+'\n'\
-                 +'diagonalization method               = '+diagonalization.method+'\n'\
-                 +'number of computed eigenvalues       = '+str(diagonalization.number_of_eigenvalues)+'\n'
+                  'targeted_energy                        = '+str(diagonalization.targeted_energy)+'\n'\
+                 +'diagonalization method                 = '+diagonalization.method+'\n'\
+                 +'number of computed eigenvalues         = '+str(diagonalization.number_of_eigenvalues)+'\n'
   if not lyapounov == None:
     params_string += \
-                  'minimum energy                       = '+str(lyapounov.e_min)+'\n'\
-                 +'maximum energy                       = '+str(lyapounov.e_max)+'\n'\
-                 +'energy step                          = '+str(lyapounov.e_step)+'\n'\
-                 +'number of energy steps               = '+str(lyapounov.number_of_e_steps)+'\n'\
-                 +'use ctypes implementation            = '+str(lyapounov.use_ctypes)+'\n'
+                  'minimum energy                         = '+str(lyapounov.e_min)+'\n'\
+                 +'maximum energy                         = '+str(lyapounov.e_max)+'\n'\
+                 +'energy step                            = '+str(lyapounov.e_step)+'\n'\
+                 +'number of energy steps                 = '+str(lyapounov.number_of_e_steps)+'\n'\
+                 +'use ctypes implementation              = '+str(lyapounov.use_ctypes)+'\n'
   params_string += '\n'
   return params_string
 

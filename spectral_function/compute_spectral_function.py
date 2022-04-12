@@ -107,21 +107,30 @@ def main():
 # Must be consistent otherwise disaster guaranteed
   my_list_of_sections = ['Wavefunction','Nonlinearity','Measurement','Propagation','Spectral','Spin']
   geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global,_,_,_,n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
-#  print('toto')
+#  print(H.randomize_hamiltonian)
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
 #  print(measurement.measure_potential)
 #  print(measurement.potential)
   if rank==0:
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
-
 #  print(header_string)
-
+# If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
+  if not  H.randomize_hamiltonian:
+    H.generate_disorder(seed=1234)
+    measurement.perform_measurement_potential(H)
+    if propagation.method=='che':
+      H.generate_sparse_matrix()
+      H.energy_range(accurate=propagation.accurate_bounds)
+# If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
+  if not initial_state.randomize_initial_state:
+    initial_state.prepare_initial_state(seed=2345)  
 # Here starts the loop over disorder configurations
   for i in range(n_config):
+#    print(i,H.randomize_hamiltonian)
  #   print(measurement.tab_spectrum)
  # Measure the spectral by propagation
-    measurement.tab_spectrum = anderson.propagation.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, propagation, measurement, spectral_function, my_timing)
+    measurement.tab_spectrum = anderson.propagation.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, propagation, measurement, spectral_function, my_timing, build_disorder=H.randomize_hamiltonian, build_initial_state=initial_state.randomize_initial_state)
  #   print(measurement.tab_spectrum)
     measurement_global.merge_measurement(measurement)
 #  print(measurement_global.tab_position)
