@@ -140,7 +140,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       initial_state_type = Wavefunction.get('initial_state')
       randomize_initial_state = False
       minimum_distance = 0.0
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point","multi_point"]: all_options_ok=False
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point","multi_point",'random']: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
@@ -158,15 +158,15 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
             tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
             if initial_state_type == "chirped_wave_packet":
               tab_chirp.append(Wavefunction.getfloat('chirp_'+str(i+1),0.0))
-      if initial_state_type in ["multi_point"]:
+      if initial_state_type in ["multi_point","random"]:
         if spin_one_half:
-          print('multi_point initial state is not yet implemented for spin-orbit systems, I switch to point initial state')
+          print('multi_point and random initial state are not yet implemented for spin-orbit systems, I switch to point initial state')
           initial_state_type = "point"
         else:
           minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
           randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a point or multi_point, I stop!\n')
+        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a point, a multi_point or random, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
       teta_measurement = Wavefunction.getfloat('teta_measurement',0.0)
 #      print(teta,teta_measurement)
@@ -526,8 +526,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'chirp_'+str(i+1)+'                                = '+str(initial_state.tab_chirp[i])+'\n'
     if initial_state.type == 'multi_point':
       params_string += \
-                  'minimum distance between points        = '+str(initial_state.minimum_distance)+'\n'\
-                +'randomize initial state for each config = '+str(initial_state.randomize_initial_state)+'\n'
+                  'minimum distance between points        = '+str(initial_state.minimum_distance)+'\n'
+    if initial_state.type in ['multi_point','random']:
+      params_string += \
+                  'randomize initial state for each config= '+str(initial_state.randomize_initial_state)+'\n'
     if H.spin_one_half:
       params_string += \
                   'teta                                   = '+str(initial_state.teta)+' \n'\

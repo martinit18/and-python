@@ -91,7 +91,30 @@ class Wavefunction(Geometry):
  #   print(self.wfc.shape)
  #   print(self.wfc)
     return
-
+  
+  def random(self,seed=2345):
+    if self.spin_one_half:
+      sys.exit("random initial state not yet implemented for spin-orbit systems, I stop!")
+    self.seed = seed
+    if self.use_mkl_random:
+      try:
+        import mkl_random
+      except ImportError:
+        self.use_mkl_random=False
+        print('No mkl_random found; Fallback to Numpy random')
+    if self.use_mkl_random:
+      mkl_random.RandomState(77777, brng='SFMT19937')
+      mkl_random.seed(seed,brng='SFMT19937')
+      my_random_normal = mkl_random.standard_normal
+    else:
+      np.random.seed(seed)
+      my_random_normal = np.random.standard_normal
+    my_random_sequence = my_random_normal(2*self.ntot)
+    my_sum = np.sum(my_random_sequence**2)
+    normalization_factor = 1.0/(self.delta_vol*np.sqrt(my_sum))
+    self.wfc = normalization_factor*my_random_sequence.view(np.complex128).reshape(self.tab_dim)
+    return
+   
   def multi_point(self,seed=2345):
 # This creates an initial state with several delta peaks in configuration space
 # These points are locatedon a multidimensional regular rectangular array
@@ -169,6 +192,8 @@ class Wavefunction(Geometry):
       self.point()
     if (self.type=='multi_point'):
       self.multi_point(seed=seed)
+    if (self.type=='random'):
+      self.random(seed=seed)  
     return  
 
   def overlap(self, other_wavefunction):
