@@ -162,6 +162,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         for i in range(dimension):
           if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
           tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
+        randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       if initial_state_type in ["multi_point","random"]:
         if spin_one_half:
           print('multi_point and random initial state are not yet implemented for spin-orbit systems, I switch to point initial state')
@@ -531,7 +532,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if initial_state.type == 'multi_point':
       params_string += \
                   'minimum distance between points        = '+str(initial_state.minimum_distance)+'\n'
-    if initial_state.type in ['multi_point','random']:
+    if initial_state.type in ['multi_point','random','gaussian_randomized']:
       params_string += \
                   'randomize initial state for each config= '+str(initial_state.randomize_initial_state)+'\n'
     if H.spin_one_half:

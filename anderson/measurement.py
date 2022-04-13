@@ -548,10 +548,10 @@ class Measurement(Geometry):
     if self.measure_dispersion_energy:
       self.tab_energy[i_tab], self.tab_nonlinear_energy[i_tab] = psi.energy(H)
     if (self.measure_dispersion_momentum):
-      psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
+      psi_momentum = local_psi.convert_from_configuration_space_to_momentum_space()
       density = psi_momentum.real**2+psi_momentum.imag**2
       if self.spin_one_half:
-        psi_momentum = local_psi_2.convert_to_momentum_space(self.use_mkl_fft)
+        psi_momentum = local_psi_2.convert_from_configuration_space_to_momentum_space()
         density_2 = psi_momentum.real**2+psi_momentum.imag**2
 # Inverse of elementary volume in momentum space
         norm = H.delta_vol*H.ntot/(2.0*np.pi)
@@ -590,10 +590,10 @@ class Measurement(Geometry):
         self.density_intermediate2[i_tab,:] = local_psi2.wfc.real**2+local_psi2.wfc.imag**2
 #      np.savetxt('toto_density.dat',self.density_intermediate[i_tab])
     if self.measure_density_momentum:
-      psi_momentum = local_psi.convert_to_momentum_space(self.use_mkl_fft)
+      psi_momentum = local_psi.convert_from_configuration_space_to_momentum_space()
       self.density_momentum_intermediate[i_tab,:] = psi_momentum.real**2+psi_momentum.imag**2
       if self.spin_one_half:
-        psi_momentum = local_psi2.convert_to_momentum_space(self.use_mkl_fft)
+        psi_momentum = local_psi2.convert_from_configuration_space_to_momentum_space()
         self.density_momentum_intermediate2[i_tab,:] = psi_momentum.real**2+psi_momentum.imag**2
     if self.measure_g1:
       self.g1_intermediate[i_tab,:] = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(local_psi.wfc)*np.conj(np.fft.fftn(local_psi.wfc))))*psi.delta_vol
@@ -620,7 +620,7 @@ class Measurement(Geometry):
     if self.measure_wavefunction:
       self.wfc = psi.wfc
     if self.measure_wavefunction_momentum:
-      self.wfc_momentum = psi.convert_to_momentum_space(self.use_mkl_fft)
+      self.wfc_momentum = psi.convert_from_configuration_space_to_momentum_space()
 # The following two lines are to check that when going back from momentum to configuration space, we end up with the initial wavefunction
 #      psi.wfc_momentum = self.wfc_momentum
 #      toto = psi.convert_from_momentum_space_to_configuration_space(self.use_mkl_fft)

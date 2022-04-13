@@ -22,18 +22,15 @@ class Wavefunction(Geometry):
 # The following line is 5 times faster!
     return np.vdot(self.wfc,other_wavefunction.wfc)*self.delta_vol
 
-  def convert_to_momentum_space(self,use_mkl_fft=True):
-    if self.dimension==1:
+  def convert_from_configuration_space_to_momentum_space(self):
+    if self.dimension==10:
+#      print('wfc',self.wfc)
 # The following three lines are for the simple 1D case
 #      wfc_momentum = self.tab_delta[0]*np.fft.fft(self.wfc)/np.sqrt(2.0*np.pi)
-#      wfc_momentum *= np.exp(-1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0))
+#      wfc_momentum *= np.exp(1j*np.pi*(self.tab_dim[0]-1)*np.fft.fftfreq(self.tab_dim[0]))
 #      return np.fft.fftshift(wfc_momentum)
 # which can be combined in one line
-#      return np.fft.fftshift(self.tab_delta[0]*np.fft.fft(self.wfc)*np.exp(-1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0))/np.sqrt(2.0*np.pi))
-#     print(self.wfc)
-#     print(1-2*np.mod(np.arange(self.tab_dim[0]),2))
-     wfc_momentum = self.tab_delta[0]*np.fft.fft(np.multiply(self.wfc,1-2*np.mod(np.arange(self.tab_dim[0]),2)))/np.sqrt(2.0*np.pi)
-     return wfc_momentum
+      return np.fft.fftshift(self.tab_delta[0]*np.fft.fft(self.wfc)*np.exp(1j*np.pi*(self.tab_dim[0]-1)*np.fft.fftfreq(self.tab_dim[0]))/np.sqrt(2.0*np.pi))
 # The conversion space->momentum is a bit tricky, here are the explanations:
 # Position x_i is discretized as x_k=(k+1/2-dim_x/2)delta_x for 0\leq k \lt dim_x
 # Momentum is discretized as p_l = l delta_p for 0 \leq l \lt dim_x and delta_p=2\pi/(dim_x*delta_x)
@@ -44,10 +41,11 @@ class Wavefunction(Geometry):
 # \psi(p_l) = delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1)) \sum_{k=0..dim_x-1} \psi(x_k) \exp{-2i\pi kl/dim_x}
 # The last sum is directly given by the routine np.fft.fft (or mkl_fft.fft) applied on self.wfc
 # After that, remains the multiplication by delta_x/\sqrt{2\pi} \exp(-i\pi l(1/dim_x-1))
+# l/dim_x is the frequency given by the routine np.fft.fftfreq(dim_x), hence the phase factor after the FFT
 # Because of FFT, the momentum is also periodic, meaning that the l values above are not 0..dim_x-1, but rather
 # -dim_x/2..dim_x/2-1. At the exit of np.fft.fft, they are in the order 0,1,...dim_x/2-1,-dim_x/2,..,-1.
 # They are put back in the natural order -dim_x/2...dim_x/2-1 using the np.fft.fftshift routine.
-    if use_mkl_fft:
+    if self.use_mkl_fft:
       try:
         import mkl_fft
         my_fft = mkl_fft.fftn
@@ -57,30 +55,30 @@ class Wavefunction(Geometry):
        my_fft = np.fft.fftn
     wfc_momentum = self.delta_vol*my_fft(self.wfc)/(np.sqrt(2.0*np.pi)**self.dimension)
 # Limited to dimension 10
-    if (self.dimension>1):
+    if (self.dimension>10):
       print('too large dimension, phase factor for the wavefunction in momentum space is not computed')
       return np.fft.fftshift(wfc_momentum)
     else:
 # Multiplication by the proper phase factor is done consecutively along each direction
 # using the flexible einsum routine of Numpy
       string = 'ijklmnopqr'
-# In 2d, the following two lines are a bit more efficient
+# In 2d, the following two lines are a bit more efficient (to be fixed, wrong as it is)
 #      wfc_momentum = (wfc_momentum.T*np.exp(-1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0))).T
 #      wfc_momentum *= np.exp(-1j*np.arange(self.tab_dim[1])*np.pi*(1.0/self.tab_dim[1]-1.0))
 # This general case works in any dimension
       for i in range(self.dimension):
-        phase_factor = np.exp(-1j*np.arange(self.tab_dim[i])*np.pi*(1.0/self.tab_dim[i]-1.0))
+        phase_factor = np.exp(1j*np.pi*(self.tab_dim[i]-1)*np.fft.fftfreq(self.tab_dim[i]))
         wfc_momentum = np.einsum(string[0:self.dimension]+','+string[i]+'->'+string[0:self.dimension],wfc_momentum,phase_factor)
       return np.fft.fftshift(wfc_momentum)
 
   def convert_from_momentum_space_to_configuration_space(self):
-    if self.dimension == 1:
+    if self.dimension == 10:
 # The following three lines are for the simple 1D case
 #     wfc = np.fft.ifftshift(self.wfc_momentum)*np.exp(1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0))
 #      wfc = np.fft.ifft(wfc)*np.sqrt(2.0*np.pi)/self.tab_delta[0]
 #      return wfc
 # which can be combined in one line
-      return np.fft.ifft(np.fft.ifftshift(self.wfc_momentum)*np.exp(1j*np.arange(self.tab_dim[0])*np.pi*(1.0/self.tab_dim[0]-1.0)))*np.sqrt(2.0*np.pi)/self.tab_delta[0]
+      return np.fft.ifft(np.fft.ifftshift(self.wfc_momentum)*np.exp(-1j*np.pi*(self.tab_dim[0]-1)*np.fft.fftfreq(self.tab_dim[0])))*np.sqrt(2.0*np.pi)/self.tab_delta[0]
 # The conversion from momentum to configuration space follows the same steps than from configuration to momentum space, in reversed order. See explanations in the configuration->momentum routine
     if self.use_mkl_fft:
       try:
@@ -101,7 +99,7 @@ class Wavefunction(Geometry):
       string = 'ijklmnopqr'
 # This general case works in any dimension
       for i in range(self.dimension):
-        phase_factor = np.exp(1j*np.arange(self.tab_dim[i])*np.pi*(1.0/self.tab_dim[i]-1.0))
+        phase_factor = np.exp(-1j*np.pi*(self.tab_dim[i]-1)*np.fft.fftfreq(self.tab_dim[i]))
         wfc = np.einsum(string[0:self.dimension]+','+string[i]+'->'+string[0:self.dimension],wfc,phase_factor)
 # A simple inverse Fourier transform and a proper scaling gives the wavefunction in configuration space
     return my_ifft(wfc)*(np.sqrt(2.0*np.pi)**self.dimension)/self.delta_vol
@@ -153,19 +151,47 @@ class Wavefunction(Geometry):
   def gaussian_randomized(self,seed=2345):
     mask = np.zeros(self.tab_dim)
     tab_k = list()
+#    normalization_factor = np.pi**(-0.25*self.dimension)
     for i in range(self.dimension):
-      toto = np.zeros(self.tab_dim[i])
-      toto[0:self.tab_dim[i]] = -0.5*((np.arange(self.tab_dim[i])-self.tab_dim[i]//2)*self.tab_delta[i]/self.tab_sigma_0[i])**2    
-      tab_k.append(toto)
+      tab_k.append(-0.5*((np.arange(self.tab_dim[i])-self.tab_dim[i]//2)*self.tab_sigma_0[i]*2.0*np.pi/(self.tab_dim[i]*self.tab_delta[i]))**2)   
+#      normalization_factor *= np.sqrt(self.tab_sigma_0[i])
+#    print('normalization_factor = ',normalization_factor)
     tab_distance = np.meshgrid(*tab_k,indexing='ij')
     for i in range(self.dimension):
       mask += tab_distance[i]
+#    self.wfc_momentum = normalization_factor*np.exp(mask).astype(np.complex128)
     self.wfc_momentum = np.exp(mask).astype(np.complex128)
-    print(mask)
-    print(self.wfc_momentum)
+# There are two possibilities for randomizing the Gaussian wavepacket in momentum space:
+# 1. Multiply each component by a complex Gaussian distributed random number
+# 2. Multiply each component by exp(i*phi) with phi a real random number uniformly distributed in [0,2*pi]
+# The two should be essentially equivalent
+# First select the random number generator
+    if self.use_mkl_random:
+      try:
+        import mkl_random
+      except ImportError:
+        self.use_mkl_random=False
+        print('No mkl_random found; Fallback to Numpy random')
+    if self.use_mkl_random:
+      mkl_random.RandomState(77777, brng='SFMT19937')
+      mkl_random.seed(seed,brng='SFMT19937')
+      my_random_normal = mkl_random.standard_normal
+      my_random_uniform = mkl_random.uniform
+    else:
+      np.random.seed(seed)
+      my_random_normal = np.random.standard_normal
+      my_random_uniform = np.random.uniform
+# Method 1:      
+#    self.wfc_momentum *= my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
+# Method 2:
+    self.wfc_momentum *= np.exp(1j*my_random_uniform(0.0,2.0*np.pi,self.ntot)).reshape(self.tab_dim)
+# Normalize the momentum space wavefunction    
+    self.wfc_momentum *= np.sqrt(self.delta_vol*self.ntot/((2.0*np.pi)**self.dimension))/(np.linalg.norm(self.wfc_momentum))
+#    print(mask)
+#    print(self.wfc_momentum)
     self.wfc = self.convert_from_momentum_space_to_configuration_space()
-    print(self.wfc)
-    print(self.convert_to_momentum_space(self))
+#    print(self.wfc)
+#    print(self.convert_from_configuration_space_to_momentum_space())
     return
   
   def chirped(self):
