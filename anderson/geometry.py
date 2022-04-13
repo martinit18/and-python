@@ -13,7 +13,7 @@ import numpy as np
 The class Geometry defines the geometry of the system, including the local Hilbert space on each site (currently limited to spin 1/2 systems) with no reference to the Hamiltonian
 """
 class Geometry:
-  def __init__(self, dimension, tab_dim ,tab_delta, spin_one_half=False):
+  def __init__(self, dimension, tab_dim ,tab_delta, use_mkl_random=False, use_mkl_fft=False, spin_one_half=False):
     self.dimension = dimension
     self.tab_dim = tab_dim
 #    self.tab_hs_dim = copy.deepcopy(tab_dim)
@@ -45,4 +45,6 @@ class Geometry:
       self.lhs_dim = 1
 # Total Hilbert space dimension
     self.hs_dim = self.lhs_dim*self.ntot
+    self.use_mkl_random = use_mkl_random
+    self.use_mkl_fft = use_mkl_fft
     return

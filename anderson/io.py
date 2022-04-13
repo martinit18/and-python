@@ -44,6 +44,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     dimension = System.getint('dimension', 1)
     one_over_mass = System.getfloat('one_over_mass', 1.0)
     use_mkl_fft = System.getboolean('use_mkl_fft',True)
+    use_mkl_random = System.getboolean('use_mkl_random',True)
     tab_size = list()
     tab_delta = list()
     tab_boundary_condition = list()
@@ -81,7 +82,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     disorder_strength = V0
     non_diagonal_disorder_strength = Disorder.getfloat('non_diagonal_disorder_strength',0.0)
     b = Disorder.getint('b',1)
-    use_mkl_random = Disorder.getboolean('use_mkl_random',True)
 
 # Optional Spin section
     if 'Spin' in my_list_of_sections:
@@ -140,7 +140,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       initial_state_type = Wavefunction.get('initial_state')
       randomize_initial_state = False
       minimum_distance = 0.0
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet","chirped_wave_packet","point","multi_point",'random']: all_options_ok=False
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","gaussian_randomized","chirped_wave_packet","point","multi_point",'random']: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
@@ -158,6 +158,10 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
             tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
             if initial_state_type == "chirped_wave_packet":
               tab_chirp.append(Wavefunction.getfloat('chirp_'+str(i+1),0.0))
+      if initial_state_type in ["gaussian_randomized"]:
+        for i in range(dimension):
+          if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
+          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
       if initial_state_type in ["multi_point","random"]:
         if spin_one_half:
           print('multi_point and random initial state are not yet implemented for spin-orbit systems, I switch to point initial state')
@@ -166,7 +170,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
           randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, each dimension must have a k0_over_2_pi value, and a sigma_0 value if not a plane wave, or be a point, a multi_point or random, I stop!\n')
+        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, some parmeters are missing, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
       teta_measurement = Wavefunction.getfloat('teta_measurement',0.0)
 #      print(teta,teta_measurement)
@@ -289,6 +293,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     non_diagonal_disorder_strength = None
     b = None
     use_mkl_random = None
+    use_mkl_fft = None
     spin_one_half = None
     spin_orbit_interaction = None
     sigma_x = None
@@ -329,7 +334,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     measure_g1 = None
     measure_overlap = None
     measure_spectral_function = None
-    use_mkl_fft = None
     remove_hot_pixel = None
     diagonalization_method = None
     targeted_energy = None
@@ -352,8 +356,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   if mpi_version:
     n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = \
       comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength = \
-      comm.bcast((disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, interaction_strength))
+    disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, use_mkl_fft, interaction_strength = \
+      comm.bcast((disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, use_mkl_fft, interaction_strength))
     if 'Spin' in my_list_of_sections:
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
         comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
@@ -366,11 +370,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_potential, measure_potential_correlation, \
         measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position, measure_dispersion_position2, \
         measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, \
-        measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel = \
+        measure_extended, measure_g1, measure_overlap, measure_spectral_function, remove_hot_pixel = \
       comm.bcast((delta_t_dispersion, delta_t_density, delta_t_spectral_function, teta_measurement, measure_potential, measure_potential_correlation, \
         measure_density, measure_density_momentum, measure_autocorrelation, measure_dispersion_position,  measure_dispersion_position2, \
         measure_dispersion_momentum, measure_dispersion_energy, measure_wavefunction, measure_wavefunction_momentum, \
-        measure_extended, measure_g1, measure_overlap, measure_spectral_function, use_mkl_fft, remove_hot_pixel))
+        measure_extended, measure_g1, measure_overlap, measure_spectral_function, remove_hot_pixel))
     if 'Diagonalization' in my_list_of_sections:
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = \
         comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
@@ -382,11 +386,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
 
-  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, spin_one_half)
+  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, )
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, \
       disorder_type=disorder_type, randomize_hamiltonian=randomize_hamiltonian, correlation_length=correlation_length, disorder_strength=disorder_strength, non_diagonal_disorder_strength=non_diagonal_disorder_strength, \
-      b=b, use_mkl_random=use_mkl_random, interaction=interaction_strength)
+      b=b, interaction=interaction_strength)
 #  print(H.randomize_hamiltonian)    
   if spin_one_half:
     H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z, alpha=alpha)
@@ -403,7 +407,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     else:
       initial_state.lhs_state = None
     initial_state.minimum_distance = minimum_distance
-    initial_state.use_mkl_random = use_mkl_random
     initial_state.tab_k_0 = tab_k_0
     initial_state.tab_sigma_0 = tab_sigma_0
     initial_state.tab_chirp = tab_chirp
@@ -493,7 +496,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   params_string += \
                   'Disorder type                          = '+H.disorder_type+'\n'\
                  +'randomize disorder for each config     = '+str(H.randomize_hamiltonian)+'\n'\
-                 +'use MKL random number generator        = '+str(H.use_mkl_random)+'\n'
+                 +'use MKL random number generator        = '+str(H.use_mkl_random)+'\n'\
+                 +'use MKL FFT                            = '+str(H.use_mkl_fft)+'\n'
   params_string += \
                   'V0                                     = '+str(H.disorder_strength)+'\n'
   if H.disorder_type not in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']:

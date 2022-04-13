@@ -25,8 +25,8 @@ They are used in the rescaling of the Hamiltonian to bring its spectrum between 
 """
 
 class Hamiltonian(Geometry):
-  def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', randomize_hamiltonian=True, one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, use_mkl_random=False, interaction=0.0):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,spin_one_half=geometry.spin_one_half)
+  def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', randomize_hamiltonian=True, one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, interaction=0.0):
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft,spin_one_half=geometry.spin_one_half)
 # seed is set to zero to recognize a generic Hamiltonian where the disorder has not been yet set
     self.seed = 0
     dimension = self.dimension
@@ -53,7 +53,6 @@ class Hamiltonian(Geometry):
     self.disorder_type = disorder_type
     self.randomize_hamiltonian = randomize_hamiltonian
     self.correlation_length = correlation_length
-    self.use_mkl_random = use_mkl_random
 #    self.diagonal_term = np.zeros(tab_dim)
 #    self.script_tunneling = 0.
 #    self.script_disorder = np.zeros(tab_dim)
