@@ -181,6 +181,8 @@ class Wavefunction(Geometry):
       np.random.seed(seed)
       my_random_normal = np.random.standard_normal
       my_random_uniform = np.random.uniform
+# Comment out at least one of the two methods
+# If both are commented out, we are back to a Gaussian wavepacket with zero velocity      
 # Method 1:      
 #    self.wfc_momentum *= my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
 # Method 2:
@@ -189,6 +191,7 @@ class Wavefunction(Geometry):
     self.wfc_momentum *= np.sqrt(self.delta_vol*self.ntot/((2.0*np.pi)**self.dimension))/(np.linalg.norm(self.wfc_momentum))
 #    print(mask)
 #    print(self.wfc_momentum)
+# Computes the wavefunction in configuration space
     self.wfc = self.convert_from_momentum_space_to_configuration_space()
 #    print(self.wfc)
 #    print(self.convert_from_configuration_space_to_momentum_space())
