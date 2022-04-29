@@ -39,9 +39,9 @@ g_over_volume = 0.1
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
-initial_state = plane_wave
+#initial_state = plane_wave
 #initial_state = gaussian_wave_packet
-#initial_state = point
+initial_state = random
 # make sure that k_0_over_2_pi_i*size_i is an integer
 k_0_over_2_pi_1 = 0.1
 k_0_over_2_pi_2 = 0.0

@@ -938,7 +938,7 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
   if measurement.measure_spectral_function:
 #    print(measurement.tab_t_measurement_spectral_function.size)
 #    print(measurement.tab_spectrum)
-    if initial_state.type in ['point','multi_point']:
+    if initial_state.type in ['point','multi_point','random']:
       base_string='density_of_states'
       data_type='density_of_states'
     else:
