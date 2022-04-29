@@ -116,17 +116,18 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Optional Nonlinearity section
     if 'Nonlinearity' in my_list_of_sections:
       if not config.has_section('Nonlinearity'):
-        my_abort(mpi_version,comm,'Parameter file does not have a Nonlinearity section, I stop!\n')
-      Nonlinearity = config['Nonlinearity']
+        interaction_strength = 0.0
+      else:  
+        Nonlinearity = config['Nonlinearity']
 # First try to see if g_over_volume is defined
-      interaction_strength = Nonlinearity.getfloat('g_over_volume')
+        interaction_strength = Nonlinearity.getfloat('g_over_volume')
 # If not, try g
-      if interaction_strength==None:
-        interaction_strength = Nonlinearity.getfloat('g',0.0)
-      else:
+        if interaction_strength==None:
+          interaction_strength = Nonlinearity.getfloat('g',0.0)
+        else:
  # Multiply g_over_V by the volume of the system
-        for i in range(dimension):
-          interaction_strength *= tab_size[i]
+          for i in range(dimension):
+            interaction_strength *= tab_size[i]
 #    print(interaction_strength)
     else:
       interaction_strength = 0.0
@@ -140,7 +141,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       initial_state_type = Wavefunction.get('initial_state')
       randomize_initial_state = False
       minimum_distance = 0.0
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet","gaussian_randomized","chirped_wave_packet","point","multi_point",'random']: all_options_ok=False
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","gaussian_randomized","chirped_wave_packet","point","multi_point","random"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
@@ -171,7 +172,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
           randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       if not all_options_ok:
-        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, some parmeters are missing, I stop!\n')
+        my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, some parameters are missing, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)
       teta_measurement = Wavefunction.getfloat('teta_measurement',0.0)
 #      print(teta,teta_measurement)
@@ -188,7 +189,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       accuracy = Propagation.getfloat('accuracy',1.e-6)
       accurate_bounds = Propagation.getboolean('accurate_bounds',False)
       want_ctypes = Propagation.getboolean('want_ctypes',True)
-      data_layout = Propagation.get('data_layout','real')
+      data_layout = Propagation.get('data_layout','complex')
       t_max = Propagation.getfloat('t_max','0.0')
       delta_t = Propagation.getfloat('delta_t','0.0')
 #      if spin_one_half and method=='che':
@@ -503,7 +504,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'V0                                     = '+str(H.disorder_strength)+'\n'
   if H.disorder_type not in ['anderson_gaussian','anderson_uniform','anderson_cauchy','nice']:
     params_string += \
-                 +'Correlation length                     = '+str(H.correlation_length)+'\n'
+                  'Correlation length                     = '+str(H.correlation_length)+'\n'
   if H.disorder_type=='nice':
     params_string += \
                   'Non diagonal disorder strength         = '+str(H.non_diagonal_disorder_strength)+'\n'\

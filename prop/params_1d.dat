@@ -15,6 +15,7 @@ boundary_condition_1 = periodic
 boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
+use_mkl_random = True
 
 [Disorder]
 #  Various disorder types can be used
@@ -24,7 +25,6 @@ type = anderson_gaussian
 # type = konstanz
 # type = singapore
 # type = speckle
-use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
@@ -56,15 +56,14 @@ data_layout = real
 t_max = 100.
 # Elementary time step
 delta_t = 1.0
-#want_cffi = False
+
 
 [Averaging]
 n_config = 100
 
 [Measurement]
 delta_t_dispersion = 2.0
-delta_t_density = 3.
-#first_measurement = 0
+delta_t_density = 20.0
 potential = True
 potential_correlation = True
 #density = True
@@ -72,13 +71,12 @@ potential_correlation = True
 #dispersion_position = True
 #dispersion_position2 = True
 #dispersion_momentum = True
-#dispersion_energy = True
+dispersion_energy = True
 #dispersion_variance = True
 #wavefunction = True
 #wavefunction_momentum = True
 #autocorrelation = True
 g1 = True
-use_mkl_fft = True
 
 [Spectral]
 range = 20.0

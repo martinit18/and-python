@@ -15,6 +15,7 @@ boundary_condition_1 = periodic
 boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
+use_mkl_random = True
 
 [Spin]
 #spin_one_half = True
@@ -32,11 +33,11 @@ type = regensburg
 # type = konstanz
 # type = singapore
 # type = speckle
-use_mkl_random = True
+
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 0.1
+V0 = 0.5
 
 [Nonlinearity]
 # g is the nonlinear interaction
