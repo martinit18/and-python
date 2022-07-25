@@ -184,9 +184,9 @@ class Wavefunction(Geometry):
 # Comment out at least one of the two methods
 # If both are commented out, we are back to a Gaussian wavepacket with zero velocity      
 # Method 1:      
-#    self.wfc_momentum *= my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
+    self.wfc_momentum *= my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
 # Method 2:
-    self.wfc_momentum *= np.exp(1j*my_random_uniform(0.0,2.0*np.pi,self.ntot)).reshape(self.tab_dim)
+#    self.wfc_momentum *= np.exp(1j*my_random_uniform(0.0,2.0*np.pi,self.ntot)).reshape(self.tab_dim)
 # Normalize the momentum space wavefunction    
     self.wfc_momentum *= np.sqrt(self.delta_vol*self.ntot/((2.0*np.pi)**self.dimension))/(np.linalg.norm(self.wfc_momentum))
 #    print(mask)
@@ -195,6 +195,60 @@ class Wavefunction(Geometry):
     self.wfc = self.convert_from_momentum_space_to_configuration_space()
 #    print(self.wfc)
 #    print(self.convert_from_configuration_space_to_momentum_space())
+    return
+
+  def gaussian_with_speckle(self,seed=2345):
+    mask = np.zeros(self.tab_dim)
+    tab_k = list()
+    for i in range(self.dimension):
+      toto = np.zeros(self.tab_dim[i])
+      half_size = self.tab_dim[i]//2+1
+      toto[0:half_size] = -0.5*(np.arange(half_size)*2.0*np.pi*self.wfc_correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
+      toto[self.tab_dim[i]+1-half_size:self.tab_dim[i]] = toto[half_size-1:0:-1]
+      tab_k.append(toto)
+    tab_distance = np.meshgrid(*tab_k,indexing='ij')
+    for i in range(self.dimension):
+       mask += tab_distance[i]
+    mask = np.exp(mask)
+    mask *= np.sqrt(self.ntot/np.sum(mask**2))
+#    print('mask',mask)
+    if self.use_mkl_random:
+      try:
+        import mkl_random
+      except ImportError:
+        self.use_mkl_random=False
+        print('No mkl_random found; Fallback to Numpy random')
+    if self.use_mkl_random:
+      mkl_random.RandomState(77777, brng='SFMT19937')
+      mkl_random.seed(seed,brng='SFMT19937')
+      my_random_normal = mkl_random.standard_normal
+      my_random_uniform = mkl_random.uniform
+    else:
+      np.random.seed(seed)
+      my_random_normal = np.random.standard_normal
+      my_random_uniform = np.random.uniform
+    grid_position = np.meshgrid(*self.grid_position,indexing='ij')
+    tab_phase = np.zeros(self.tab_dim)
+    tab_amplitude = np.zeros(self.tab_dim)
+#    print(tab_position[0].shape)
+#    print(tab_position[1].shape)
+    for i in range(len(grid_position)):
+#      print('i',i,self.tab_k_0[i],grid_position[i])
+      tab_phase += self.tab_k_0[i]*grid_position[i]
+      tab_amplitude += (grid_position[i]/self.tab_sigma_0[i])**2
+# The next two lines are to avoid too small values of abs(psi[i])
+# which slow down the calculation
+    threshold = 100.
+    tab_amplitude =np.where(tab_amplitude>threshold,threshold,tab_amplitude)
+    psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
+    psi *= np.fft.ifftn(mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))
+#    psi *= np.ones(self.tab_dim,dtype=np.complex128)
+    psi = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+    if self.spin_one_half:
+      self.wfc = np.multiply.outer(psi,self.lhs_state)
+    else:
+      self.wfc = psi
+#    print('wfc',self.wfc)
     return
   
   def chirped(self):
@@ -354,5 +408,7 @@ class Wavefunction(Geometry):
       self.random(seed=seed)  
     if (self.type=='gaussian_randomized'):
       self.gaussian_randomized(seed=seed)  
+    if (self.type=='gaussian_with_speckle'):
+      self.gaussian_with_speckle(seed=seed)  
     return  
 

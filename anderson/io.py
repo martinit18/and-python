@@ -141,7 +141,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       initial_state_type = Wavefunction.get('initial_state')
       randomize_initial_state = False
       minimum_distance = 0.0
-      if initial_state_type not in ["plane_wave","gaussian_wave_packet","gaussian_randomized","chirped_wave_packet","point","multi_point","random"]: all_options_ok=False
+      wfc_correlation_length = 0.0
+      if initial_state_type not in ["plane_wave","gaussian_wave_packet","gaussian_randomized","gaussian_with_speckle","chirped_wave_packet","point","multi_point","random"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
       tab_sigma_0 = list()
@@ -164,6 +165,17 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
           tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
         randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
+      if initial_state_type in ["gaussian_with_speckle"]:
+        for i in range(dimension):
+          if not config.has_option('Wavefunction','k_0_over_2_pi_'+str(i+1)): all_options_ok=False
+          k_0_over_2_pi=Wavefunction.getfloat('k_0_over_2_pi_'+str(i+1))
+# k_0_over_2_pi*size must be an integer is all dimensions
+# Renormalize k_0_over_2_pi to ensure it
+          tab_k_0.append(2.0*math.pi*round(k_0_over_2_pi*tab_size[i])/tab_size[i])
+          if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
+          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
+        randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
+        wfc_correlation_length = Wavefunction.getfloat('wfc_correlation_length')
       if initial_state_type in ["multi_point","random"]:
         if spin_one_half:
           print('multi_point and random initial state are not yet implemented for spin-orbit systems, I switch to point initial state')
@@ -176,6 +188,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       teta = Wavefunction.getfloat('teta',0.0)
       teta_measurement = Wavefunction.getfloat('teta_measurement',0.0)
 #      print(teta,teta_measurement)
+#      print(tab_k_0)
 
 
 
@@ -309,6 +322,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     tab_k_0 = None
     tab_sigma_0 = None
     tab_chirp = None
+    wfc_correlation_length = None
     teta = None
     teta_measurement = None
     method = None
@@ -364,8 +378,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
         comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
-      initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement = \
-        comm.bcast((initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, teta, teta_measurement))
+      initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, wfc_correlation_length, teta, teta_measurement = \
+        comm.bcast((initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, wfc_correlation_length, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t))
     if 'Measurement' in my_list_of_sections:
@@ -403,6 +417,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     initial_state = anderson.wavefunction.Wavefunction(geometry)
     initial_state.type = initial_state_type
     initial_state.randomize_initial_state = randomize_initial_state
+    initial_state.wfc_correlation_length = wfc_correlation_length
     if spin_one_half:
       initial_state.lhs_state = np.array([np.cos(teta),np.sin(teta)])
       initial_state.teta = teta
@@ -519,21 +534,24 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
 #    print(initial_state.type)
     params_string += \
                   'Initial state                          = '+initial_state.type+'\n'
-    if initial_state.type in ['plane_wave','gaussian_wave_packet','chirped_wave_packet']:
+    if initial_state.type in ['plane_wave','gaussian_wave_packet','chirped_wave_packet','gaussian_with_speckle']:
       for i in range(H.dimension):
         params_string += \
                   'k_0_'+str(i+1)+'                                  = '+str(initial_state.tab_k_0[i])+'\n'
-        if initial_state.type == 'gaussian_wave_packet':
+        if initial_state.type in ['gaussian_wave_packet','gaussian_with_speckle']:
           params_string += \
                   'sigma_0_'+str(i+1)+'                              = '+str(initial_state.tab_sigma_0[i])+'\n'
         if initial_state.type == 'chirped_wave_packet':
           params_string += \
                   'sigma_0_'+str(i+1)+'                              = '+str(initial_state.tab_sigma_0[i])+'\n'\
                  +'chirp_'+str(i+1)+'                                = '+str(initial_state.tab_chirp[i])+'\n'
+    if initial_state.type == 'gaussian_with_speckle':
+      params_string += \
+                  'correlation length of the speckle      = '+str(initial_state.wfc_correlation_length)+'\n'
     if initial_state.type == 'multi_point':
       params_string += \
                   'minimum distance between points        = '+str(initial_state.minimum_distance)+'\n'
-    if initial_state.type in ['multi_point','random','gaussian_randomized']:
+    if initial_state.type in ['multi_point','random','gaussian_randomized','gaussian_with_speckle']:
       params_string += \
                   'randomize initial state for each config= '+str(initial_state.randomize_initial_state)+'\n'
     if H.spin_one_half:
@@ -923,6 +941,8 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
     anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
     anderson.io.output_density('wavefunction_final.dat',measurement.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
   if (measurement.measure_wavefunction_momentum):
+# Ugly hack for the initial wavefunction in momentum space    
+    anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_from_configuration_space_to_momentum_space(),measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
     anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
   if (measurement.measure_autocorrelation):
     anderson.io.output_density('temporal_autocorrelation.dat',measurement.tab_autocorrelation,measurement,tab_abscissa=measurement.tab_t_measurement_dispersion,header_string=header_string,data_type='autocorrelation')
