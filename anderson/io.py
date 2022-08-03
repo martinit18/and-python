@@ -142,6 +142,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       randomize_initial_state = False
       minimum_distance = 0.0
       wfc_correlation_length = 0.0
+      epsilon_speckle = 0.0
       if initial_state_type not in ["plane_wave","gaussian_wave_packet","gaussian_randomized","gaussian_with_speckle","chirped_wave_packet","point","multi_point","random"]: all_options_ok=False
 #    assert initial_state_type in ["plane_wave","gaussian_wave_packet"], "Initial state is not properly defined"
       tab_k_0 = list()
@@ -176,6 +177,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
         randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
         wfc_correlation_length = Wavefunction.getfloat('wfc_correlation_length')
+        epsilon_speckle = Wavefunction.getfloat('epsilon_speckle',0.0)
       if initial_state_type in ["multi_point","random"]:
         if spin_one_half:
           print('multi_point and random initial state are not yet implemented for spin-orbit systems, I switch to point initial state')
@@ -323,6 +325,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     tab_sigma_0 = None
     tab_chirp = None
     wfc_correlation_length = None
+    epsilon_speckle = None
     teta = None
     teta_measurement = None
     method = None
@@ -378,8 +381,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
         comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
     if 'Wavefunction' in my_list_of_sections:
-      initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, wfc_correlation_length, teta, teta_measurement = \
-        comm.bcast((initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, wfc_correlation_length, teta, teta_measurement))
+      initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, wfc_correlation_length, epsilon_speckle, teta, teta_measurement = \
+        comm.bcast((initial_state_type, minimum_distance, randomize_initial_state, tab_k_0, tab_sigma_0, tab_chirp, wfc_correlation_length, epsilon_speckle, teta, teta_measurement))
     if 'Propagation' in my_list_of_sections:
       method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t = comm.bcast((method, accuracy, accurate_bounds, want_ctypes, data_layout, t_max, delta_t))
     if 'Measurement' in my_list_of_sections:
@@ -418,6 +421,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     initial_state.type = initial_state_type
     initial_state.randomize_initial_state = randomize_initial_state
     initial_state.wfc_correlation_length = wfc_correlation_length
+    initial_state.epsilon_speckle = epsilon_speckle
     if spin_one_half:
       initial_state.lhs_state = np.array([np.cos(teta),np.sin(teta)])
       initial_state.teta = teta
@@ -547,7 +551,8 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'chirp_'+str(i+1)+'                                = '+str(initial_state.tab_chirp[i])+'\n'
     if initial_state.type == 'gaussian_with_speckle':
       params_string += \
-                  'correlation length of the speckle      = '+str(initial_state.wfc_correlation_length)+'\n'
+                  'correlation length of the speckle      = '+str(initial_state.wfc_correlation_length)+'\n'\
+                  'weight of the speckle/background       = '+str(initial_state.epsilon_speckle)+'\n'  
     if initial_state.type == 'multi_point':
       params_string += \
                   'minimum distance between points        = '+str(initial_state.minimum_distance)+'\n'

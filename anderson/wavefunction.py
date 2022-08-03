@@ -127,6 +127,8 @@ class Wavefunction(Geometry):
 #    print('norm=',norm,energy,non_linear_energy)
     return energy/norm,non_linear_energy/norm
 
+# This creates a Gaussian wavepacket with average mommentum given by tab_k_0 
+# and width given by tab_sigma_0
   def gaussian(self):
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
@@ -147,7 +149,10 @@ class Wavefunction(Geometry):
     else:
       self.wfc = psi
     return
-  
+
+# This creates a Gaussian wavepacket (with zero momentum) where the phase is randomized at each point
+# This is probably useless
+# See gaussian_with_soeckle for a better routine  
   def gaussian_randomized(self,seed=2345):
     mask = np.zeros(self.tab_dim)
     tab_k = list()
@@ -182,7 +187,7 @@ class Wavefunction(Geometry):
       my_random_normal = np.random.standard_normal
       my_random_uniform = np.random.uniform
 # Comment out at least one of the two methods
-# If both are commented out, we are back to a Gaussian wavepacket with zero velocity      
+# If both are commented out, we are back to a Gaussian wavepacket with zero momentum      
 # Method 1:      
     self.wfc_momentum *= my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
 # Method 2:
@@ -197,7 +202,18 @@ class Wavefunction(Geometry):
 #    print(self.convert_from_configuration_space_to_momentum_space())
     return
 
+# This creates the sum of a standard gaussian wavepacket and of a speckle gaussian wavepacket
+# Both components share the same momentum tab_k_0 and the same width tab_sigma_0
+# The speckle component is simple the standard gausian wavepacket multiplied by a complex Gaussian random number
+# With a spatial correlation length wfc_correlation_length
+# The resulting correlation function of the speckle field decays like exp(-0.25*(r/wfc_correlation_length)**2),
+# like in Bardon-Brun et al, Phys. Rev. Research 2, 013297 (2020)
+# The weight of the speckle component with respect to the standard gaussian wavepacket is given by the parameter epsilon_speckle
+# epsilon_speckle=0 is a pure gaussian wavepacket
+# epsilon_sepckle-infinity is a pure speckle
+# Everything is normalized by dividing by sqrt(1+epsilon_speckle**2)
   def gaussian_with_speckle(self,seed=2345):
+# Create the mask    
     mask = np.zeros(self.tab_dim)
     tab_k = list()
     for i in range(self.dimension):
@@ -222,11 +238,11 @@ class Wavefunction(Geometry):
       mkl_random.RandomState(77777, brng='SFMT19937')
       mkl_random.seed(seed,brng='SFMT19937')
       my_random_normal = mkl_random.standard_normal
-      my_random_uniform = mkl_random.uniform
+#      my_random_uniform = mkl_random.uniform
     else:
       np.random.seed(seed)
       my_random_normal = np.random.standard_normal
-      my_random_uniform = np.random.uniform
+#      my_random_uniform = np.random.uniform
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
     tab_amplitude = np.zeros(self.tab_dim)
@@ -240,10 +256,22 @@ class Wavefunction(Geometry):
 # which slow down the calculation
     threshold = 100.
     tab_amplitude =np.where(tab_amplitude>threshold,threshold,tab_amplitude)
-    psi = np.exp(-0.5*tab_amplitude+1j*tab_phase)
-    psi *= np.fft.ifftn(mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))
+# psi_smooth is the (not normalized) Gaussian wave packet
+    psi_smooth = np.exp(-0.5*tab_amplitude+1j*tab_phase)
+# psi_speckle is the same multiplied by the speckle field
+# The sqrt(1/2) is here because both the real and imaginary parts of the complex field have unit standard deviation    
+    psi_speckle = psi_smooth*np.sqrt(0.5)*np.fft.ifftn(mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))
+#    print('psi_speckle',psi_speckle)
+#    print('Norms1 = ',np.linalg.norm(psi_smooth)/np.sqrt(self.delta_vol),np.linalg.norm(psi_speckle)/np.sqrt(self.delta_vol))    
 #    psi *= np.ones(self.tab_dim,dtype=np.complex128)
-    psi = psi/(np.linalg.norm(psi)*np.sqrt(self.delta_vol))
+#    print('Norm = ',np.linalg.norm(psi))
+# Normalise psi_smooth
+    psi_smooth = psi_smooth/(np.linalg.norm(psi_smooth)*np.sqrt(self.delta_vol))
+# Normalize psi_speckle
+    psi_speckle= psi_speckle/(np.linalg.norm(psi_speckle)*np.sqrt(self.delta_vol))
+# Combine the two compenents
+    psi = (psi_smooth+self.epsilon_speckle*psi_speckle)/np.sqrt(1.0+self.epsilon_speckle**2)
+#    print('Norms2  = ',np.linalg.norm(psi_smooth)/np.sqrt(self.delta_vol),np.linalg.norm(psi_speckle)/np.sqrt(self.delta_vol),np.linalg.norm(psi)/np.sqrt(self.delta_vol))    
     if self.spin_one_half:
       self.wfc = np.multiply.outer(psi,self.lhs_state)
     else:
