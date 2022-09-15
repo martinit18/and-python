@@ -216,8 +216,8 @@ or scipy.sparse.linalg (Sparse diagonalization), which internally uses Arpack.
 Of course, sparse diagonalization is much faster for large matrices. It can easily
 go to matrices of size 1.e7 in 1d, the main limitation being memory allocation.
 In 2d, it works quite well. Preliminary tests in 3d show that it does not behave too well.
-It should be good to explore the specialized module primme https://github.com/
-primme/primme, not available in conda, but easy to get using pip.
+It should be good to explore the specialized module primme https://github.com/primme/primme, not available in conda, 
+but easy to get using pip.
 Another interesting possibility would be to interface with Jadamilu.
 
 II.5. Lyapounov
