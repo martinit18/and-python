@@ -1,8 +1,8 @@
 # README
 # and-python project
-# Version 3.1
+# Version 3.2
 # Author: Dominique Delande
-# April, 5, 2022
+# September, 15, 2022
 
 WARNING: In this version, the following features are not yet implemented:
 * Lyapounov. Not implemented at all for multidimensional systems. C interface in 1d is obsolete.
@@ -174,7 +174,7 @@ the program uses numpy.random. First tests seem to indicate that mkl_random is s
 If the mkl_fft module is present, most FFTs (the ones which use a lot of CPU time) 
 are performed using the MKL FFT routines. If not present, the program uses numpy.fft,
 which is a bit slower.
-All the modules are available using anaconda or miniforge, the later one being recommended.
+All the modules are available using anaconda (or miniforge), the former one being recommended.
 The ctypes module should also be made optional, but is not in this version.
 
 The last module "anderson" contains all the specific code of this software.
