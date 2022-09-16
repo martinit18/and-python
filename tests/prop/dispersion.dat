@@ -1,0 +1,55 @@
+# Script ran by delande on machine meteor
+# Name of python script:  /home/delande/git/and-python/prop/compute_prop.py
+# Name of parameter file: /home/delande/git/and-python/tests/prop/params_1d.dat
+# Single processor version
+# 
+# Calculation started on: Fri Apr  8 22:27:45 2022
+# Calculation   ended on: Fri Apr  8 22:27:45 2022
+# 
+# Dimension                            = 1
+# Size_1                               = 20.0
+# delta_1                              = 1.0
+# N_1                                  = 20
+# Boundary_Condition_1                 = periodic
+# Volume                               = 20.0
+# 1/mass                               = 1.0
+# Disorder type                        = anderson_gaussian
+# use MKL random number generator      = True
+# V0                                   = 1.0
+# g                                    = 0.0
+# g_over_volume                        = 0.0
+# Number of disorder realizations      = 1
+# Number of processes                  = 1
+# Number of realizations per proc      = 1
+# Initial state                        = plane_wave
+# k_0_1                                = 0.0
+# Integration Method                   = che
+# accuracy                             = 1e-06
+# accurate spectrum bounds             = False
+# use ctypes implementation            = True
+# use specific full Chebyshev routine  = True
+# use specific Chebyshev step routine  = True
+# use specific H|psi> routine          = True
+# maximum Chebyshev order              = 10
+# maximum non-linear phase             = 0.0
+# data layout                          = complex
+# time step                            = 1.0
+# total time                           = 10.0
+# time step for dispersion measurement = 2.0
+# time step for density measurement    = 5.0
+# time step for spectral function      = 10.0
+# remove hot pixel in momentum density = False
+# 
+# Column 1: Time
+# Column 2: <r_1>
+# Column 3: <r_1^2>
+# Column 4: <p_1>
+# Column 5: Total energy
+# Column 6: Nonlinear energy
+# 
+0.000000000000000000e+00 5.551115123125782702e-17 3.325000000000000000e+01 0.000000000000000000e+00 -7.714670045019899128e-03 0.000000000000000000e+00
+2.000000000000000000e+00 -1.044427117355114953e+00 3.552503868974780943e+01 1.237633346979781779e-01 -7.714389868190447801e-03 0.000000000000000000e+00
+4.000000000000000000e+00 -2.191687996913155856e-01 3.422406379340337423e+01 2.138616383840008239e-01 -7.714109691611609372e-03 0.000000000000000000e+00
+6.000000000000000000e+00 -7.216373758218831425e-01 3.651354112358033177e+01 3.220184904770777290e-02 -7.713829515283500936e-03 0.000000000000000000e+00
+8.000000000000000000e+00 -1.197299125203326486e+00 3.199918861939026726e+01 -1.564966248700160739e-02 -7.713549339206053103e-03 0.000000000000000000e+00
+1.000000000000000000e+01 -2.875689520428824086e-01 3.497566252584027779e+01 -2.549310455172723935e-02 -7.713269163379107146e-03 0.000000000000000000e+00

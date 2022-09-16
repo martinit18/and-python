@@ -1,0 +1,110 @@
+[System]
+dimension = 2
+# System size in natural units
+size_1 = 600.
+size_2 = 600.
+size_3 = 10.
+size_4 = 1.
+# Spatial discretization
+delta_1 = 1.5
+delta_2 = 1.5
+delta_3 = 0.25
+delta_4 = 0.25
+one_over_mass = 1.0
+# either periodic or open
+boundary_condition_1 = periodic
+boundary_condition_2 = periodic
+boundary_condition_3 = periodic
+boundary_condition_4 = periodic
+use_mkl_fft = True
+use_mkl_random = True
+
+[Disorder]
+#  Various disorder types can be used
+#type = anderson_uniform
+type = anderson_gaussian
+randomize_hamiltonian = True
+#type = regensburg
+#type = konstanz
+# type = singapore
+# type = speckle
+# Correlation length of disorder
+sigma = 0.5
+# Disorder strength
+V0 = 0.0
+
+[Nonlinearity]
+# g is the nonlinear interaction
+g_over_volume = 0.25
+
+[Wavefunction]
+# Either plane_wave or gaussian_wave_packet
+#initial_state = plane_wave
+#initial_state = gaussian_wave_packet
+#initial_state = point
+#initial_state = multi_point
+#initial_state = random
+#initial_state = gaussian_randomized
+initial_state = gaussian_with_speckle 
+wfc_correlation_length = 6.33
+epsilon_speckle = 0.07
+#minimum_distance = 1.0
+randomize_initial_state = True
+# make sure that k_0_over_2_pi_i*size_i is an integer
+k_0_over_2_pi_1 = 0.0
+k_0_over_2_pi_2 = 0.0
+k_0_over_2_pi_3 = 0.0
+# Size of Gaussian wavepacket
+sigma_0_1 = 10000000.0
+sigma_0_2 = 10000000.0
+
+[Propagation]
+# Propagation method can be either 'ode' or 'che' (for Chebyshev)
+method = che
+#want_ctypes = False
+#data_layout = real
+data_layout = complex
+# Total duration of the propagation
+t_max = 200.
+# Elementary time step
+delta_t = 0.5
+
+[Averaging]
+n_config = 8
+
+[Measurement]
+delta_t_dispersion = 100.0
+delta_t_density = 100.0
+delta_t_spectral_function = 50000.
+#density = True
+#density_momentum = True
+#dispersion_position = True
+#dispersion_position2 = True
+#dispersion_momentum = True
+#dispersion_energy = True
+#dispersion_variance = True
+#wavefunction = True
+#wavefunction_momentum = True
+#autocorrelation = True
+#spectral_function = True
+#potential = True
+#potential_correlation = True
+g1 = True
+
+[Spectral]
+# To specifiy the energy interval where the spectral function or the density of states is computed
+# You may either use the pair [e_min,e_max]
+# or the range variable, in which case the interval is [-range/2,range/2]
+# [e_min,e_max] has precedence over range if both are specified
+range = 20.0
+resolution = 0.05
+e_min = -6.0
+e_max = 70.0
+
+[Diagonalization]
+#method = lapack
+targeted_energy = -0.5
+IPR_min = 0.0
+IPR_max = 0.04
+number_of_bins = 200
+number_of_eigenvalues = 100

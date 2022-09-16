@@ -1,0 +1,24 @@
+# README.g1
+# DD, Sept, 16, 2022
+This directory contains an example for the calculation of the g1 function
+It corresponds to the data in Fig. 2 of T. Bardon-Brun et al, Phys. Rev. Research 2, 013297 (2020)
+The input file is in params_g1_2d.dat and it can be ran with:
+  python compute_prop.py params_g1_2d.dat
+(where you have to put the proper path for the script compute_prop,py, something like ../../prop/compute_prop.py)
+The wallclock time is 12.5s on my desktop computer. 
+As this example averages over 8 disorder realizations, it can also be ran with MPI:
+  mpiexec -n N python compute_prop.py params_g1_2d.dat
+with N the number of processes.
+The system size and the final time are slightly smaller than in the original figure, and the
+spatial discretization a bit too large, but the results are nevertheless good.
+To compare with the original figure, distances have to be multiplied by 0.158 and times divided by 2.
+g1 is computed at t=0, 100 and 200, which corresponds to z/zNL=0, 50, 100.
+You may view the 2d plot of (real part of) g1 using:
+  view_2d.py g1_intermediate_N.dat
+with N=0, 1 or 2.
+You may compute an angular average using
+  my_extract_radial.py g1_intermediate_N.dat
+and looking at the 1d data in g1_intermediate_N_Re_radial.dat
+
+N.B.: In this example, there is no disorder, the randomness is only in the initial state which is
+of type "gaussian_with_speckle". 
