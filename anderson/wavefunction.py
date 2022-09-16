@@ -204,13 +204,13 @@ class Wavefunction(Geometry):
 
 # This creates the sum of a standard gaussian wavepacket and of a speckle gaussian wavepacket
 # Both components share the same momentum tab_k_0 and the same width tab_sigma_0
-# The speckle component is simple the standard gausian wavepacket multiplied by a complex Gaussian random number
+# The speckle component is simply the standard gausian wavepacket multiplied by a complex Gaussian random number
 # With a spatial correlation length wfc_correlation_length
 # The resulting correlation function of the speckle field decays like exp(-0.25*(r/wfc_correlation_length)**2),
 # like in Bardon-Brun et al, Phys. Rev. Research 2, 013297 (2020)
 # The weight of the speckle component with respect to the standard gaussian wavepacket is given by the parameter epsilon_speckle
 # epsilon_speckle=0 is a pure gaussian wavepacket
-# epsilon_sepckle-infinity is a pure speckle
+# epsilon_speckle=infinity is a pure speckle
 # Everything is normalized by dividing by sqrt(1+epsilon_speckle**2)
   def gaussian_with_speckle(self,seed=2345):
 # Create the mask    
