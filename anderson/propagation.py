@@ -555,6 +555,9 @@ def chebyshev_propagation_generic(wfc, H, propagation,timing):
 #    print('endend_no_cffi',local_wfc[0],local_wfc[1],local_wfc[ntot-1])
   return
 
+def chebyshev_spectral_function():
+  return
+
 def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """Returns rhs of Gross-Pitaevskii equation with discretized space
     For data_layout == 'complex':
