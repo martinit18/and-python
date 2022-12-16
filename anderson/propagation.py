@@ -555,7 +555,11 @@ def chebyshev_propagation_generic(wfc, H, propagation,timing):
 #    print('endend_no_cffi',local_wfc[0],local_wfc[1],local_wfc[ntot-1])
   return
 
-def chebyshev_spectral_function():
+def chebyshev_kpm_step(H, psi, psi_old, c1, c2):
+# Generic code uses the sparse multiplication
+  psi_old[:] = c1*H.apply_h(psi)-c2*psi[:]-psi_old[:]
+#  print('psi',psi)
+#  print('psi_old',psi_old)
   return
 
 def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
@@ -585,7 +589,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
 
 
 class Spectral_function:
-  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function):
+  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, method_spectral_function, n_kpm):
     e_range = e_max - e_min
     e_middle = 0.5*(e_max+e_min)
     self.n_pts_autocorr = int(0.5*e_range/e_resolution+0.5)
@@ -596,6 +600,8 @@ class Spectral_function:
     self.t_max = self.delta_t*self.n_pts_autocorr
     self.e_resolution = e_resolution
     self.multiplicative_factor_for_interaction = multiplicative_factor_for_interaction_in_spectral_function
+    self.method_spectral_function = method_spectral_function
+    self.n_kpm = n_kpm
     return
 
   def spectral_function_from_temporal_autocorrelation(self,tab_autocorrelation):
@@ -618,6 +624,44 @@ class Spectral_function:
 # with delta_e = 2*pi/delta_t
     return tab_spectrum
 
+def compute_spectral_function_kpm_method(initial_state, H, spectral_function):
+#  psi_0 = initial_state.wfc.ravel()
+  psi = copy.deepcopy(initial_state.wfc.ravel())
+  psi_old = np.zeros_like(psi)
+  n_kpm = spectral_function.n_kpm
+# The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
+# This avoids the divergence of the denominator at edges  
+  c1 = 2.0/(spectral_function.e_max-spectral_function.e_min+2.0*spectral_function.e_resolution)
+  c2 = 0.5*c1*(spectral_function.e_max+spectral_function.e_min)
+  tab_mu = np.zeros(n_kpm+1)
+# Jackson damping
+#  tab_g = np.ones(n_kpm+1) 
+  tab_g = (np.linspace(n_kpm+2,1,num=n_kpm+1)*np.cos(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))\
+         +np.sin(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))/np.tan(np.pi/(n_kpm+2)))/(n_kpm+2)
+#  print(tab_g)
+# First create the array of x values for which the spectral function is computed
+  n_pts = 2*spectral_function.n_pts_autocorr+1
+  tab_x =  np.linspace(-1.0+1.0/n_pts,1.0-1.0/n_pts,num=n_pts)
+#  tab_mu = np.zeros(2*((spectral_function.n_kpm+1)//2)+1) 
+  tab_mu[0] = np.vdot(initial_state.wfc,psi).real*H.delta_vol
+  chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+  c1 *= 2.0
+  c2 *= 2.0
+  tab_mu[1] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol*tab_g[1]
+# The various Chebyshev polynomials are computed by recursion
+# Initialize T_0 and T_1
+  tab_T_old = np.ones(n_pts)
+  tab_T = tab_x*tab_T_old
+  tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T
+  for i in range(2,n_kpm+1):
+    psi_old, psi = psi, psi_old
+    chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+    tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol*tab_g[i]
+#  print(tab_mu)  
+    tab_T_old = 2.0*tab_x*tab_T-tab_T_old
+    tab_spectrum += 2.0*tab_mu[i]*tab_T_old
+    tab_T, tab_T_old = tab_T_old, tab_T
+  return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-tab_x**2)*(spectral_function.e_max-spectral_function.e_min+2.0*spectral_function.e_resolution))    
 
 def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, build_disorder=True, build_initial_state=False):
 #  print(H.interaction,spectral_function.multiplicative_factor_for_interaction)
@@ -641,6 +685,8 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 #  save_disorder = H.disorder
   H.interaction = 0.0
   H.disorder = H.disorder + save_interaction*spectral_function.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+  if spectral_function.method_spectral_function == 'kpm':
+    return compute_spectral_function_kpm_method(initial_state, H, spectral_function)
   initial_state_2 = copy.deepcopy(initial_state)
 #  print('1',initial_state.type,initial_state_2.type)
 #  print(H.disorder[0,0])
