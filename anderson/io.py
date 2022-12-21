@@ -184,7 +184,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           initial_state_type = "point"
         else:
           minimum_distance = Wavefunction.getfloat('minimum_distance',0.0)
-          randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
+          randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',True)
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Wavefunction section of the parameter file, some parameters are missing, I stop!\n')
       teta = Wavefunction.getfloat('teta',0.0)

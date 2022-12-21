@@ -28,6 +28,14 @@ void elementary_clenshaw_step_complex_2d(const int dim_x, const int dim_y, const
 
 void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y, const int dim_z, const int b_x, const int b_y, const int b_z, const double complex * restrict wfc, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c_coef, const int add_real, const double c1, const double c2, const double c3_x, const double c3_y, const double c3_z);
 
+void chebyshev_kpm_step(const int dimension, const int * restrict tab_dim, const int * restrict tab_boundary_condition, double complex * restrict psi, double complex * restrict psi_old,  const double * restrict disorder, const double * tab_tunneling, const double c1, const double c2);
+
+void chebyshev_kpm_step_1d(const int dim_x, const int boundary_condition, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c1, const double c2, const double c3_x);
+
+void chebyshev_kpm_step_2d(const int dim_x, const int dim_y, const int b_x, const int b_y,  const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c1, const double c2, const double c3_x, const double c3_y);
+
+void chebyshev_kpm_step_3d(const int dim_x, const int dim_y, const int dim_z, const int b_x, const int b_y, const int b_z, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c1, const double c2, const double c3_x, const double c3_y, const double c3_z);
+
 uint64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
 {
   return ((timeA_p->tv_sec * 1000000000) + timeA_p->tv_nsec) -
@@ -1242,3 +1250,495 @@ inline void elementary_clenshaw_step_complex_3d(const int dim_x, const int dim_y
   return;
 }
 
+void chebyshev_kpm_step(const int dimension, const int * restrict tab_dim, const int * restrict tab_boundary_condition, double complex * restrict psi, double complex * restrict psi_old,  const double * restrict disorder, const double * tab_tunneling, const double c1, const double c2)
+{
+  double c3_x, c3_y, c3_z;
+  int i;
+#ifdef TIMING
+  struct timespec start, end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
+  int ntot=1;
+  for (i=0;i<dimension;i++) {
+    ntot *= tab_dim[i];
+  }
+  if (dimension==1) {
+    int dim_x = tab_dim[0];
+    int boundary_condition = tab_boundary_condition[0];
+    double c3_x = c1*tab_tunneling[0];
+    chebyshev_kpm_step_1d(dim_x, boundary_condition, psi, psi_old, disorder, c1, c2, c3_x);
+  }
+//  printf("%f %f %f %f %f %f\n",psi[100],psi_old[100],wfc[100]);
+  if (dimension==2) {
+    int dim_x = tab_dim[0];
+    int dim_y = tab_dim[1];
+    int b_x = tab_boundary_condition[0];
+    int b_y = tab_boundary_condition[1];
+    double c3_x = c1*tab_tunneling[0];
+    double c3_y = c1*tab_tunneling[1];
+    chebyshev_kpm_step_2d(dim_x, dim_y, b_x, b_y, psi, psi_old, disorder, c1, c2, c3_x, c3_y);
+  }  
+  if (dimension==3) {
+    int dim_x = tab_dim[0];
+    int dim_y = tab_dim[1];
+    int dim_z = tab_dim[2];
+    int b_x = tab_boundary_condition[0];
+    int b_y = tab_boundary_condition[1];
+    int b_z = tab_boundary_condition[2];
+    double c3_x = c1*tab_tunneling[0];
+    double c3_y = c1*tab_tunneling[1];
+    double c3_z = c1*tab_tunneling[2];
+//    printf("%d %d %d %d %f %f %f %f\n",dim_x,dim_y,b_x,b_y,c1,c2,c3_x,c3_y);
+    chebyshev_kpm_step_3d(dim_x, dim_y, dim_z, b_x, b_y, b_z, psi, psi_old, disorder, c1, c2, c3_x, c3_y, c3_z);
+  } 
+  return;
+}
+
+inline void chebyshev_kpm_step_1d(const int dim_x, const int boundary_condition, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c1, const double c2, const double c3_x)
+{
+  int i;
+//  printf("c_coef %f\n",c_coef);
+// boundary_condition=1 is periodic
+// boundary_condition=0 is open
+  if (boundary_condition) {
+    psi_old[0] = (c1*disorder[0]-c2)*psi[0] - c3_x*(psi[1]+psi[dim_x-1]) - psi_old[0];
+    psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1] -c3_x*(psi[0]+psi[dim_x-2]) - psi_old[dim_x-1] ;
+  } else { 
+    psi_old[0] = (c1*disorder[0]-c2)*psi[0] - c3_x*(psi[1]) - psi_old[0];
+    psi_old[dim_x-1] = (c1*disorder[dim_x-1]-c2)*psi[dim_x-1] -c3_x*(psi[dim_x-2]) - psi_old[dim_x-1] ;
+  }
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif
+  for (i=1;i<dim_x-1;i++) {
+//    printf("i %d\n",i);
+    psi_old[i]=(c1*disorder[i]-c2)*psi[i] - c3_x*(psi[i+1]+psi[i-1]) - psi_old[i];
+  }
+  return;
+}
+
+inline void chebyshev_kpm_step_2d(const int dim_x, const int dim_y, const int b_x, const int b_y,  const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c1, const double c2, const double c3_x, const double c3_y)
+{
+  int i,j,i_low;
+//  printf("in  %f %f %f %f %f %f\n",creal(psi[0]),cimag(psi[0]),creal(psi_old[0]),cimag(psi_old[0]),creal(wfc[0]), cimag(wfc[0]));
+//  int ntot = dim_x*dim_y;
+  double complex *p_old,*p_current,*p_new,*p_temp;
+  
+// The following "optimized" Intel malloc/free seems slower than the regular one
+/*
+#ifdef __ICC
+  p_old = (double complex *) _mm_malloc ((dim_y+2)*sizeof(double complex),SIZE);
+  p_current = (double complex *) _mm_malloc ((dim_y+2)*sizeof(double complex),SIZE);
+  p_new = (double complex *) _mm_malloc ((dim_y+2)*sizeof(double complex),SIZE);
+#else
+  p_old = (double complex *) malloc ((dim_y+2)*sizeof(double complex));
+  p_current = (double complex *) malloc ((dim_y+2)*sizeof(double complex));
+  p_new = (double complex *) malloc ((dim_y+2)*sizeof(double complex));
+#endif
+*/
+
+  p_old = (double complex *) calloc ((dim_y+2),sizeof(double complex));
+  p_current = (double complex *) calloc ((dim_y+2),sizeof(double complex));
+  p_new = (double complex *) calloc ((dim_y+2),sizeof(double complex));
+
+// If periodic boundary conditions along x, initialize p_current to the last row, otherwise 0
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif  
+  for (i=0;i<dim_y;i++) {
+    p_current[i+1] = b_x*psi[i+(dim_x-1)*dim_y];
+  }
+// Initialize the next row, which will become the current row in the first iteration of the loop
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif
+  for (i=0;i<dim_y;i++) {
+    p_new[i+1] = psi[i];
+  }
+// If periodic boundary condition along y, copy the first and last components
+  p_new[0]=b_y*p_new[dim_y];
+  p_new[dim_y+1]=b_y*p_new[1];
+// Starts iteration along the rows
+  for (i=0; i<dim_x; i++) {
+//    printf("i %d\n",i);
+    p_temp=p_old;
+    p_old=p_current;
+    p_current=p_new;
+    p_new=p_temp;
+    if (i<dim_x-1) {
+// The generic row
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif
+        for (j=0; j<dim_y; j++) {
+        p_new[j+1]=psi[j+(i+1)*dim_y];
+      }
+    } else {
+// If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif
+        for (j=0;j<dim_y;j++) {
+        p_new[j+1] = b_x*psi[j];
+      }
+    }
+// If periodic boundary condition along y, copy the first and last components
+    p_new[0]=b_y*p_new[dim_y];
+    p_new[dim_y+1]=b_y*p_new[1];
+    i_low=i*dim_y;
+// Ready to treat the current row
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif
+    for (j=0; j<dim_y; j++) {
+      psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[j+1] - c3_y*(p_current[j+2]+ p_current[j]) - c3_x*(p_old[j+1]+p_new[j+1]) - psi_old[i_low];
+      i_low++;
+    }
+  }
+  
+  free(p_new);
+  free(p_current);
+  free(p_old);
+
+  return;
+}
+
+inline void chebyshev_kpm_step_3d(const int dim_x, const int dim_y, const int dim_z, const int b_x, const int b_y, const int b_z, const double complex * restrict psi, double complex * restrict psi_old, const double * restrict disorder, const double c1, const double c2, const double c3_x, const double c3_y, const double c3_z)
+{
+  int i,j,k,i_low;
+  int dim_transverse;
+  int pos_psi;
+  int pos_current, pos_current_1, pos_current_2, pos_current_3, pos_current_4, pos_current_5;
+  int pos_new, pos_new_1, pos_new_2, pos_new_3, pos_new_4;
+  int pos_old;
+//  printf("in  %f %f %f %f %f %f\n",creal(psi[0]),cimag(psi[0]),creal(psi_old[0]),cimag(psi_old[0]),creal(wfc[0]), cimag(wfc[0]));
+//  int ntot = dim_x*dim_y;
+//  printf("using elementary_clenshaw_step_complex_3d\n");
+  double complex *p_old,*p_current,*p_new,*p_temp;
+  
+  p_old = (double complex *) calloc ((dim_y+2)*(dim_z+2),sizeof(double complex));
+  p_current = (double complex *) calloc ((dim_y+2)*(dim_z+2),sizeof(double complex));
+  p_new = (double complex *) calloc ((dim_y+2)*(dim_z+2),sizeof(double complex));
+  dim_transverse = dim_y*dim_z;
+  
+// If periodic boundary conditions along x, initialize p_current to the last plane, otherwise 0
+  for (j=0;j<dim_y;j++) {
+    pos_psi = (dim_x-1)*dim_transverse+j*dim_z;
+    pos_current = (j+1)*(dim_z+2)+1;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
+    for (k=0;k<dim_z;k++) {
+      p_current[pos_current+k] = b_x*psi[pos_psi+k];
+    }  
+  }
+// Initialize the next plane, which will become the current plane in the first iteration of the loop
+  for (j=0;j<dim_y;j++) {
+    pos_psi = j*dim_z;
+    pos_new = (j+1)*(dim_z+2)+1;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
+    for (k=0;k<dim_z;k++) {
+      p_new[pos_new+k] = psi[pos_psi+k];
+    }  
+  }
+// If periodic boundary condition along y, copy the first and last row along z
+  pos_new_1 = 1;
+  pos_new_2 = dim_y*(dim_z+2)+1;
+  pos_new_3 = (dim_y+1)*(dim_z+2)+1;
+  pos_new_4 = dim_z+3;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
+  for (k=0;k<dim_z;k++) {
+    p_new[pos_new_1+k] = b_y*p_new[pos_new_2+k];
+    p_new[pos_new_3+k] = b_y*p_new[pos_new_4+k];
+  }
+// If periodic boundary condition along z, copy the first and last row along y
+  pos_new_1 = dim_z+2;
+  pos_new_2 = 2*dim_z+2;
+  pos_new_3 = 2*dim_z+3;
+  pos_new_4 = dim_z+3;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
+  for (k=0;k<dim_z;k++) {
+    p_new[pos_new_1+k*(dim_z+2)] = b_z*p_new[pos_new_2+k*(dim_z+2)];
+    p_new[pos_new_3+k*(dim_z+2)] = b_z*p_new[pos_new_4+k*(dim_z+2)];
+  }
+// Starts iteration along the rows
+  for (i=0; i<dim_x; i++) {
+//    printf("i %d\n",i);
+    p_temp=p_old;
+    p_old=p_current;
+    p_current=p_new;
+    p_new=p_temp;
+    if (i<dim_x-1) {
+// The generic plane
+      for (j=0;j<dim_y;j++) {
+        pos_psi = (i+1)*dim_transverse+j*dim_z;
+        pos_new = (j+1)*(dim_z+2)+1;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
+        for (k=0;k<dim_z;k++) {
+          p_new[pos_new+k] = psi[pos_psi+k];
+        }  
+      }     
+    } else {
+// If in last row, put in p_new the first row if periodic along x, 0 otherwise )
+      for (j=0;j<dim_y;j++) {
+        pos_psi = j*dim_z;
+        pos_new = (j+1)*(dim_z+2)+1;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif               
+        for (k=0;k<dim_z;k++) {
+          p_new[pos_new+k] = b_x*psi[pos_psi+k];
+        }  
+      }
+    }
+// If periodic boundary condition along y, copy the first and last row along z
+    pos_new_1 = 1;
+    pos_new_2 = dim_y*(dim_z+2)+1;
+    pos_new_3 = (dim_y+1)*(dim_z+2)+1;
+    pos_new_4 = dim_z+3;
+ #ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif       
+    for (k=0;k<dim_z;k++) {
+      p_new[pos_new_1+k] = b_y*p_new[pos_new_2+k];
+      p_new[pos_new_3+k] = b_y*p_new[pos_new_4+k];
+    }
+// If periodic boundary condition along z, copy the first and last row along y
+    pos_new_1 = dim_z+2;
+    pos_new_2 = 2*dim_z+2;
+    pos_new_3 = 2*dim_z+3;
+    pos_new_4 = dim_z+3;
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+//  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif           
+    for (k=0;k<dim_z;k++) {
+      p_new[pos_new_1+k*(dim_z+2)] = b_z*p_new[pos_new_2+k*(dim_z+2)];
+      p_new[pos_new_3+k*(dim_z+2)] = b_z*p_new[pos_new_4+k*(dim_z+2)];
+    }
+    for (j=0;j<dim_y;j++) {      
+      i_low=i*dim_transverse+j*dim_z;
+      pos_current_1 = (j+1)*(dim_z+2)+1;
+//      pos_current_2 = (j+2)*(dim_z+2)+1;
+//      pos_current_3 = j*(dim_z+2)+1;
+//      pos_current_4 = (j+1)*(dim_z+2)+2;
+//      pos_current_5 = (j+1)*(dim_z+2);
+//      pos_old = (j+1)*(dim_z+2)+1;
+//      pos_new = (j+1)*(dim_z+2)+1;
+  
+// Ready to treat the current row
+#ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  //#pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif            
+      for (k=0; k<dim_z; k++) {
+/*          psi_old[i_low+k] = (c1*disorder[i_low+k]-c2)*p_current[pos_current_1+k] 
+            - c3_y*(p_current[pos_current_2+k]+ p_current[pos_current_3+k]) 
+            - c3_z*(p_current[pos_current_4+k]+ p_current[pos_current_5+k])
+            - c3_x*(p_old[pos_old+k]+p_new[pos_new+k]) 
+            + c_coef*wfc[i_low+k] - psi_old[i_low+k];*/
+        psi_old[i_low] = (c1*disorder[i_low]-c2)*p_current[pos_current_1] 
+            - c3_y*(p_current[pos_current_1-dim_z-2]+ p_current[pos_current_1+dim_z+2]) 
+            - c3_z*(p_current[pos_current_1+1]+ p_current[pos_current_1-1])
+            - c3_x*(p_old[pos_current_1]+p_new[pos_current_1]) 
+            - psi_old[i_low];
+        i_low++;  
+        pos_current_1++;
+      }  
+    }    
+  }  
+  free(p_new);
+  free(p_current);
+  free(p_old);
+//  printf("psi_old\n");
+//  for (i=0;i<dim_x*dim_y*dim_z;i++) {
+//    printf("%lg %lg\n",creal(psi_old[i]),cimag(psi_old[i]));
+//  }  
+  return;
+}

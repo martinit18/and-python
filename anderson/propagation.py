@@ -562,6 +562,15 @@ def chebyshev_kpm_step(H, psi, psi_old, c1, c2):
 #  print('psi_old',psi_old)
   return
 
+def chebyshev_kpm_step_ctypes(H, psi, psi_old, c1, c2):
+  chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
+  chebyshev_ctypes_lib.chebyshev_kpm_step.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctl.ndpointer(np.intc),\
+          ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_double]
+  chebyshev_ctypes_lib.chebyshev_kpm_step.restype = None
+  chebyshev_ctypes_lib.chebyshev_kpm_step(H.dimension, np.asarray(H.tab_dim,dtype=np.intc), H.array_boundary_condition,\
+    psi.ravel(), psi_old.ravel(), H.disorder.ravel(), np.asarray(H.tab_tunneling), c1, c2) 
+  return
+ 
 def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """Returns rhs of Gross-Pitaevskii equation with discretized space
     For data_layout == 'complex':
@@ -629,13 +638,14 @@ def compute_spectral_function_kpm_method(initial_state, H, spectral_function):
   psi = copy.deepcopy(initial_state.wfc.ravel())
   psi_old = np.zeros_like(psi)
   n_kpm = spectral_function.n_kpm
+  chebyshev_kpm_step = chebyshev_kpm_step_ctypes
 # The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
 # This avoids the divergence of the denominator at edges  
   c1 = 2.0/(spectral_function.e_max-spectral_function.e_min+2.0*spectral_function.e_resolution)
   c2 = 0.5*c1*(spectral_function.e_max+spectral_function.e_min)
   tab_mu = np.zeros(n_kpm+1)
 # Jackson damping
-#  tab_g = np.ones(n_kpm+1) 
+# tab_g = np.ones(n_kpm+1) 
   tab_g = (np.linspace(n_kpm+2,1,num=n_kpm+1)*np.cos(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))\
          +np.sin(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))/np.tan(np.pi/(n_kpm+2)))/(n_kpm+2)
 #  print(tab_g)
@@ -643,23 +653,41 @@ def compute_spectral_function_kpm_method(initial_state, H, spectral_function):
   n_pts = 2*spectral_function.n_pts_autocorr+1
   tab_x =  np.linspace(-1.0+1.0/n_pts,1.0-1.0/n_pts,num=n_pts)
 #  tab_mu = np.zeros(2*((spectral_function.n_kpm+1)//2)+1) 
-  tab_mu[0] = np.vdot(initial_state.wfc,psi).real*H.delta_vol
+  tab_mu[0] = np.vdot(psi,psi).real*H.delta_vol
   chebyshev_kpm_step(H, psi, psi_old, c1, c2)
   c1 *= 2.0
   c2 *= 2.0
-  tab_mu[1] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol*tab_g[1]
+  tab_mu[1] = np.vdot(psi,psi_old).real*H.delta_vol
 # The various Chebyshev polynomials are computed by recursion
 # Initialize T_0 and T_1
   tab_T_old = np.ones(n_pts)
   tab_T = tab_x*tab_T_old
-  tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T
-  for i in range(2,n_kpm+1):
-    psi_old, psi = psi, psi_old
-    chebyshev_kpm_step(H, psi, psi_old, c1, c2)
-    tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol*tab_g[i]
+  tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T*tab_g[1]
+  method = 'new'
+  if method=='old':
+# Range for the old method  
+    for i in range(2,n_kpm+1):
+      psi_old, psi = psi, psi_old
+      chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+# The old method    
+      tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
+#      print(i,tab_mu[i])
+  else:  
+# The improved method which saves a factor 2
+    tab_mu[2] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
+# Range for the improved method
+    for i in range(2,(n_kpm+1)//2+1):
+      psi_old, psi = psi, psi_old
+      chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+      tab_mu[2*i-1] = 2.0*np.vdot(psi,psi_old).real*H.delta_vol-tab_mu[1]
+#      print(2*i-1,tab_mu[2*i-1])
+      if 2*i<n_kpm+1:
+        tab_mu[2*i] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
+#        print(2*i,tab_mu[2*i])
 #  print(tab_mu)  
+  for i in range(2,n_kpm+1):
     tab_T_old = 2.0*tab_x*tab_T-tab_T_old
-    tab_spectrum += 2.0*tab_mu[i]*tab_T_old
+    tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
     tab_T, tab_T_old = tab_T_old, tab_T
   return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-tab_x**2)*(spectral_function.e_max-spectral_function.e_min+2.0*spectral_function.e_resolution))    
 

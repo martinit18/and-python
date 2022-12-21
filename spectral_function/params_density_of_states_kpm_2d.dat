@@ -4,7 +4,7 @@ dimension = 2
 size_1 = 50.
 size_2 = 50.
 size_3 = 5.
-size_4 = 1.
+size_4 = 1.  
 # Spatial discretization
 delta_1 = 0.5
 delta_2 = 0.5
@@ -42,6 +42,7 @@ g = 0.
 #initial_state = plane_wave
 #initial_state = gaussian_wave_packet
 initial_state = random
+randomize_initial_state = True
 # make sure that k_0_over_2_pi_i*size_i is an integer
 k_0_over_2_pi_1 = 0.1
 k_0_over_2_pi_2 = 0.0
@@ -88,6 +89,6 @@ resolution = 0.025
 e_min= -1.
 e_max= 17.
 method = kpm
-n_kpm = 720
+n_kpm = 180
 # Multiplicative factor for the interaction coefficient
 multiplicative_factor_for_interaction = 0.0
