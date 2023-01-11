@@ -117,7 +117,7 @@ def main():
 #  print(header_string)
 # If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
   if not  H.randomize_hamiltonian:
-    H.generate_disorder(seed=6333)
+    H.generate_disorder(seed=1234)
     measurement.perform_measurement_potential(H)
     if propagation.method=='che':
       H.generate_sparse_matrix()
