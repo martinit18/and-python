@@ -85,10 +85,9 @@ spectral_function = False
 # or the range variable, in which case the interval is [-range/2,range/2]
 # [e_min,e_max] has precedence over range if both are specified
 range = 100.0
-resolution = 0.025
+resolution = 0.02
 e_min= -1.
 e_max= 17.
-method = kpm
 n_kpm = 180
 # Multiplicative factor for the interaction coefficient
 multiplicative_factor_for_interaction = 0.0

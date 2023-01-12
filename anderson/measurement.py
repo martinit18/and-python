@@ -47,7 +47,7 @@ class Measurement(Geometry):
     self.remove_hot_pixel = remove_hot_pixel
     return
 
-  def prepare_measurement(self,propagation,is_spectral_function=False, is_inner_spectral_function=False,spectral_function=None, global_measurement=False):
+  def prepare_measurement(self,propagation,spectral_function=None, global_measurement=False):
     delta_t = propagation.delta_t
     t_max = propagation.t_max
     """
@@ -60,7 +60,6 @@ class Measurement(Geometry):
 # correct the last time
     self.tab_i_measurement[number_of_measurements-1]=number_of_time_steps
     self.tab_t_measurement[number_of_measurements-1]=t_max
-    """
 #    print("Inside prepare_measurement, is_spectral_function = ",is_spectral_function, is_inner_spectral_function)
     if is_spectral_function:
       self.tab_time = np.zeros((spectral_function.n_pts_autocorr+1,4))
@@ -75,115 +74,116 @@ class Measurement(Geometry):
 #        print(self.tab_spectrum)
 #    tab_time[0:dim_tab_time_propagation,1] = 1
     else:
-      dim_tab_time_propagation = int(t_max/delta_t+0.999)
-      dim_tab_time_dispersion = int(t_max/self.delta_t_dispersion+0.999)
-      number_of_measurements_dispersion = dim_tab_time_dispersion+1
-      dim_tab_time_density = int(t_max/self.delta_t_density+0.999)
-      number_of_measurements_density = dim_tab_time_density+1
-      dim_tab_time_spectral_function = int(t_max/self.delta_t_spectral_function+0.999)
-      number_of_measurements_spectral_function = dim_tab_time_spectral_function+1
+    """  
+    dim_tab_time_propagation = int(t_max/delta_t+0.999)
+    dim_tab_time_dispersion = int(t_max/self.delta_t_dispersion+0.999)
+    number_of_measurements_dispersion = dim_tab_time_dispersion+1
+    dim_tab_time_density = int(t_max/self.delta_t_density+0.999)
+    number_of_measurements_density = dim_tab_time_density+1
+    dim_tab_time_spectral_function = int(t_max/self.delta_t_spectral_function+0.999)
+    number_of_measurements_spectral_function = dim_tab_time_spectral_function+1
 #      print(t_max,self.delta_t_spectral_function)
 #      print('Number of measurements of the spectral function = ',number_of_measurements_spectral_function)
-      tab_time = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,4))
-      tab_time[0:dim_tab_time_propagation,0] = delta_t*np.arange(dim_tab_time_propagation)
-  #    tab_time[0:dim_tab_time_propagation,1] = 1
-      tab_time[dim_tab_time_propagation:dim_tab_time_propagation+dim_tab_time_dispersion,0] = self.delta_t_dispersion*np.arange(dim_tab_time_dispersion)
-      tab_time[dim_tab_time_propagation:dim_tab_time_propagation+dim_tab_time_dispersion,1] = 1
-      tab_time[dim_tab_time_propagation+dim_tab_time_dispersion:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,0] = self.delta_t_density*np.arange(dim_tab_time_density)
-      tab_time[dim_tab_time_propagation+dim_tab_time_dispersion:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,2] = 1
-      tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,0] = self.delta_t_spectral_function*np.arange(dim_tab_time_spectral_function)
-      tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,3] = 1
-      tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,0] = t_max
-      tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,1:4] = 1
-  #    print(tab_time)
-  # sort by increasing time
-      tab_time = tab_time[np.argsort(tab_time[:, 0])]
-  #    print(tab_time)
-  # merge when several times (quasi-)coincide
-      j=0
-      tiny =1.e-12
-      tab_time_new = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,4))
-      tab_time_new[0,:] = tab_time[0,:]
-      for i in range(dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function):
-        if tab_time[i+1,0]-tab_time[i,0]>tiny:
-          tab_time_new[j+1,:] = tab_time[i+1,:]
-          j+=1
-        else:
-          tab_time_new[j,1:] += tab_time[i+1,1:]
-      self.tab_time = tab_time_new[:j+1,:]
-  # For the first and last time, remove the computation of densities
-  #    self.tab_time[0,2]=0.0
-  #    self.tab_time[-1,2]=0.0
-  #    print(tab_time)
-  # Select only events where dispersion is measured
-      self.tab_t_measurement_dispersion = self.tab_time[self.tab_time[:,1]==1.0,0]
-  #    print (self.tab_t_measurement)
-      dim_density = self.tab_dim[:]
-      dim_dispersion = [number_of_measurements_dispersion]
-      dim_dispersion_vec = [self.dimension,number_of_measurements_dispersion]
-      if global_measurement:
-        if self.extended:
-          dim_density.insert(0,2)
-          dim_dispersion.insert(0,2)
-          dim_dispersion_vec.insert(0,2)
-        else:
-          dim_density.insert(0,1)
-          dim_dispersion.insert(0,1)
-          dim_dispersion_vec.insert(0,1)
+    tab_time = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,4))
+    tab_time[0:dim_tab_time_propagation,0] = delta_t*np.arange(dim_tab_time_propagation)
+#    tab_time[0:dim_tab_time_propagation,1] = 1
+    tab_time[dim_tab_time_propagation:dim_tab_time_propagation+dim_tab_time_dispersion,0] = self.delta_t_dispersion*np.arange(dim_tab_time_dispersion)
+    tab_time[dim_tab_time_propagation:dim_tab_time_propagation+dim_tab_time_dispersion,1] = 1
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,0] = self.delta_t_density*np.arange(dim_tab_time_density)
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density,2] = 1
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,0] = self.delta_t_spectral_function*np.arange(dim_tab_time_spectral_function)
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density:dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,3] = 1
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,0] = t_max
+    tab_time[dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,1:4] = 1
+#    print(tab_time)
+# sort by increasing time
+    tab_time = tab_time[np.argsort(tab_time[:, 0])]
+#    print(tab_time)
+# merge when several times (quasi-)coincide
+    j=0
+    tiny =1.e-12
+    tab_time_new = np.zeros((1+dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function,4))
+    tab_time_new[0,:] = tab_time[0,:]
+    for i in range(dim_tab_time_propagation+dim_tab_time_dispersion+dim_tab_time_density+dim_tab_time_spectral_function):
+      if tab_time[i+1,0]-tab_time[i,0]>tiny:
+        tab_time_new[j+1,:] = tab_time[i+1,:]
+        j+=1
+      else:
+        tab_time_new[j,1:] += tab_time[i+1,1:]
+    self.tab_time = tab_time_new[:j+1,:]
+# For the first and last time, remove the computation of densities
+#    self.tab_time[0,2]=0.0
+#    self.tab_time[-1,2]=0.0
+#    print(tab_time)
+# Select only events where dispersion is measured
+    self.tab_t_measurement_dispersion = self.tab_time[self.tab_time[:,1]==1.0,0]
+#    print (self.tab_t_measurement)
+    dim_density = self.tab_dim[:]
+    dim_dispersion = [number_of_measurements_dispersion]
+    dim_dispersion_vec = [self.dimension,number_of_measurements_dispersion]
+    if global_measurement:
+      if self.extended:
+        dim_density.insert(0,2)
+        dim_dispersion.insert(0,2)
+        dim_dispersion_vec.insert(0,2)
+      else:
+        dim_density.insert(0,1)
+        dim_dispersion.insert(0,1)
+        dim_dispersion_vec.insert(0,1)
 #      if self.measure_density:
 #        self.density_final = np.zeros(dim_density)
-  #      print(self.density_final.shape,tab_dim)
-      if self.measure_autocorrelation:
-        self.tab_autocorrelation = np.zeros(number_of_measurements_dispersion,dtype=np.complex128)
+#      print(self.density_final.shape,tab_dim)
+    if self.measure_autocorrelation:
+      self.tab_autocorrelation = np.zeros(number_of_measurements_dispersion,dtype=np.complex128)
 #      if self.measure_density_momentum:
 #        self.density_momentum_final = np.zeros(dim_density)
-      if self.measure_dispersion_position:
-        self.tab_position = np.zeros(dim_dispersion_vec)
-        if self.spin_one_half:
-          self.tab_position_2 = np.zeros(dim_dispersion_vec)
-      if self.measure_dispersion_position2:
-        self.tab_position2 = np.zeros(dim_dispersion_vec)
-        if self.spin_one_half:
-          self.tab_position2_2 = np.zeros(dim_dispersion_vec)
-      if self.measure_dispersion_momentum:
-        self.tab_momentum = np.zeros(dim_dispersion_vec)
-        if self.spin_one_half:
-          self.tab_momentum_2 = np.zeros(dim_dispersion_vec)
-      if self.measure_dispersion_energy:
-        self.tab_energy = np.zeros(dim_dispersion)
-        self.tab_nonlinear_energy = np.zeros(dim_dispersion)
-      if self.measure_wavefunction:
-        self.wfc =  np.zeros(self.tab_extended_dim,dtype=np.complex128)
-      if self.measure_wavefunction_momentum:
-        self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
-      if self.measure_g1:
-        self.g1 =  np.zeros(self.tab_dim,dtype=np.complex128)
-        dim_g1 = self.tab_dim[:]
-        dim_g1.insert(0,number_of_measurements_density)
-        self.g1_intermediate = np.zeros(dim_g1,dtype=np.complex128)
-      if self.measure_overlap:
-        self.overlap = 0.0
+    if self.measure_dispersion_position:
+      self.tab_position = np.zeros(dim_dispersion_vec)
+      if self.spin_one_half:
+        self.tab_position_2 = np.zeros(dim_dispersion_vec)
+    if self.measure_dispersion_position2:
+      self.tab_position2 = np.zeros(dim_dispersion_vec)
+      if self.spin_one_half:
+        self.tab_position2_2 = np.zeros(dim_dispersion_vec)
+    if self.measure_dispersion_momentum:
+      self.tab_momentum = np.zeros(dim_dispersion_vec)
+      if self.spin_one_half:
+        self.tab_momentum_2 = np.zeros(dim_dispersion_vec)
+    if self.measure_dispersion_energy:
+      self.tab_energy = np.zeros(dim_dispersion)
+      self.tab_nonlinear_energy = np.zeros(dim_dispersion)
+    if self.measure_wavefunction:
+      self.wfc =  np.zeros(self.tab_extended_dim,dtype=np.complex128)
+    if self.measure_wavefunction_momentum:
+      self.wfc_momentum =  np.zeros(self.tab_dim,dtype=np.complex128)
+    if self.measure_g1:
+      self.g1 =  np.zeros(self.tab_dim,dtype=np.complex128)
+      dim_g1 = self.tab_dim[:]
+      dim_g1.insert(0,number_of_measurements_density)
+      self.g1_intermediate = np.zeros(dim_g1,dtype=np.complex128)
+    if self.measure_overlap:
+      self.overlap = 0.0
 #      print('Measure spectral function = ',self.measure_spectral_function)
-      if self.measure_spectral_function:
-        self.tab_energies = np.fft.fftshift(np.fft.fftfreq(2*spectral_function.n_pts_autocorr+1,d=spectral_function.delta_t/(2.0*np.pi)))+0.5*(spectral_function.e_max+spectral_function.e_min)
+    if self.measure_spectral_function:
+      self.tab_energies = np.fft.fftshift(np.fft.fftfreq(2*spectral_function.n_pts_autocorr+1,d=spectral_function.delta_t/(2.0*np.pi)))+0.5*(spectral_function.e_max+spectral_function.e_min)
  #       print(number_of_measurements_spectral_function)
-        self.tab_spectrum = np.zeros((2*spectral_function.n_pts_autocorr+1,number_of_measurements_spectral_function))
-      else:
-        self.tab_time[:,3]=0.0
-      self.tab_t_measurement_spectral_function = self.tab_time[self.tab_time[:,3]==1.0,0]
-  # What follows is the code for the intermediate times
-      self.tab_t_measurement_density = self.tab_time[self.tab_time[:,2]==1.0,0]
-  #    print(self.tab_t_measurement_density)
-      dim_density.insert(0,number_of_measurements_density)
-      if self.measure_density:
-        self.density_intermediate = np.zeros(dim_density)
-        if self.spin_one_half:
-          self.density_intermediate2 = np.zeros(dim_density)
-  #      print(dim_density)
-      if self.measure_density_momentum:
-        self.density_momentum_intermediate = np.zeros(dim_density)
-        if self.spin_one_half:
-          self.density_momentum_intermediate2 = np.zeros(dim_density)
+      self.tab_spectrum = np.zeros((2*spectral_function.n_pts_autocorr+1,number_of_measurements_spectral_function))
+    else:
+      self.tab_time[:,3]=0.0
+    self.tab_t_measurement_spectral_function = self.tab_time[self.tab_time[:,3]==1.0,0]
+# What follows is the code for the intermediate times
+    self.tab_t_measurement_density = self.tab_time[self.tab_time[:,2]==1.0,0]
+#    print(self.tab_t_measurement_density)
+    dim_density.insert(0,number_of_measurements_density)
+    if self.measure_density:
+      self.density_intermediate = np.zeros(dim_density)
+      if self.spin_one_half:
+        self.density_intermediate2 = np.zeros(dim_density)
+#      print(dim_density)
+    if self.measure_density_momentum:
+      self.density_momentum_intermediate = np.zeros(dim_density)
+      if self.spin_one_half:
+        self.density_momentum_intermediate2 = np.zeros(dim_density)
     if self.measure_potential:
       self.potential = np.zeros(self.tab_dim)
     if self.measure_potential_correlation:

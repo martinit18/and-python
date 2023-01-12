@@ -273,9 +273,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       if not config.has_option('Spectral','resolution'): all_options_ok = False
       spectre_resolution = Spectral.getfloat('resolution')
       multiplicative_factor_for_interaction_in_spectral_function = Spectral.getfloat('multiplicative_factor_for_interaction',0.0)
-      method_spectral_function = Spectral.get('method','fft')
-      if method_spectral_function == 'fft' and not config.has_section('Propagation'):
-        my_abort(mpi_version,comm,'Parameter file has a Spectral section and uses the fft method, but does not have a Propagation section, I stop!\n')
       n_kpm = Spectral.getint('n_kpm',100)
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Spectral section of the parameter file, there must be a resolution and either an energy interval [e_min,e_max] or an energy range e_range, I stop!\n')
@@ -365,7 +362,6 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     spectre_max = None
     spectre_resolution = None
     multiplicative_factor_for_interaction_in_spectral_function = None
-    method_spectral_function = None
     n_kpm = None
     e_min = None
     e_max = None
@@ -401,8 +397,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = \
         comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
-      spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, method_spectral_function, n_kpm = \
-        comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, method_spectral_function, n_kpm))
+      spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, n_kpm = \
+        comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm))
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = \
         comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
@@ -439,23 +435,23 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Define the structure of spectral_function
   if 'Spectral' in my_list_of_sections:
 #    measure_spectral_function_local = not 'Measurement' in my_list_of_sections
-    measure_spectral_function_local = True
-    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, method_spectral_function, n_kpm)
-    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
-    return_list.append(propagation_spectral)
+#    measure_spectral_function_local = True
+    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm)
+#    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
+#    return_list.append(propagation_spectral)
     return_list.append(spectral_function)
-    measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, \
-      measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, \
-      measure_potential=measure_potential, measure_potential_correlation=measure_potential_correlation, use_mkl_fft=use_mkl_fft)
-    measurement_spectral_global = copy.deepcopy(measurement_spectral)
+#    measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, \
+#      measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, \
+#      measure_potential=measure_potential, measure_potential_correlation=measure_potential_correlation, use_mkl_fft=use_mkl_fft)
+#    measurement_spectral_global = copy.deepcopy(measurement_spectral)
 #    print("Calling prepare_measurement from the Spectral section")
-    measurement_spectral.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local)
+#    measurement_spectral.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local)
 #    print(measurement_spectral.tab_spectrum)
-    measurement_spectral_global.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local,global_measurement=True)
+#    measurement_spectral_global.prepare_measurement(propagation_spectral,spectral_function=spectral_function,is_spectral_function=True,is_inner_spectral_function=not measure_spectral_function_local,global_measurement=True)
 #    measurement_spectral.tab_time[:,3]=0
 #    measurement_spectral_global.tab_time[:,3]=0
-    return_list.append(measurement_spectral)
-    return_list.append(measurement_spectral_global)
+#    return_list.append(measurement_spectral)
+#    return_list.append(measurement_spectral_global)
   else:
     spectral_function = None
 
@@ -986,6 +982,16 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
 #      i=measurement.tab_t_measurement_spectral_function.size-1
 #      print(i)
 #      anderson.io.output_density(base_string+'_final.dat',measurement.tab_spectrum[:,i], measurement,header_string=header_string+'Time = '+str(measurement.tab_t_measurement_spectral_function[i])+' \n',tab_abscissa=measurement.tab_energies,data_type=data_type)
+  return
+
+def print_spectral_function(spectral_function,geometry,initial_state=None,header_string='Origin of data not specified'):
+  if initial_state.type in ['point','multi_point','random']:
+    base_string='density_of_states'
+    data_type='density_of_states'
+  else:
+    base_string='spectral_function'
+    data_type='spectral_function'
+  anderson.io.output_density(base_string+'.dat',spectral_function.tab_spectrum,geometry,header_string=header_string,tab_abscissa=spectral_function.tab_energy,data_type=data_type)
   return
 
 """

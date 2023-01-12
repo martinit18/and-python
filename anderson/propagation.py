@@ -587,7 +587,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
       H.apply_minus_i_h_gpe_real(wfc, rhs)
 #      print('inside gpe real',wfc[100],rhs[100])
     else:
-#      print('inside gpe wfc',wfc.dtype,wfc.shape)
+#      print('inside gpe wfc',wfc.dtype,wfc.shape)spectral_function,
 #      print('inside gpe rhs',rhs.dtype,rhs.shape)
       H.apply_minus_i_h_gpe_complex(wfc, rhs)
 #      print('inside gpe complex',wfc[200],wfc[201],rhs[200],rhs[201])
@@ -598,21 +598,23 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
 
 
 class Spectral_function:
-  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, method_spectral_function, n_kpm):
+  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm):
     e_range = e_max - e_min
     e_middle = 0.5*(e_max+e_min)
-    self.n_pts_autocorr = int(0.5*e_range/e_resolution+0.5)
+    self.n_pts = int(e_range/e_resolution+1.5)
 # In case e_range/e_resolution is not an integer, I keep e_resolution and rescale e_range
-    self.e_min = e_middle - e_resolution*self.n_pts_autocorr
-    self.e_max = e_middle + e_resolution*self.n_pts_autocorr
-    self.delta_t = 2.0*np.pi/(e_resolution*(2*self.n_pts_autocorr+1))
-    self.t_max = self.delta_t*self.n_pts_autocorr
+    self.e_min = e_middle - 0.5*e_resolution*(self.n_pts-1)
+    self.e_max = e_middle + 0.5*e_resolution*(self.n_pts-1)  
+    self.tab_x = np.linspace(-1.0+2.0/(self.n_pts+1),1.0-2.0/(self.n_pts+1),num=self.n_pts)
+#    print(self.tab_x)
+    self.tab_energy = np.linspace(self.e_min,self.e_max,num=self.n_pts)
+    self.tab_spectrum = np.zeros(self.n_pts)
     self.e_resolution = e_resolution
     self.multiplicative_factor_for_interaction = multiplicative_factor_for_interaction_in_spectral_function
-    self.method_spectral_function = method_spectral_function
     self.n_kpm = n_kpm
     return
 
+  """
   def spectral_function_from_temporal_autocorrelation(self,tab_autocorrelation):
 # The autocorrelation function for negative time is simply the complex conjugate of the one at positive time
 # We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
@@ -632,65 +634,99 @@ class Spectral_function:
 # The energy spectrum at this stage is starting at e=-n_pts_autocorr*delta_e and ending at e=-n_pts_autocorr*delta_e
 # with delta_e = 2*pi/delta_t
     return tab_spectrum
+  """
+  
+  def normalize(self, n):
+    self.tab_spectrum /= n
+    return
+  
+  def mpi_merge(self, comm, timing):
+    start_mpi_time = timeit.default_timer()
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      print("mpi4py is not found!")
+      return
+    toto = np.empty_like(self.tab_spectrum)
+    comm.Reduce(self.tab_spectrum,toto)
+    self.tab_spectrum = np.copy(toto)
+    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+    return    
 
-def compute_spectral_function_kpm_method(initial_state, H, spectral_function):
-#  psi_0 = initial_state.wfc.ravel()
-  psi = copy.deepcopy(initial_state.wfc.ravel())
-  psi_old = np.zeros_like(psi)
-  n_kpm = spectral_function.n_kpm
-  chebyshev_kpm_step = chebyshev_kpm_step_ctypes
-# The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
-# This avoids the divergence of the denominator at edges  
-  c1 = 2.0/(spectral_function.e_max-spectral_function.e_min+2.0*spectral_function.e_resolution)
-  c2 = 0.5*c1*(spectral_function.e_max+spectral_function.e_min)
-  tab_mu = np.zeros(n_kpm+1)
-# Jackson damping
-# tab_g = np.ones(n_kpm+1) 
-  tab_g = (np.linspace(n_kpm+2,1,num=n_kpm+1)*np.cos(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))\
-         +np.sin(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))/np.tan(np.pi/(n_kpm+2)))/(n_kpm+2)
-#  print(tab_g)
-# First create the array of x values for which the spectral function is computed
-  n_pts = 2*spectral_function.n_pts_autocorr+1
-  tab_x =  np.linspace(-1.0+1.0/n_pts,1.0-1.0/n_pts,num=n_pts)
-#  tab_mu = np.zeros(2*((spectral_function.n_kpm+1)//2)+1) 
-  tab_mu[0] = np.vdot(psi,psi).real*H.delta_vol
-  chebyshev_kpm_step(H, psi, psi_old, c1, c2)
-  c1 *= 2.0
-  c2 *= 2.0
-  tab_mu[1] = np.vdot(psi,psi_old).real*H.delta_vol
-# The various Chebyshev polynomials are computed by recursion
-# Initialize T_0 and T_1
-  tab_T_old = np.ones(n_pts)
-  tab_T = tab_x*tab_T_old
-  tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T*tab_g[1]
-  method = 'new'
-  if method=='old':
-# Range for the old method  
+  def compute_spectral_function(self,i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=False):
+    if build_disorder:
+      H.generate_disorder(seed=i_seed+1234)
+#    measurement.perform_measurement_potential(H)
+      H.generate_sparse_matrix()
+#      H.energy_range(accurate=propagation.accurate_bounds)
+    save_interaction = H.interaction
+    save_disorder = copy.deepcopy(H.disorder)
+    if build_initial_state:
+      initial_state.prepare_initial_state(seed=i_seed+2345)  
+  #  print(save_disorder)
+  #  save_disorder = H.disorder
+    H.interaction = 0.0
+    H.disorder = H.disorder + save_interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+  #  psi_0 = initial_state.wfc.ravel()
+    psi = copy.deepcopy(initial_state.wfc.ravel())
+    psi_old = np.zeros_like(psi)
+    n_kpm = self.n_kpm
+    chebyshev_kpm_step = chebyshev_kpm_step_ctypes
+  # The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
+  # This avoids the divergence of the denominator at edges  
+    c1 = 2.0/(self.e_max-self.e_min+2.0*self.e_resolution)
+    c2 = 0.5*c1*(self.e_max+self.e_min)
+    tab_mu = np.zeros(n_kpm+1)
+  # Jackson damping
+  # tab_g = np.ones(n_kpm+1) 
+    tab_g = (np.linspace(n_kpm+2,1,num=n_kpm+1)*np.cos(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))\
+           +np.sin(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))/np.tan(np.pi/(n_kpm+2)))/(n_kpm+2)
+  #  print(tab_g)
+  # First create the array of x values for which the spectral function is computed
+  #  n_pts = 2*spectral_function.n_pts_autocorr+1
+  #  tab_x =  np.linspace(-1.0+1.0/n_pts,1.0-1.0/n_pts,num=n_pts)
+  #  tab_mu = np.zeros(2*((spectral_function.n_kpm+1)//2)+1) 
+    tab_mu[0] = np.vdot(psi,psi).real*H.delta_vol
+    chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+    c1 *= 2.0
+    c2 *= 2.0
+    tab_mu[1] = np.vdot(psi,psi_old).real*H.delta_vol
+  # The various Chebyshev polynomials are computed by recursion
+  # Initialize T_0 and T_1
+    tab_T_old = np.ones(self.n_pts)
+    tab_T = self.tab_x*tab_T_old
+    tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T*tab_g[1]
+    method = 'new'
+    if method=='old':
+  # Range for the old method  
+      for i in range(2,n_kpm+1):
+        psi_old, psi = psi, psi_old
+        chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+  # The old method    
+        tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
+  #      print(i,tab_mu[i])
+    else:  
+  # The improved method which saves a factor 2
+      tab_mu[2] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
+  # Range for the improved method
+      for i in range(2,(n_kpm+1)//2+1):
+        psi_old, psi = psi, psi_old
+        chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+        tab_mu[2*i-1] = 2.0*np.vdot(psi,psi_old).real*H.delta_vol-tab_mu[1]
+  #      print(2*i-1,tab_mu[2*i-1])
+        if 2*i<n_kpm+1:
+          tab_mu[2*i] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
+  #        print(2*i,tab_mu[2*i])
+  #  print(tab_mu)    
+    H.interaction = save_interaction
+    H.disorder = copy.deepcopy(save_disorder)
     for i in range(2,n_kpm+1):
-      psi_old, psi = psi, psi_old
-      chebyshev_kpm_step(H, psi, psi_old, c1, c2)
-# The old method    
-      tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
-#      print(i,tab_mu[i])
-  else:  
-# The improved method which saves a factor 2
-    tab_mu[2] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
-# Range for the improved method
-    for i in range(2,(n_kpm+1)//2+1):
-      psi_old, psi = psi, psi_old
-      chebyshev_kpm_step(H, psi, psi_old, c1, c2)
-      tab_mu[2*i-1] = 2.0*np.vdot(psi,psi_old).real*H.delta_vol-tab_mu[1]
-#      print(2*i-1,tab_mu[2*i-1])
-      if 2*i<n_kpm+1:
-        tab_mu[2*i] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
-#        print(2*i,tab_mu[2*i])
-#  print(tab_mu)  
-  for i in range(2,n_kpm+1):
-    tab_T_old = 2.0*tab_x*tab_T-tab_T_old
-    tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
-    tab_T, tab_T_old = tab_T_old, tab_T
-  return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-tab_x**2)*(spectral_function.e_max-spectral_function.e_min+2.0*spectral_function.e_resolution))    
+      tab_T_old = 2.0*self.tab_x*tab_T-tab_T_old
+      tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
+      tab_T, tab_T_old = tab_T_old, tab_T
+    return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-self.tab_x**2)*(self.e_max-self.e_min+2.0*self.e_resolution))    
 
+"""
 def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, build_disorder=True, build_initial_state=False):
 #  print(H.interaction,spectral_function.multiplicative_factor_for_interaction)
 # When computing the spectral function from the temporal autocorrelation, it is better to switch off the interaction, so that what is computed is <psi(t)|delta(E-H)|\psi(t)> without any non-linear term in the delta function
@@ -739,6 +775,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
 #  measurement.tab_spectrum[:] = spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
 #  print(measurement.tab_spectrum)
   return spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
+"""
 
 def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_spectral, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, build_disorder=True, build_initial_state=False):
 
@@ -816,8 +853,8 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
   if measurement.tab_time[0,3]==1:
 #    print('Measure spectral function at time:',measurement.tab_time[0,0],j_spectral_function)
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
-    measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(\
-      i_seed, geometry, initial_state, H, propagation_spectral, measurement_spectral, spectral_function, timing, build_disorder=False, build_initial_state=False)
+    measurement.tab_spectrum[:,j_spectral_function] = spectral_function.compute_spectral_function(\
+      i_seed, geometry, initial_state, H, timing, build_disorder=False, build_initial_state=False)
 #    print('j_spectral_function = ',j_spectral_function)
     j_spectral_function+=1
   delta_t_old = -1.0
@@ -877,8 +914,8 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_s
 #        print('It is time to store density',measurement.tab_time[i,0],j_density)
 #        print(j_spectral_function,psi.wfc[0])
 #        print(propagation_spectral.delta_t,propagation_spectral.t_max)
-        measurement.tab_spectrum[:,j_spectral_function] = anderson.propagation.compute_spectral_function(\
-          i_seed, geometry, psi, H, propagation_spectral, measurement_spectral, spectral_function, timing, build_disorder=False)
+        measurement.tab_spectrum[:,j_spectral_function] = spectral_function.compute_spectral_function(\
+          i_seed, geometry, psi, H, timing, build_disorder=False)
 #        print(j_spectral_function,psi.wfc[0])
 #        print('j_spectral_function = ',j_spectral_function)
         j_spectral_function+=1
