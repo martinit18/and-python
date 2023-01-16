@@ -11,17 +11,23 @@ import numpy as np
 from scipy.integrate import ode
 import scipy.special as sp
 import timeit
-import ctypes
-import numpy.ctypeslib as ctl
 import anderson
 import copy
 import sys
-import numba
+
+def numba_decorator(x):
+  try:
+    import numba
+    return numba.jit(nopython=True,fastmath=True,cache=True)(x)
+  except: 
+    print('numba package not found, this will use the slower regular Python version')
+    return(x)
+  pass  
 
 from anderson.wavefunction import Wavefunction
 
 class Temporal_Propagation:
-  def __init__(self, t_max, delta_t, method='che', accuracy=1.e-6, accurate_bounds=False, data_layout='real', want_ctypes=True, H=None):
+  def __init__(self, t_max, delta_t, method='che', accuracy=1.e-6, accurate_bounds=False, data_layout='real', want_ctypes=True, H=None):      
     self.t_max = t_max
     self.method = method
     self.want_ctypes = want_ctypes
@@ -35,6 +41,8 @@ class Temporal_Propagation:
     self.has_specific_full_chebyshev_routine = False
     if not H.spin_one_half and self.want_ctypes:
       try:
+        import ctypes
+        import numpy.ctypeslib as ctl
         self.has_specific_full_chebyshev_routine = True
         self.chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
         if self.data_layout=='real':
@@ -61,7 +69,7 @@ class Temporal_Propagation:
         self.has_specific_full_chebyshev_routine = False
         self.chebyshev_ctypes_lib = None
         if H.seed == 0 :
-          print("\nWarning, no chebyshev C library found, this uses the slow Python version!\n")
+          print("\nWarning, no ctypes module, no numpy.ctypeslib module or no chebyshev C library found, this uses the slow Python version!\n")
     self.use_ctypes = self.has_specific_full_chebyshev_routine and self.want_ctypes
     if self.use_ctypes:
       self.chebyshev_propagation = chebyshev_propagation_ctypes
@@ -171,7 +179,8 @@ def chebyshev_step_1d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, ta
   chebyshev_step_1d_complex_numba(H.tab_dim[0], H.tab_boundary_condition[0], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
   return
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+#@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def chebyshev_step_1d_complex_numba(dim_x, boundary, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('wfc',wfc.shape,wfc.dtype)
 #  print('psi',psi.shape,psi.dtype)
@@ -194,7 +203,8 @@ def chebyshev_step_1d_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c
   chebyshev_step_1d_real_numba(H.tab_dim[0], H.tab_boundary_condition[0], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
   return
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+#@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def chebyshev_step_1d_real_numba(dim_x, boundary, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
   c3=tab_c3[0]
   if add_real:
@@ -282,7 +292,7 @@ def chebyshev_step_2d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, ta
   chebyshev_step_2d_complex_numba(H.tab_dim[0], H.tab_dim[1], H.tab_boundary_condition[0], H.tab_boundary_condition[1], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
   return
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def chebyshev_step_2d_complex_numba(dim_x, dim_y, b_x, b_y, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('using chebyshev_step_2d_complex')
 # Specific code for dimension 2
@@ -338,8 +348,10 @@ def chebyshev_step_2d_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, tab_c
   chebyshev_step_2d_real_numba(H.tab_dim[0], H.tab_dim[1], H.tab_boundary_condition[0], H.tab_boundary_condition[1], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
   return
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
+#@numba.jit(nopython=True,fastmath=True,cache=True)
 def chebyshev_step_2d_real_numba(dim_x, dim_y, b_x, b_y, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
+#  print('toto')
 # Specific code for dimension 2
   c3_x=tab_c3[0]
   c3_y=tab_c3[1]
@@ -407,7 +419,8 @@ def chebyshev_step_3d_complex(wfc, H, psi, psi_old, c_coef, add_real, c1, c2, ta
   chebyshev_step_3d_complex_numba(H.tab_dim[0], H.tab_dim[1], H.tab_dim[2], H.tab_boundary_condition[0], H.tab_boundary_condition[1],  H.tab_boundary_condition[2], H.disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3)
   return
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
+#@numba.jit(nopython=True,fastmath=True,cache=True)
 def chebyshev_step_3d_complex_numba(dim_x, dim_y, dim_z, b_x, b_y, b_z, disorder, wfc, psi, psi_old, c_coef, add_real, c1, c2, tab_c3):
 #  print('using chebyshev_step_3d_complex')
   if not(add_real):
@@ -555,21 +568,7 @@ def chebyshev_propagation_generic(wfc, H, propagation,timing):
 #    print('endend_no_cffi',local_wfc[0],local_wfc[1],local_wfc[ntot-1])
   return
 
-def chebyshev_kpm_step(H, psi, psi_old, c1, c2):
-# Generic code uses the sparse multiplication
-  psi_old[:] = c1*H.apply_h(psi)-c2*psi[:]-psi_old[:]
-#  print('psi',psi)
-#  print('psi_old',psi_old)
-  return
 
-def chebyshev_kpm_step_ctypes(H, psi, psi_old, c1, c2):
-  chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
-  chebyshev_ctypes_lib.chebyshev_kpm_step.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctl.ndpointer(np.intc),\
-          ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_double]
-  chebyshev_ctypes_lib.chebyshev_kpm_step.restype = None
-  chebyshev_ctypes_lib.chebyshev_kpm_step(H.dimension, np.asarray(H.tab_dim,dtype=np.intc), H.array_boundary_condition,\
-    psi.ravel(), psi_old.ravel(), H.disorder.ravel(), np.asarray(H.tab_tunneling), c1, c2) 
-  return
  
 def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """Returns rhs of Gross-Pitaevskii equation with discretized space
@@ -598,7 +597,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
 
 
 class Spectral_function:
-  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm):
+  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, H):
     e_range = e_max - e_min
     e_middle = 0.5*(e_max+e_min)
     self.n_pts = int(e_range/e_resolution+1.5)
@@ -607,35 +606,53 @@ class Spectral_function:
     self.e_max = e_middle + 0.5*e_resolution*(self.n_pts-1)  
     self.tab_x = np.linspace(-1.0+2.0/(self.n_pts+1),1.0-2.0/(self.n_pts+1),num=self.n_pts)
 #    print(self.tab_x)
-    self.tab_energy = np.linspace(self.e_min,self.e_max,num=self.n_pts)
+    self.tab_energies = np.linspace(self.e_min,self.e_max,num=self.n_pts)
     self.tab_spectrum = np.zeros(self.n_pts)
     self.e_resolution = e_resolution
     self.multiplicative_factor_for_interaction = multiplicative_factor_for_interaction_in_spectral_function
     self.n_kpm = n_kpm
+    self.want_ctypes_for_spectral_function = want_ctypes_for_spectral_function
+# Is there a ctypes implementation?
+    self.has_chebyshev_kpm_routine = False
+    if not H.spin_one_half and self.want_ctypes_for_spectral_function:
+      try:
+        import ctypes
+        import numpy.ctypeslib as ctl
+        self.has_chebyshev_kpm_routine = True
+        self.chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
+        self.chebyshev_ctypes_lib.chebyshev_kpm_step.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctl.ndpointer(np.intc),\
+          ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_double]
+        self.chebyshev_ctypes_lib.chebyshev_kpm_step.restype = None
+        if not hasattr(self.chebyshev_ctypes_lib,'chebyshev_kpm_step'):
+          self.has_chebyshev_kpm_routine = False
+          self.chebyshev_ctypes_lib = None
+          if H.seed == 0 :
+            print("\nWarning, chebyshev C library found, but without routine for KPM computation of the spectral function, this uses the slow Python version\n")
+      except:
+        self.has_chebyshev_kpm_routine = False
+        self.chebyshev_ctypes_lib = None
+        if H.seed == 0 :
+          print("\nWarning, no ctypes module, no numpy.ctypeslib module or no chebyshev C library found, this uses the slow Python version!\n")
+    self.use_ctypes = self.has_chebyshev_kpm_routine and self.want_ctypes_for_spectral_function
+    if self.use_ctypes:
+      self.chebyshev_kpm_routine = self.chebyshev_kpm_step_ctypes
+    else:
+      self.chebyshev_kpm_routine = self.chebyshev_kpm_step
     return
 
-  """
-  def spectral_function_from_temporal_autocorrelation(self,tab_autocorrelation):
-# The autocorrelation function for negative time is simply the complex conjugate of the one at positive time
-# We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
-# see manual of numpy.fft.ifft for explanations
-# The number of points in tab_autocorrelation is n_pts_autocorr+1
-# Multiply by a complex oscillatory exponential so that the energy is shifted
-    e_middle = 0.5*(self.e_max+self.e_min)
-#    print(e_middle)
-    tab_autocorrelation *= np.exp(1j*e_middle*self.delta_t*np.arange(self.n_pts_autocorr+1))
-    tab_autocorrelation_symmetrized=np.concatenate((tab_autocorrelation,np.conj(tab_autocorrelation[:0:-1])))
-
-# Make the inverse Fourier transform which is by construction real, so keep only real part
-# Note that it is surely possible to improve using Hermitian FFT (useless as it uses very few resources)
-# Both the spectrum and the energies are reordered in ascending order
-    tab_spectrum=np.fft.fftshift(np.real(np.fft.ifft(tab_autocorrelation_symmetrized)))/self.e_resolution
-#    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))+e_middle
-# The energy spectrum at this stage is starting at e=-n_pts_autocorr*delta_e and ending at e=-n_pts_autocorr*delta_e
-# with delta_e = 2*pi/delta_t
-    return tab_spectrum
-  """
   
+  def chebyshev_kpm_step(self, H, psi, psi_old, c1, c2):
+# Generic code uses the sparse multiplication
+    psi_old[:] = c1*H.apply_h(psi)-c2*psi[:]-psi_old[:]
+#  print('psi',psi)
+#  print('psi_old',psi_old)
+    return
+
+  def chebyshev_kpm_step_ctypes(self, H, psi, psi_old, c1, c2):
+    self.chebyshev_ctypes_lib.chebyshev_kpm_step(H.dimension, np.asarray(H.tab_dim,dtype=np.intc), H.array_boundary_condition,\
+      psi.ravel(), psi_old.ravel(), H.disorder.ravel(), np.asarray(H.tab_tunneling), c1, c2) 
+    return  
+
   def normalize(self, n):
     self.tab_spectrum /= n
     return
@@ -653,10 +670,9 @@ class Spectral_function:
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return    
 
-  def compute_spectral_function(self,i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=False):
+  def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=False):
     if build_disorder:
       H.generate_disorder(seed=i_seed+1234)
-#    measurement.perform_measurement_potential(H)
       H.generate_sparse_matrix()
 #      H.energy_range(accurate=propagation.accurate_bounds)
     save_interaction = H.interaction
@@ -671,7 +687,6 @@ class Spectral_function:
     psi = copy.deepcopy(initial_state.wfc.ravel())
     psi_old = np.zeros_like(psi)
     n_kpm = self.n_kpm
-    chebyshev_kpm_step = chebyshev_kpm_step_ctypes
   # The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
   # This avoids the divergence of the denominator at edges  
     c1 = 2.0/(self.e_max-self.e_min+2.0*self.e_resolution)
@@ -687,7 +702,7 @@ class Spectral_function:
   #  tab_x =  np.linspace(-1.0+1.0/n_pts,1.0-1.0/n_pts,num=n_pts)
   #  tab_mu = np.zeros(2*((spectral_function.n_kpm+1)//2)+1) 
     tab_mu[0] = np.vdot(psi,psi).real*H.delta_vol
-    chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+    self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
     c1 *= 2.0
     c2 *= 2.0
     tab_mu[1] = np.vdot(psi,psi_old).real*H.delta_vol
@@ -701,7 +716,7 @@ class Spectral_function:
   # Range for the old method  
       for i in range(2,n_kpm+1):
         psi_old, psi = psi, psi_old
-        chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+        self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
   # The old method    
         tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
   #      print(i,tab_mu[i])
@@ -711,7 +726,7 @@ class Spectral_function:
   # Range for the improved method
       for i in range(2,(n_kpm+1)//2+1):
         psi_old, psi = psi, psi_old
-        chebyshev_kpm_step(H, psi, psi_old, c1, c2)
+        self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
         tab_mu[2*i-1] = 2.0*np.vdot(psi,psi_old).real*H.delta_vol-tab_mu[1]
   #      print(2*i-1,tab_mu[2*i-1])
         if 2*i<n_kpm+1:
@@ -726,58 +741,7 @@ class Spectral_function:
       tab_T, tab_T_old = tab_T_old, tab_T
     return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-self.tab_x**2)*(self.e_max-self.e_min+2.0*self.e_resolution))    
 
-"""
-def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, build_disorder=True, build_initial_state=False):
-#  print(H.interaction,spectral_function.multiplicative_factor_for_interaction)
-# When computing the spectral function from the temporal autocorrelation, it is better to switch off the interaction, so that what is computed is <psi(t)|delta(E-H)|\psi(t)> without any non-linear term in the delta function
-# When the initial state is a plane wave, \overline{|\psi(r,t)|^2} is simply g/V that is a constant shift in energy
-#  print('inside compute_spectral_function')
-#  print(H.disorder[0,0])
-#  print(np.sum(H.disorder))
-#  print('Inside compute_spectral_function build_disorder = ',build_disorder,' seed = ',i_seed+1234)
-  if build_disorder:
-    H.generate_disorder(seed=i_seed+1234)
-    measurement.perform_measurement_potential(H)
-    if propagation.method=='che':
-      H.generate_sparse_matrix()
-      H.energy_range(accurate=propagation.accurate_bounds)
-  save_interaction = H.interaction
-  save_disorder = copy.deepcopy(H.disorder)
-  if build_initial_state:
-    initial_state.prepare_initial_state(seed=i_seed+2345)  
-#  print(save_disorder)
-#  save_disorder = H.disorder
-  H.interaction = 0.0
-  H.disorder = H.disorder + save_interaction*spectral_function.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
-  if spectral_function.method_spectral_function == 'kpm':
-    return compute_spectral_function_kpm_method(initial_state, H, spectral_function)
-  initial_state_2 = copy.deepcopy(initial_state)
-#  print('1',initial_state.type,initial_state_2.type)
-#  print(H.disorder[0,0])
-#  print(np.sum(H.disorder))
-#  print(save_disorder.dtype,initial_state.wfc.dtype)
-#  print(H.interaction)
-#  print(propagation.delta_t,propagation.t_max)
-#  print(initial_state_2.wfc-initial_state.wfc)
-#  print(initial_state.wfc[0,0])
-  gpe_evolution(i_seed, geometry, initial_state_2, H, propagation, propagation, measurement, timing, build_disorder=False, build_initial_state=build_initial_state)
-#  print(initial_state_2.wfc-initial_state.wfc)
-#  print(initial_state.wfc[0,0])
-  H.interaction = save_interaction
-  H.disorder = copy.deepcopy(save_disorder)
-#  H.disorder = save_disorder
-  initial_state = copy.deepcopy(initial_state_2)
-#  print('2',initial_state.type,initial_state_2.type)
-#  print(H.disorder[0,0])
-#  print(np.sum(H.disorder))
-#  print(H.interaction)
-#  print(measurement.tab_autocorrelation)
-#  measurement.tab_spectrum[:] = spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
-#  print(measurement.tab_spectrum)
-  return spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
-"""
-
-def gpe_evolution(i_seed, geometry, initial_state, H, propagation, propagation_spectral, measurement, timing, debug=False, measurement_spectral=None, spectral_function=None, build_disorder=True, build_initial_state=False):
+def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, spectral_function=None, build_disorder=True, build_initial_state=False):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
@@ -1240,4 +1204,74 @@ def elementary_clenshaw_step_real(wfc, H, psi, psi_old, c_coef, add_real, c1, c2
 #  print('no_cffi wfc_dec',wfc[0],wfc[1],wfc[dim_x-2],wfc[dim_x-1])
 # ,H.two_over_delta_e,H.two_e0_over_delta_e,H.tab_tunneling[0],c_coef,one_or_two,add_real)
   return
+
+
+def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, measurement, spectral_function, timing, debug=False, build_disorder=True, build_initial_state=False):
+#  print(H.interaction,spectral_function.multiplicative_factor_for_interaction)
+# When computing the spectral function from the temporal autocorrelation, it is better to switch off the interaction, so that what is computed is <psi(t)|delta(E-H)|\psi(t)> without any non-linear term in the delta function
+# When the initial state is a plane wave, \overline{|\psi(r,t)|^2} is simply g/V that is a constant shift in energy
+#  print('inside compute_spectral_function')
+#  print(H.disorder[0,0])
+#  print(np.sum(H.disorder))
+#  print('Inside compute_spectral_function build_disorder = ',build_disorder,' seed = ',i_seed+1234)
+  if build_disorder:
+    H.generate_disorder(seed=i_seed+1234)
+    measurement.perform_measurement_potential(H)
+    if propagation.method=='che':
+      H.generate_sparse_matrix()
+      H.energy_range(accurate=propagation.accurate_bounds)
+  save_interaction = H.interaction
+  save_disorder = copy.deepcopy(H.disorder)
+  if build_initial_state:
+    initial_state.prepare_initial_state(seed=i_seed+2345)  
+#  print(save_disorder)
+#  save_disorder = H.disorder
+  H.interaction = 0.0
+  H.disorder = H.disorder + save_interaction*spectral_function.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+  if spectral_function.method_spectral_function == 'kpm':
+    return compute_spectral_function_kpm_method(initial_state, H, spectral_function)
+  initial_state_2 = copy.deepcopy(initial_state)
+#  print('1',initial_state.type,initial_state_2.type)
+#  print(H.disorder[0,0])
+#  print(np.sum(H.disorder))
+#  print(save_disorder.dtype,initial_state.wfc.dtype)
+#  print(H.interaction)
+#  print(propagation.delta_t,propagation.t_max)
+#  print(initial_state_2.wfc-initial_state.wfc)
+#  print(initial_state.wfc[0,0])
+  gpe_evolution(i_seed, geometry, initial_state_2, H, propagation, propagation, measurement, timing, build_disorder=False, build_initial_state=build_initial_state)
+#  print(initial_state_2.wfc-initial_state.wfc)
+#  print(initial_state.wfc[0,0])
+  H.interaction = save_interaction
+  H.disorder = copy.deepcopy(save_disorder)
+#  H.disorder = save_disorder
+  initial_state = copy.deepcopy(initial_state_2)
+#  print('2',initial_state.type,initial_state_2.type)
+#  print(H.disorder[0,0])
+#  print(np.sum(H.disorder))
+#  print(H.interaction)
+#  print(measurement.tab_autocorrelation)
+#  measurement.tab_spectrum[:] = spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
+#  print(measurement.tab_spectrum)
+  return spectral_function.spectral_function_from_temporal_autocorrelation(measurement.tab_autocorrelation)
+
+  def spectral_function_from_temporal_autocorrelation(self,tab_autocorrelation):
+# The autocorrelation function for negative time is simply the complex conjugate of the one at positive time
+# We will use an inverse FFT, so that positive time must be first, followed by negative times (all increasing)
+# see manual of numpy.fft.ifft for explanations
+# The number of points in tab_autocorrelation is n_pts_autocorr+1
+# Multiply by a complex oscillatory exponential so that the energy is shifted
+    e_middle = 0.5*(self.e_max+self.e_min)
+#    print(e_middle)
+    tab_autocorrelation *= np.exp(1j*e_middle*self.delta_t*np.arange(self.n_pts_autocorr+1))
+    tab_autocorrelation_symmetrized=np.concatenate((tab_autocorrelation,np.conj(tab_autocorrelation[:0:-1])))
+
+# Make the inverse Fourier transform which is by construction real, so keep only real part
+# Note that it is surely possible to improve using Hermitian FFT (useless as it uses very few resources)
+# Both the spectrum and the energies are reordered in ascending order
+    tab_spectrum=np.fft.fftshift(np.real(np.fft.ifft(tab_autocorrelation_symmetrized)))/self.e_resolution
+#    tab_energies=np.fft.fftshift(np.fft.fftfreq(2*self.n_pts_autocorr+1,d=self.delta_t/(2.0*np.pi)))+e_middle
+# The energy spectrum at this stage is starting at e=-n_pts_autocorr*delta_e and ending at e=-n_pts_autocorr*delta_e
+# with delta_e = 2*pi/delta_t
+    return tab_spectrum
 """

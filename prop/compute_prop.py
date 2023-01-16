@@ -109,7 +109,7 @@ def main():
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranted
   my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral','Spin']
-  geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  geometry, H, initial_state, spectral_function, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 #  propagation.chebyshev_propagation = anderson.propagation.chebyshev_propagation_generic
 #  propagation.chebyshev_step = eval("anderson.propagation.chebyshev_step_generic_"+propagation.data_layout)
 #  H.apply_h = H.apply_h_generic
@@ -139,7 +139,7 @@ def main():
   for i in range(n_config):
 # Propagation for one realization of disorder
 #    print(propagation.delta_t,propagation.t_max,propagation_spectral.delta_t,propagation_spectral.t_max,)
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, propagation_spectral,measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function,build_disorder=H.randomize_hamiltonian,build_initial_state=initial_state.randomize_initial_state)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation,measurement, my_timing,spectral_function=spectral_function,build_disorder=H.randomize_hamiltonian,build_initial_state=initial_state.randomize_initial_state)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
 # The following lines just for generating and printing a single realization of disorder

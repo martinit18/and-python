@@ -165,10 +165,9 @@ class Measurement(Geometry):
       self.overlap = 0.0
 #      print('Measure spectral function = ',self.measure_spectral_function)
     if self.measure_spectral_function:
-      self.tab_energies = np.fft.fftshift(np.fft.fftfreq(2*spectral_function.n_pts_autocorr+1,d=spectral_function.delta_t/(2.0*np.pi)))+0.5*(spectral_function.e_max+spectral_function.e_min)
- #       print(number_of_measurements_spectral_function)
-      self.tab_spectrum = np.zeros((2*spectral_function.n_pts_autocorr+1,number_of_measurements_spectral_function))
-    else:
+      self.tab_spectrum = np.zeros((spectral_function.n_pts,number_of_measurements_spectral_function))
+      self.tab_energies = spectral_function.tab_energies
+    else:  
       self.tab_time[:,3]=0.0
     self.tab_t_measurement_spectral_function = self.tab_time[self.tab_time[:,3]==1.0,0]
 # What follows is the code for the intermediate times
