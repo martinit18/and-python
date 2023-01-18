@@ -188,19 +188,30 @@ def main():
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
+    print("ODE time             = {0:.3f}".format(my_timing.ODE_TIME))
+    print("ODE nops             = {0:.4e}".format(my_timing.ODE_NOPS))    
     if (propagation.method=='ode'):
       print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
+      print("GPE nops             = {0:.4e}".format(my_timing.GPE_NOPS))
       print("Number of time steps =",my_timing.N_SOLOUT)
     else:
       print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
+      print("CHE nops             = {0:.4e}".format(my_timing.CHE_NOPS))
       print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
       print("Max order            =",my_timing.MAX_CHE_ORDER)
     print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
+    print("Expect nops          = {0:.4e}".format(my_timing.EXPECT_NOPS))
+    if measurement.measure_spectral_function:
+      print("KPM time             = {0:.3f}".format(my_timing.KPM_TIME))
+      print("KPM nops             = {0:.4e}".format(my_timing.KPM_NOPS))
+      print("SPECTRUM time        = {0:.3f}".format(my_timing.SPECTRUM_TIME))
+      print("SPECTRUM nops        = {0:.4e}".format(my_timing.SPECTRUM_NOPS))     
     if mpi_version:
       print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
     print("Dummy time           = {0:.3f}".format(my_timing.DUMMY_TIME))
-    print("Number of ops        = {0:.4e}".format(my_timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
+    my_timing.TOTAL_NOPS = my_timing.CHE_NOPS+my_timing.EXPECT_NOPS+my_timing.GPE_NOPS+my_timing.KPM_NOPS+my_timing.ODE_NOPS+my_timing.SPECTRUM_NOPS
+    print("Total number of ops  = {0:.4e}".format(my_timing.TOTAL_NOPS))
+    print("Total CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

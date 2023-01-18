@@ -591,7 +591,7 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
       H.apply_minus_i_h_gpe_complex(wfc, rhs)
 #      print('inside gpe complex',wfc[200],wfc[201],rhs[200],rhs[201])
     timing.GPE_TIME+=(timeit.default_timer() - start_time)
-    timing.NUMBER_OF_OPS+=16.0*H.hs_dim
+    timing.GPE_NOPS+=16.0*H.hs_dim
     return rhs
 
 
@@ -604,6 +604,9 @@ class Spectral_function:
 # In case e_range/e_resolution is not an integer, I keep e_resolution and rescale e_range
     self.e_min = e_middle - 0.5*e_resolution*(self.n_pts-1)
     self.e_max = e_middle + 0.5*e_resolution*(self.n_pts-1)  
+# The KPM calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
+# This avoids the divergence of the denominator at edges
+# Create the array of x values for which the spectral function is computed
     self.tab_x = np.linspace(-1.0+2.0/(self.n_pts+1),1.0-2.0/(self.n_pts+1),num=self.n_pts)
 #    print(self.tab_x)
     self.tab_energies = np.linspace(self.e_min,self.e_max,num=self.n_pts)
@@ -671,74 +674,83 @@ class Spectral_function:
     return    
 
   def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=False):
+    start_dummy_time=timeit.default_timer()
     if build_disorder:
       H.generate_disorder(seed=i_seed+1234)
-      H.generate_sparse_matrix()
 #      H.energy_range(accurate=propagation.accurate_bounds)
-    save_interaction = H.interaction
-    save_disorder = copy.deepcopy(H.disorder)
     if build_initial_state:
       initial_state.prepare_initial_state(seed=i_seed+2345)  
-  #  print(save_disorder)
-  #  save_disorder = H.disorder
-    H.interaction = 0.0
-    H.disorder = H.disorder + save_interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
-  #  psi_0 = initial_state.wfc.ravel()
+    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)      
+    start_kpm_time = timeit.default_timer()
+    if H.interaction*self.multiplicative_factor_for_interaction != 0.0:  
+# Modify the disorder to take into account part of the interaction term      
+      H.disorder = H.disorder + H.interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+# If there is no specific apply_h routine, a sparse version of the Hamiltonian is used
+# This sparse matrix must be generated
+#    if not H.has_specific_apply_h_routine:
+#      H.generate_sparse_matrix()
+#  psi_0 = initial_state.wfc.ravel()
     psi = copy.deepcopy(initial_state.wfc.ravel())
     psi_old = np.zeros_like(psi)
     n_kpm = self.n_kpm
-  # The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
-  # This avoids the divergence of the denominator at edges  
+# The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
+# This avoids the divergence of the denominator at edges  
     c1 = 2.0/(self.e_max-self.e_min+2.0*self.e_resolution)
     c2 = 0.5*c1*(self.e_max+self.e_min)
     tab_mu = np.zeros(n_kpm+1)
-  # Jackson damping
-  # tab_g = np.ones(n_kpm+1) 
+# Jackson damping
+# tab_g = np.ones(n_kpm+1) 
     tab_g = (np.linspace(n_kpm+2,1,num=n_kpm+1)*np.cos(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))\
            +np.sin(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))/np.tan(np.pi/(n_kpm+2)))/(n_kpm+2)
-  #  print(tab_g)
-  # First create the array of x values for which the spectral function is computed
-  #  n_pts = 2*spectral_function.n_pts_autocorr+1
-  #  tab_x =  np.linspace(-1.0+1.0/n_pts,1.0-1.0/n_pts,num=n_pts)
-  #  tab_mu = np.zeros(2*((spectral_function.n_kpm+1)//2)+1) 
+#  print(tab_g)
     tab_mu[0] = np.vdot(psi,psi).real*H.delta_vol
     self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
     c1 *= 2.0
     c2 *= 2.0
     tab_mu[1] = np.vdot(psi,psi_old).real*H.delta_vol
-  # The various Chebyshev polynomials are computed by recursion
-  # Initialize T_0 and T_1
+# The various Chebyshev polynomials are computed by recursion
+# Initialize T_0 and T_1
     tab_T_old = np.ones(self.n_pts)
     tab_T = self.tab_x*tab_T_old
     tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T*tab_g[1]
-    method = 'new'
-    if method=='old':
-  # Range for the old method  
-      for i in range(2,n_kpm+1):
-        psi_old, psi = psi, psi_old
-        self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
-  # The old method    
-        tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
-  #      print(i,tab_mu[i])
-    else:  
-  # The improved method which saves a factor 2
-      tab_mu[2] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
-  # Range for the improved method
-      for i in range(2,(n_kpm+1)//2+1):
-        psi_old, psi = psi, psi_old
-        self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
-        tab_mu[2*i-1] = 2.0*np.vdot(psi,psi_old).real*H.delta_vol-tab_mu[1]
-  #      print(2*i-1,tab_mu[2*i-1])
-        if 2*i<n_kpm+1:
-          tab_mu[2*i] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
-  #        print(2*i,tab_mu[2*i])
-  #  print(tab_mu)    
-    H.interaction = save_interaction
-    H.disorder = copy.deepcopy(save_disorder)
+    """  
+# Range for the old method  
+    for i in range(2,n_kpm+1):
+      psi_old, psi = psi, psi_old
+      self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
+# The old method    
+      tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
+#      print(i,tab_mu[i])
+
+    """  
+# The improved method which saves a factor 2
+    tab_mu[2] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
+# Range for the improved method
+    for i in range(2,(n_kpm+1)//2+1):
+      psi_old, psi = psi, psi_old
+      self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
+      tab_mu[2*i-1] = 2.0*np.vdot(psi,psi_old).real*H.delta_vol-tab_mu[1]
+#      print(2*i-1,tab_mu[2*i-1])
+      if 2*i<n_kpm+1:
+        tab_mu[2*i] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
+#        print(2*i,tab_mu[2*i])
+# print(tab_mu)    
+    timing.KPM_TIME += (timeit.default_timer() - start_kpm_time)
+# Count of operations: (8+7*H.dimension)*H.hs_dim comes from each kpm routine (assuming it is the ctypes version)
+# 8*H.hs_dim comes from each scalar product (vdot operation)    
+    timing.KPM_NOPS += n_kpm*(12.0+3.5*H.dimension)*H.hs_dim
+    start_dummy_time = timeit.default_timer()
+# Restore the initial disorder
+    if H.interaction*self.multiplicative_factor_for_interaction != 0.0:  
+      H.disorder = H.disorder - H.interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
+    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)    
+    start_spectrum_time = timeit.default_timer()
     for i in range(2,n_kpm+1):
       tab_T_old = 2.0*self.tab_x*tab_T-tab_T_old
       tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
       tab_T, tab_T_old = tab_T_old, tab_T
+    timing.SPECTRUM_TIME += (timeit.default_timer() - start_spectrum_time)
+    timing.SPECTRUM_NOPS += 7.0*self.n_pts*n_kpm
     return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-self.tab_x**2)*(self.e_max-self.e_min+2.0*self.e_resolution))    
 
 def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, spectral_function=None, build_disorder=True, build_initial_state=False):
@@ -848,7 +860,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #      print(timing.MAX_NONLINEAR_PHASE)
 #      print(y[2000])
       timing.CHE_TIME+=(timeit.default_timer() - start_che_time)
-      timing.NUMBER_OF_OPS+=(12.0+6.0*H.dimension)*hs_dim*propagation.tab_coef.size
+      timing.CHE_NOPS+=(12.0+7.0*H.dimension)*hs_dim*propagation.tab_coef.size
 #      print(y[0])
     if measurement.tab_time[i,1]==1 or measurement.tab_time[i,2]==1:
       start_dummy_time=timeit.default_timer()

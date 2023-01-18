@@ -53,6 +53,7 @@ class Hamiltonian(Geometry):
     self.disorder_type = disorder_type
     self.randomize_hamiltonian = randomize_hamiltonian
     self.correlation_length = correlation_length
+    self.sparse_matrix = None
 #    self.diagonal_term = np.zeros(tab_dim)
 #    self.script_tunneling = 0.
 #    self.script_disorder = np.zeros(tab_dim)
@@ -69,9 +70,9 @@ class Hamiltonian(Geometry):
       self.has_specific_apply_h_routine = True
       self.apply_h = self.apply_h_1d
 # Standard 2d system
-    if self.dimension == 2 and not self.spin_one_half:
-      self.has_specific_apply_h_routine = True
-      self.apply_h = self.apply_h_2d
+#    if self.dimension == 2 and not self.spin_one_half:
+#      self.has_specific_apply_h_routine = True
+#      self.apply_h = self.apply_h_2d
 # 1d system with spin-orbit
     if self.dimension == 1 and self.spin_one_half:
       self.has_specific_apply_h_routine = True
@@ -186,6 +187,7 @@ class Hamiltonian(Geometry):
       np.random.seed(seed)
       my_random_normal = np.random.standard_normal
       my_random_uniform = np.random.uniform
+    self.sparse_matrix = None  
 #    print('seed=',seed)
 #    print(self.tab_dim_cumulative)
     if self.disorder_type=='anderson_uniform':
@@ -506,6 +508,11 @@ class Hamiltonian(Geometry):
 
   def apply_h_generic(self,wfc):
 #    print('inside generic_apply_h')
+# This routines uses a sparse matrix-vector product
+# If the Hamiltonian has not been computed as a sparse matrix, do it now
+# It should be done only once per disorder realization
+    if self.sparse_matrix == None:
+      self.generate_sparse_matrix()
     return self.sparse_matrix.dot(wfc.ravel())
 
   def apply_minus_i_h_gpe_complex(self, wfc, rhs):

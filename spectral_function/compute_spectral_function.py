@@ -99,9 +99,7 @@ def main():
 # Parse parameter file and prepare the useful objects:
 # H for the Hamiltonian of the system
 # initial_state for the initial state
-# propagation for the propagation scheme
-# measurement for the measurement scheme
-# measurement_global is used to gather (average) the results for several disorder configurations
+# spectral_function for the charactertic properties of the spectral function to compute
 # my_list_of_sections is the list of sections needed for this particular calculation
 # Can be in any order
 # The list determines the various structures returned by the routine
@@ -111,16 +109,12 @@ def main():
 #  print(H.randomize_hamiltonian)
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
-#  print(measurement.measure_potential)
-#  print(measurement.potential)
   if rank==0:
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function)
 #  print(header_string)
 # If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
   if not  H.randomize_hamiltonian:
     H.generate_disorder(seed=1234)
-#    measurement.perform_measurement_potential(H)
-#    if propagation.method=='che':
     H.generate_sparse_matrix()
 #    H.energy_range(accurate=propagation.accurate_bounds)
 # If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
@@ -137,14 +131,6 @@ def main():
   my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
     my_timing.mpi_merge(comm)
-#    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
-#    toto = np.empty_like(measurement_global.tab_autocorrelation)
-#    comm.Reduce(measurement_global.tab_autocorrelation,toto,op=MPI.SUM)
-#    measurement_global.tab_autocorrelation = toto
-#    timing.CHE_TIME = comm.reduce(timing.CHE_TIME)
-#    global_timing=comm.reduce(timing)
-#    print(rank,global_timing.CHE_TIME)
-#    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
     spectral_function.normalize(n_config*nprocs)
@@ -156,19 +142,22 @@ def main():
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
-#    if (propagation.method=='ode'):
-#      print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
+    print("KPM time             = {0:.3f}".format(my_timing.KPM_TIME))
+    print("KPM nops             = {0:.4e}".format(my_timing.KPM_NOPS))
+    print("SPECTRUM time        = {0:.3f}".format(my_timing.SPECTRUM_TIME))
+    print("SPECTRUM nops        = {0:.4e}".format(my_timing.SPECTRUM_NOPS))
 #      print("Number of time steps =",my_timing.N_SOLOUT)
 #    else:
 #      print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
 #      print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
 #      print("Max order            =",my_timing.MAX_CHE_ORDER)
-    print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
+#    print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
     if mpi_version:
       print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
     print("Dummy time           = {0:.3f}".format(my_timing.DUMMY_TIME))
-    print("Number of ops        = {0:.4e}".format(my_timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
+    my_timing.TOTAL_NOPS = my_timing.KPM_NOPS+my_timing.SPECTRUM_NOPS
+    print("Total number of ops  = {0:.4e}".format(my_timing.TOTAL_NOPS))
+    print("Total CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()
