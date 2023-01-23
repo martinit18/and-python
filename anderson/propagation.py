@@ -592,12 +592,14 @@ def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
 #      print('inside gpe complex',wfc[200],wfc[201],rhs[200],rhs[201])
     timing.GPE_TIME+=(timeit.default_timer() - start_time)
     timing.GPE_NOPS+=16.0*H.hs_dim
+    timing.N_SOLOUT += 1
+#    print('Inside gross_pitaevskii t = ',t)
     return rhs
 
 
 
 class Spectral_function:
-  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, H):
+  def __init__(self,e_min,e_max,e_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds, H):
     e_range = e_max - e_min
     e_middle = 0.5*(e_max+e_min)
     self.n_pts = int(e_range/e_resolution+1.5)
@@ -615,6 +617,19 @@ class Spectral_function:
     self.multiplicative_factor_for_interaction = multiplicative_factor_for_interaction_in_spectral_function
     self.n_kpm = n_kpm
     self.want_ctypes_for_spectral_function = want_ctypes_for_spectral_function
+# Check whether the energy bounds are sufficient to enclose all the energy spectrum
+# This is a simple, not sufficient test, which only wants to avoid simple mistakes
+# A more accurate test would require to call H.energy_range for each disorder realization
+    if self.e_min>0.0 or self.e_max<2.0*H.diagonal:
+      if allow_unsafe_energy_bounds:
+        print('WARNING, the energy range for the spectral function is probably too small\n'\
+              'the minimum energy is ',self.e_min,' and should be smaller than 0.0\n'\
+              'the maximum energy is ',self.e_max,' and should be larger  than ',2.0*H.diagonal)
+      else:
+        print('The energy range for the spectral function is too small, I stop!\n'\
+              'the minimum energy is ',self.e_min,' and should be smaller than 0.0\n'\
+              'the maximum energy is ',self.e_max,' and should be larger  than ',2.0*H.diagonal)
+        sys.exit() 
 # Is there a ctypes implementation?
     self.has_chebyshev_kpm_routine = False
     if not H.spin_one_half and self.want_ctypes_for_spectral_function:
@@ -672,6 +687,7 @@ class Spectral_function:
     self.tab_spectrum = np.copy(toto)
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return    
+
 
   def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=False):
     start_dummy_time=timeit.default_timer()
@@ -745,19 +761,36 @@ class Spectral_function:
       H.disorder = H.disorder - H.interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
     timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)    
     start_spectrum_time = timeit.default_timer()
-    for i in range(2,n_kpm+1):
-      tab_T_old = 2.0*self.tab_x*tab_T-tab_T_old
-      tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
-      tab_T, tab_T_old = tab_T_old, tab_T
+# If the number of operations is large enough, use the numba version
+# Otherwise, stick to the simple Python version    
+    if self.n_pts*n_kpm>1.e6:
+      tab_spectrum = compute_spectral_function_from_mu(n_kpm,tab_T,tab_T_old,self.tab_x,tab_mu,tab_g,tab_spectrum)
+    else:
+      for i in range(2,n_kpm+1):
+        tab_T_old = 2.0*self.tab_x*tab_T-tab_T_old
+        tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
+        tab_T, tab_T_old = tab_T_old, tab_T
     timing.SPECTRUM_TIME += (timeit.default_timer() - start_spectrum_time)
     timing.SPECTRUM_NOPS += 7.0*self.n_pts*n_kpm
     return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-self.tab_x**2)*(self.e_max-self.e_min+2.0*self.e_resolution))    
 
+
+@numba_decorator  
+def compute_spectral_function_from_mu(n_kpm,tab_T,tab_T_old,tab_x,tab_mu,tab_g,tab_spectrum):
+  for i in range(2,n_kpm+1):
+    tab_T_old = 2.0*tab_x*tab_T-tab_T_old
+    tab_spectrum += 2.0*tab_mu[i]*tab_T_old*tab_g[i]
+    tab_T, tab_T_old = tab_T_old, tab_T
+  return tab_spectrum
+
+     
 def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, spectral_function=None, build_disorder=True, build_initial_state=False):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
+#    print(t,timing.N_SOLOUT)
     return None
+  
 #  print('Inside GPE build_disorder = ',build_disorder)
 # print('0',initial_state.type)
   start_dummy_time=timeit.default_timer()
@@ -772,7 +805,6 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
     H.generate_disorder(seed=i_seed+1234)
     measurement.perform_measurement_potential(H)
     if propagation.method=='che':
-      H.generate_sparse_matrix()
       H.energy_range(accurate=propagation.accurate_bounds)
 #    H.energy_range(accurate=True)
 #    print('  accurate bounds',H.e_min,H.e_max)
@@ -796,17 +828,20 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
     rhs = np.zeros(2*hs_dim)
 #    print('y',y.dtype,y.shape)
 #    print('rhs',rhs.dtype,rhs.shape)
-    solver = ode(f=lambda t,y: gross_pitaevskii(t,y,H,propagation.data_layout,rhs,timing)).set_integrator('dop853', atol=accuracy, rtol=10.0*accuracy)
-    solver.set_solout(solout)
+    solver = ode(f=lambda t,y: gross_pitaevskii(t,y,H,propagation.data_layout,rhs,timing)).set_integrator('dop853', atol=accuracy, rtol=10.0*accuracy, nsteps=10000)
+#    solver.set_solout(solout)
     solver.set_initial_value(y)
-
+#    print('After initialisation, N_SOLOUT = ',timing.N_SOLOUT)
 
 #  print(timeit.default_timer())
   timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
 
   start_expect_time = timeit.default_timer()
-
-  init_state_autocorr = copy.deepcopy(initial_state)
+# Keeping the initial state is needed when the autocorrelation <psi(0)|psi(t)> is measured
+  if measurement.measure_autocorrelation or measurement.measure_overlap: 
+    init_state_autocorr = copy.deepcopy(initial_state)
+  else:
+    init_state_autocorr = None
   measurement.perform_measurement_dispersion(0, H, initial_state, initial_state)
   timing.EXPECT_TIME+=(timeit.default_timer() - start_expect_time)
 #  print('2',initial_state.wfc[0],initial_state.wfc[1])
@@ -841,6 +876,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
     if (propagation.method == 'ode'):
       start_ode_time = timeit.default_timer()
       solver.integrate(measurement.tab_time[i,0])
+#      print(i,measurement.tab_time[i,0],timing.N_SOLOUT)
       timing.ODE_TIME+=(timeit.default_timer() - start_ode_time)
     else:
       start_che_time = timeit.default_timer()

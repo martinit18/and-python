@@ -273,8 +273,12 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       if not config.has_option('Spectral','resolution'): all_options_ok = False
       spectre_resolution = Spectral.getfloat('resolution')
       multiplicative_factor_for_interaction_in_spectral_function = Spectral.getfloat('multiplicative_factor_for_interaction',0.0)
-      n_kpm = Spectral.getint('n_kpm',100)
+      n_kpm = Spectral.getint('n_kpm',0)
+# Determine the default value of n_kpm      
+      if n_kpm==0:
+        n_kpm=int(0.5*(spectre_max-spectre_min)/spectre_resolution)
       want_ctypes_for_spectral_function = Spectral.getboolean('want_ctypes_for_spectral_function',True)
+      allow_unsafe_energy_bounds = Spectral.getboolean('allow_unsafe_energy_bounds',False)
       if not all_options_ok:
         my_abort(mpi_version,comm,'In the Spectral section of the parameter file, there must be a resolution and either an energy interval [e_min,e_max] or an energy range e_range, I stop!\n')
 
@@ -365,6 +369,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     multiplicative_factor_for_interaction_in_spectral_function = None
     n_kpm = None
     want_ctypes_for_spectral_function = None
+    allow_unsafe_energy_bounds = None
     e_min = None
     e_max = None
     number_of_e_steps = None
@@ -399,8 +404,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues  = \
         comm.bcast((diagonalization_method, targeted_energy, IPR_min, IPR_max, number_of_bins, number_of_eigenvalues))
     if 'Spectral' in my_list_of_sections:
-      spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function = \
-        comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function))
+      spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds = \
+        comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds))
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = \
         comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
@@ -438,7 +443,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   if 'Spectral' in my_list_of_sections:
 #    measure_spectral_function_local = not 'Measurement' in my_list_of_sections
 #    measure_spectral_function_local = True
-    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, H)
+    spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds, H)
 #    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
 #    return_list.append(propagation_spectral)
     return_list.append(spectral_function)

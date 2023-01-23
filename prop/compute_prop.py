@@ -130,7 +130,6 @@ def main():
     H.generate_disorder(seed=1234)
     measurement.perform_measurement_potential(H)
     if propagation.method=='che':
-      H.generate_sparse_matrix()
       H.energy_range(accurate=propagation.accurate_bounds)
 # If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
   if not initial_state.randomize_initial_state:
@@ -188,11 +187,11 @@ def main():
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
-    print("ODE time             = {0:.3f}".format(my_timing.ODE_TIME))
-    print("ODE nops             = {0:.4e}".format(my_timing.ODE_NOPS))    
     if (propagation.method=='ode'):
-      print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
-      print("GPE nops             = {0:.4e}".format(my_timing.GPE_NOPS))
+      print("ODE time             = {0:.3f}".format(my_timing.ODE_TIME))
+      print("ODE nops is unknown")    
+      print("    GPE time         = {0:.3f}".format(my_timing.GPE_TIME))
+      print("    GPE nops         = {0:.4e}".format(my_timing.GPE_NOPS))
       print("Number of time steps =",my_timing.N_SOLOUT)
     else:
       print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))

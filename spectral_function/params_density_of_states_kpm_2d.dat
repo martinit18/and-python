@@ -88,7 +88,7 @@ range = 100.0
 resolution = 0.02
 e_min= -1.
 e_max= 17.
-n_kpm = 180
+#n_kpm = 450
 #want_ctypes_for_spectral_function = False
 # Multiplicative factor for the interaction coefficient
 multiplicative_factor_for_interaction = 0.0

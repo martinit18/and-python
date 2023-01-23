@@ -89,3 +89,4 @@ e_min= -1.
 e_max= 17.
 # Multiplicative factor for the interaction coefficient
 multiplicative_factor_for_interaction = 0.0
+n_kpm = 100
