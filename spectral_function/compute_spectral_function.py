@@ -113,18 +113,18 @@ def main():
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function)
 #  print(header_string)
 # If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
-  if not  H.randomize_hamiltonian:
-    H.generate_disorder(seed=1234)
-    H.generate_sparse_matrix()
+#  if not  H.randomize_hamiltonian:
+#    H.generate_disorder(seed=1234)
+#    H.generate_sparse_matrix()
 #    H.energy_range(accurate=propagation.accurate_bounds)
 # If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
-  if not initial_state.randomize_initial_state:
-    initial_state.prepare_initial_state(seed=2345)  
+#  if not initial_state.randomize_initial_state:
+#    initial_state.prepare_initial_state(seed=2345)  
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 #    print(i,H.randomize_hamiltonian)
 # Compute the spectral function and accumulate it
-    spectral_function.tab_spectrum += spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing, build_disorder=H.randomize_hamiltonian, build_initial_state=initial_state.randomize_initial_state)
+    spectral_function.tab_spectrum += spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
   if mpi_version:
     spectral_function.mpi_merge(comm,my_timing)
   t2 = time.perf_counter()

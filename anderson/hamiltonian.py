@@ -26,7 +26,7 @@ They are used in the rescaling of the Hamiltonian to bring its spectrum between 
 
 class Hamiltonian(Geometry):
   def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', randomize_hamiltonian=True, one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, interaction=0.0):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft,spin_one_half=geometry.spin_one_half)
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft,spin_one_half=geometry.spin_one_half, reproducible_randomness=geometry.reproducible_randomness, custom_seed=geometry.custom_seed)
 # seed is set to zero to recognize a generic Hamiltonian where the disorder has not been yet set
     self.seed = 0
     dimension = self.dimension
@@ -172,47 +172,34 @@ class Hamiltonian(Geometry):
   def generate_disorder(self,seed):
 #    print(self.use_mkl_random)
     self.seed = seed
-    if self.use_mkl_random:
-      try:
-        import mkl_random
-      except ImportError:
-        self.use_mkl_random=False
-        print('No mkl_random found; Fallback to Numpy random')
-    if self.use_mkl_random:
-      mkl_random.RandomState(77777, brng='SFMT19937')
-      mkl_random.seed(seed,brng='SFMT19937')
-      my_random_normal = mkl_random.standard_normal
-      my_random_uniform = mkl_random.uniform
-    else:
-      np.random.seed(seed)
-      my_random_normal = np.random.standard_normal
-      my_random_uniform = np.random.uniform
+    my_rng = self.rng(seed)
+# No sparse matrix for the Hamiltonian has yet been generated    
     self.sparse_matrix = None  
 #    print('seed=',seed)
 #    print(self.tab_dim_cumulative)
     if self.disorder_type=='anderson_uniform':
-      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.disorder = self.diagonal + self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
-      self.disorder = self.diagonal + self.disorder_strength*my_random_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.disorder = self.diagonal + self.disorder_strength*my_rng.standard_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
 #      print(self.disorder.shape,self.disorder.dtype)
       return
     if self.disorder_type=='nice':
 # Only in dimension 1
-      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot)/np.sqrt(self.delta_vol)
-      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_random_uniform(-1.0,1.0,self.b*(self.ntot+self.b)).reshape((self.ntot+self.b,self.b))
+      self.disorder = self.diagonal + self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot)/np.sqrt(self.delta_vol)
+      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_rng.uniform(-1.0,1.0,self.b*(self.ntot+self.b)).reshape((self.ntot+self.b,self.b))
 #      print(self.disorder)
       return
     if self.generate=='simple mask':
-      self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(self.ntot).reshape(self.tab_dim))))
+      self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_rng.standard_normal(self.ntot).reshape(self.tab_dim))))
 #      self.print_potential()
       return
     if self.generate=='field mask':
 # When a field_mask is used, the initial data is a complex uncorrelated set of Gaussian distributed random numbers in configuration space
 # The Fourier transform in momentum space is also a complex uncorrelated set of Gaussian distributed random numbers
 # Thus the first FT is useless and can be short circuited
-      self.disorder =  self.diagonal + 0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2
+      self.disorder =  self.diagonal + 0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_rng.standard_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2
 # Alternatively (slower)
 #      self.disorder =  self.diagonal + 0.5*self.disorder_strength*np.abs(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))))**2
 #      self.print_potential()

@@ -17,16 +17,18 @@ boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
 use_mkl_fft = True
+#use_mkl_random = False
+#reproducible_randomness = False
+custom_seed = 1
 
 [Disorder]
 #  Various disorder types can be used
 #type = anderson_uniform
 type = anderson_gaussian
 #type = regensburg
-#type = konstanz
+#type = konstanzq
 # type = singapore
 # type = speckle
-use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
@@ -42,7 +44,7 @@ g = 0.
 #initial_state = plane_wave
 #initial_state = gaussian_wave_packet
 initial_state = random
-randomize_initial_state = True
+#randomize_initial_state = False
 # make sure that k_0_over_2_pi_i*size_i is an integer
 k_0_over_2_pi_1 = 0.1
 k_0_over_2_pi_2 = 0.0

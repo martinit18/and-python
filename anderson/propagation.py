@@ -689,13 +689,22 @@ class Spectral_function:
     return    
 
 
-  def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=False):
+  def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_initial_state=False):
     start_dummy_time=timeit.default_timer()
-    if build_disorder:
-      H.generate_disorder(seed=i_seed+1234)
+    if H.randomize_hamiltonian or H.seed==0:
+      if geometry.reproducible_randomness:        
+        seed = i_seed+1234+H.custom_seed
+      else:
+        seed = None
+#      print(i_seed,seed)  
+      H.generate_disorder(seed) 
 #      H.energy_range(accurate=propagation.accurate_bounds)
-    if build_initial_state:
-      initial_state.prepare_initial_state(seed=i_seed+2345)  
+    if initial_state.randomize_initial_state or initial_state.seed==0:
+      if geometry.reproducible_randomness:        
+        seed = i_seed+2345+H.custom_seed
+      else:
+        seed = None
+      initial_state.prepare_initial_state(seed)  
     timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)      
     start_kpm_time = timeit.default_timer()
     if H.interaction*self.multiplicative_factor_for_interaction != 0.0:  

@@ -13,8 +13,9 @@ from anderson.geometry import Geometry
 
 class Wavefunction(Geometry):
   def __init__(self, geometry):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,spin_one_half=geometry.spin_one_half,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft)
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,spin_one_half=geometry.spin_one_half,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft, reproducible_randomness=geometry.reproducible_randomness, custom_seed=geometry.custom_seed)
     self.wfc = np.zeros(self.tab_extended_dim,dtype=np.complex128)
+    self.seed = 0
     return
 
   def overlap(self, other_wavefunction):
@@ -153,7 +154,7 @@ class Wavefunction(Geometry):
 # This creates a Gaussian wavepacket (with zero momentum) where the phase is randomized at each point
 # This is probably useless
 # See gaussian_with_soeckle for a better routine  
-  def gaussian_randomized(self,seed=2345):
+  def gaussian_randomized(self,seed):
     mask = np.zeros(self.tab_dim)
     tab_k = list()
 #    normalization_factor = np.pi**(-0.25*self.dimension)
@@ -171,25 +172,11 @@ class Wavefunction(Geometry):
 # 2. Multiply each component by exp(i*phi) with phi a real random number uniformly distributed in [0,2*pi]
 # The two should be essentially equivalent
 # First select the random number generator
-    if self.use_mkl_random:
-      try:
-        import mkl_random
-      except ImportError:
-        self.use_mkl_random=False
-        print('No mkl_random found; Fallback to Numpy random')
-    if self.use_mkl_random:
-      mkl_random.RandomState(77777, brng='SFMT19937')
-      mkl_random.seed(seed,brng='SFMT19937')
-      my_random_normal = mkl_random.standard_normal
-      my_random_uniform = mkl_random.uniform
-    else:
-      np.random.seed(seed)
-      my_random_normal = np.random.standard_normal
-      my_random_uniform = np.random.uniform
+    my_rng = self.rng(seed)
 # Comment out at least one of the two methods
 # If both are commented out, we are back to a Gaussian wavepacket with zero momentum      
 # Method 1:      
-    self.wfc_momentum *= my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
+    self.wfc_momentum *= my_rng.standard_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)  
 # Method 2:
 #    self.wfc_momentum *= np.exp(1j*my_random_uniform(0.0,2.0*np.pi,self.ntot)).reshape(self.tab_dim)
 # Normalize the momentum space wavefunction    
@@ -212,7 +199,7 @@ class Wavefunction(Geometry):
 # epsilon_speckle=0 is a pure gaussian wavepacket
 # epsilon_speckle=infinity is a pure speckle
 # Everything is normalized by dividing by sqrt(1+epsilon_speckle**2)
-  def gaussian_with_speckle(self,seed=2345):
+  def gaussian_with_speckle(self,seed):
 # Create the mask    
     mask = np.zeros(self.tab_dim)
     tab_k = list()
@@ -228,20 +215,7 @@ class Wavefunction(Geometry):
     mask = np.exp(mask)
     mask *= np.sqrt(self.ntot/np.sum(mask**2))
 #    print('mask',mask)
-    if self.use_mkl_random:
-      try:
-        import mkl_random
-      except ImportError:
-        self.use_mkl_random=False
-        print('No mkl_random found; Fallback to Numpy random')
-    if self.use_mkl_random:
-      mkl_random.RandomState(77777, brng='SFMT19937')
-      mkl_random.seed(seed,brng='SFMT19937')
-      my_random_normal = mkl_random.standard_normal
-#      my_random_uniform = mkl_random.uniform
-    else:
-      np.random.seed(seed)
-      my_random_normal = np.random.standard_normal
+    my_rng = self.rng(seed)  
 #      my_random_uniform = np.random.uniform
     grid_position = np.meshgrid(*self.grid_position,indexing='ij')
     tab_phase = np.zeros(self.tab_dim)
@@ -260,7 +234,7 @@ class Wavefunction(Geometry):
     psi_smooth = np.exp(-0.5*tab_amplitude+1j*tab_phase)
 # psi_speckle is the same multiplied by the speckle field
 # The sqrt(1/2) is here because both the real and imaginary parts of the complex field have unit standard deviation    
-    psi_speckle = psi_smooth*np.sqrt(0.5)*np.fft.ifftn(mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))
+    psi_speckle = psi_smooth*np.sqrt(0.5)*np.fft.ifftn(mask*my_rng.standard_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))
 #    print('psi_speckle',psi_speckle)
 #    print('Norms1 = ',np.linalg.norm(psi_smooth)/np.sqrt(self.delta_vol),np.linalg.norm(psi_speckle)/np.sqrt(self.delta_vol))    
 #    psi *= np.ones(self.tab_dim,dtype=np.complex128)
@@ -332,30 +306,19 @@ class Wavefunction(Geometry):
  #   print(self.wfc)
     return
   
-  def random(self,seed=2345):
+  def random(self,seed):
     if self.spin_one_half:
       sys.exit("random initial state not yet implemented for spin-orbit systems, I stop!")
     self.seed = seed
-    if self.use_mkl_random:
-      try:
-        import mkl_random
-      except ImportError:
-        self.use_mkl_random=False
-        print('No mkl_random found; Fallback to Numpy random')
-    if self.use_mkl_random:
-      mkl_random.RandomState(77777, brng='SFMT19937')
-      mkl_random.seed(seed,brng='SFMT19937')
-      my_random_normal = mkl_random.standard_normal
-    else:
-      np.random.seed(seed)
-      my_random_normal = np.random.standard_normal
-    my_random_sequence = my_random_normal(2*self.ntot)
+    my_rng = self.rng(seed)
+    my_random_sequence = my_rng.standard_normal(2*self.ntot)
+#    print(seed,my_random_sequence[0])
     my_sum = np.sum(my_random_sequence**2)
     normalization_factor = 1.0/(self.delta_vol*np.sqrt(my_sum))
     self.wfc = normalization_factor*my_random_sequence.view(np.complex128).reshape(self.tab_dim)
     return
    
-  def multi_point(self,seed=2345):
+  def multi_point(self,seed):
 # This creates an initial state with several delta peaks in configuration space
 # These points are locatedon a multidimensional regular rectangular array
 # so that there is at least distance "minimum_distance" (in length units, not numer of sites)
@@ -367,20 +330,7 @@ class Wavefunction(Geometry):
     if self.spin_one_half:
       sys.exit("muti_point initial state not yet implemented for spin-orbit systems, I stop!")
     self.seed = seed
-    if self.use_mkl_random:
-      try:
-        import mkl_random
-      except ImportError:
-        self.use_mkl_random=False
-        print('No mkl_random found; Fallback to Numpy random')
-    if self.use_mkl_random:
-      mkl_random.RandomState(77777, brng='SFMT19937')
-      mkl_random.seed(seed,brng='SFMT19937')
-      my_random_normal = mkl_random.standard_normal
-    else:
-      np.random.seed(seed)
-      my_random_normal = np.random.standard_normal
-#    print(self.use_mkl_random,self.seed)
+    my_rng = self.rng(seed)
     A = np.empty(self.dimension,dtype=object)
     for i in range(self.dimension):
 # If the minimum distance is too small (=0 when not set), only a single point is used
@@ -401,7 +351,7 @@ class Wavefunction(Geometry):
 # This creates the tuple of point indices where a delta-peak is put
     aa = tuple(prod for prod in itertools.product(*A))
     my_sum = 0.0
-    my_random_sequence = my_random_normal(2*len(aa))
+    my_random_sequence = my_rng.standard_normal(2*len(aa))
     my_sum = np.sum(my_random_sequence**2)
     normalization_factor = 1.0/(self.delta_vol*np.sqrt(my_sum))
     j=0
@@ -421,7 +371,7 @@ class Wavefunction(Geometry):
 #    print(self.wfc.ravel()[0])
     return
 
-  def prepare_initial_state(self,seed=2345):
+  def prepare_initial_state(self,seed):
     if (self.type=='plane_wave'):
       self.plane_wave()
     if (self.type=='gaussian_wave_packet'):
@@ -431,12 +381,12 @@ class Wavefunction(Geometry):
     if (self.type=='point'):
       self.point()
     if (self.type=='multi_point'):
-      self.multi_point(seed=seed)
+      self.multi_point(seed)
     if (self.type=='random'):
-      self.random(seed=seed)  
+      self.random(seed)  
     if (self.type=='gaussian_randomized'):
-      self.gaussian_randomized(seed=seed)  
+      self.gaussian_randomized(seed)  
     if (self.type=='gaussian_with_speckle'):
-      self.gaussian_with_speckle(seed=seed)  
+      self.gaussian_with_speckle(seed)  
     return  
 

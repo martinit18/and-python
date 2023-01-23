@@ -13,7 +13,7 @@ import numpy as np
 The class Geometry defines the geometry of the system, including the local Hilbert space on each site (currently limited to spin 1/2 systems) with no reference to the Hamiltonian
 """
 class Geometry:
-  def __init__(self, dimension, tab_dim ,tab_delta, use_mkl_random=False, use_mkl_fft=False, spin_one_half=False):
+  def __init__(self, dimension, tab_dim ,tab_delta, spin_one_half=False, reproducible_randomness=True, custom_seed=0, use_mkl_random=True, use_mkl_fft=True):
     self.dimension = dimension
     self.tab_dim = tab_dim
 #    self.tab_hs_dim = copy.deepcopy(tab_dim)
@@ -47,4 +47,39 @@ class Geometry:
     self.hs_dim = self.lhs_dim*self.ntot
     self.use_mkl_random = use_mkl_random
     self.use_mkl_fft = use_mkl_fft
+    self.reproducible_randomness = reproducible_randomness
+    self.custom_seed = custom_seed
+    self.define_random_number_generator()
     return
+
+# If possible, use the MKL random number generator
+# Otherwise, use Numpy random number generator  
+  def define_random_number_generator(self): 
+    if self.use_mkl_random:
+      try:
+        import mkl_random
+      except ImportError:
+        self.use_mkl_random=False
+        print('No mkl_random found; Fallback to Numpy random')
+    if self.use_mkl_random:
+#      mkl_random.RandomState(77777, brng='SFMT19937')
+#      self.rng = mkl_rng
+      self.rng = lambda seed: mkl_random.RandomState(seed, brng='SFMT19937')
+#      self.my_random_set_seed = self.mkl_random.seed
+    else:
+#      self.rng = np_rng
+      self.rng = lambda seed: np.random.default_rng(seed)
+#      np.random.default_rng(0)
+#      self.my_random_set_seed = np.random.default_rng
+#    self.my_random_normal = self.rng.standard_normal
+#    self.my_random_uniform = self.rng.uniform
+    return
+  
+"""
+def mkl_rng(seed):
+  import mkl_random
+  return mkl_random.RandomState(seed, brng='SFMT19937')
+  
+def np_rng(seed):
+  return np.random.default_rng(seed)
+"""

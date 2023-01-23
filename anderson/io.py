@@ -45,6 +45,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     one_over_mass = System.getfloat('one_over_mass', 1.0)
     use_mkl_fft = System.getboolean('use_mkl_fft',True)
     use_mkl_random = System.getboolean('use_mkl_random',True)
+    reproducible_randomness = System.getboolean('reproducible_randomness',True)
+    custom_seed = System.getint('custom_seed', 0)
     tab_size = list()
     tab_delta = list()
     tab_boundary_condition = list()
@@ -175,7 +177,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
           tab_k_0.append(2.0*math.pi*round(k_0_over_2_pi*tab_size[i])/tab_size[i])
           if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
           tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
-        randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
+        randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',True)
         wfc_correlation_length = Wavefunction.getfloat('wfc_correlation_length')
         epsilon_speckle = Wavefunction.getfloat('epsilon_speckle',0.0)
       if initial_state_type in ["multi_point","random"]:
@@ -306,6 +308,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     tab_delta = None
     tab_dim = None
     tab_boundary_condition = None
+    reproducible_randomness = None
+    custom_seed = None
     disorder_type = None
     randomize_hamiltonian = None
     correlation_length = None
@@ -379,10 +383,10 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 
   if mpi_version:
-    n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition  = \
-      comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition))
-    disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, use_mkl_fft, interaction_strength = \
-      comm.bcast((disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, use_mkl_random, use_mkl_fft, interaction_strength))
+    n_config, dimension, one_over_mass, tab_size, tab_delta, tab_dim, tab_boundary_condition, use_mkl_random, use_mkl_fft, reproducible_randomness, custom_seed  = \
+      comm.bcast((n_config, dimension, one_over_mass, tab_size,tab_delta, tab_dim, tab_boundary_condition, use_mkl_random, use_mkl_fft, reproducible_randomness, custom_seed))
+    disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, interaction_strength = \
+      comm.bcast((disorder_type, randomize_hamiltonian, correlation_length, disorder_strength, non_diagonal_disorder_strength, b, interaction_strength))
     if 'Spin' in my_list_of_sections:
       spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha = \
         comm.bcast((spin_one_half, spin_orbit_interaction, sigma_x, sigma_y, sigma_z, alpha))
@@ -411,7 +415,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
 
 
-  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, )
+  geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, reproducible_randomness=reproducible_randomness, custom_seed=custom_seed )
 # Prepare Hamiltonian structure (the disorder is NOT computed, as it is specific to each realization)
   H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, \
       disorder_type=disorder_type, randomize_hamiltonian=randomize_hamiltonian, correlation_length=correlation_length, disorder_strength=disorder_strength, non_diagonal_disorder_strength=non_diagonal_disorder_strength, \
@@ -523,6 +527,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   params_string += \
                   'Disorder type                           = '+H.disorder_type+'\n'\
                  +'randomize disorder for each config      = '+str(H.randomize_hamiltonian)+'\n'\
+                 +'Use reproducible randomness             = '+str(H.reproducible_randomness)+'\n'
+  if H.reproducible_randomness:    
+    params_string += \
+                  'Custom seed for random number generator = '+str(H.custom_seed)+'\n'\
                  +'use MKL random number generator         = '+str(H.use_mkl_random)+'\n'\
                  +'use MKL FFT                             = '+str(H.use_mkl_fft)+'\n'
   params_string += \
