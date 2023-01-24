@@ -9,13 +9,22 @@ Created on Sun Nov 22 19:27:50 2020
 import numpy as np
 import scipy.sparse as ssparse
 import sys
-import ctypes
-import numpy.ctypeslib as ctl
-import anderson
+#import ctypes
+#import numpy.ctypeslib as ctl
+#import anderson
 from anderson.geometry import Geometry
 from anderson.wavefunction import Wavefunction
-import os
-import numba
+#import os
+#import numba
+
+def numba_decorator(x):
+  try:
+    import numba
+    return numba.jit(nopython=True,fastmath=True,cache=True)(x)
+  except: 
+    print('numba package not found, this will use the slower regular Python version')
+    return(x)
+  pass  
 
 """
 The class Hamiltonian contains all properties that define a disordered Hamiltonian discretized spatially
@@ -647,7 +656,7 @@ class Hamiltonian(Geometry):
     return
 
 #@numba.jit("c16[:](i4,f8,types.unicode_type,f8[:],c16[:])",nopython=True,fastmath=True,boundscheck=False,cache=True,nogil=True)
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def apply_h_1d_numba(dim_x,tunneling,boundary,disorder,wfc):
 #  if wfc.dtype==np.float64:
 #    rhs = np.empty(dim_x,dtype=np.float64)
@@ -664,7 +673,7 @@ def apply_h_1d_numba(dim_x,tunneling,boundary,disorder,wfc):
   rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + disorder[1:dim_x-1] * wfc[1:dim_x-1]
   return rhs
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def apply_h_1d_so_numba(dim_x, tunneling, boundary, disorder, scaled_spin_orbit_interaction, sigma_x, sigma_y, sigma_z, scaled_alpha, wfc):
 #  print('apply_h_1d_so',scaled_spin_orbit_interaction)
 #  scaled_spin_orbit_interaction = -scaled_spin_orbit_interaction
@@ -718,7 +727,8 @@ def apply_h_1d_so_numba(dim_x, tunneling, boundary, disorder, scaled_spin_orbit_
                       + (sigma_minus)*wfc[hs_dim-2]
   return rhs
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+
+@numba_decorator
 def apply_h_2d_numba(dim_x, dim_y, tunneling_x, tunneling_y, b_x, b_y, disorder, wfc):
 #    print('apply_h_2d')
     local_wfc = wfc.ravel()

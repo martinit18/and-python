@@ -689,9 +689,9 @@ class Spectral_function:
     return    
 
 
-  def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_initial_state=False):
+  def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=True):
     start_dummy_time=timeit.default_timer()
-    if H.randomize_hamiltonian or H.seed==0:
+    if build_disorder and (H.randomize_hamiltonian or H.seed==0):
       if geometry.reproducible_randomness:        
         seed = i_seed+1234+H.custom_seed
       else:
@@ -699,7 +699,8 @@ class Spectral_function:
 #      print(i_seed,seed)  
       H.generate_disorder(seed) 
 #      H.energy_range(accurate=propagation.accurate_bounds)
-    if initial_state.randomize_initial_state or initial_state.seed==0:
+    print
+    if build_initial_state and (initial_state.randomize_initial_state or initial_state.seed==0):
       if geometry.reproducible_randomness:        
         seed = i_seed+2345+H.custom_seed
       else:
@@ -793,7 +794,7 @@ def compute_spectral_function_from_mu(n_kpm,tab_T,tab_T_old,tab_x,tab_mu,tab_g,t
   return tab_spectrum
 
      
-def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, spectral_function=None, build_disorder=True, build_initial_state=False):
+def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, spectral_function=None):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
@@ -808,20 +809,34 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   tab_extended_dim = geometry.tab_extended_dim
 #  tab_delta = geometry.tab_delta
   hs_dim = geometry.hs_dim
-  psi = Wavefunction(geometry)
   accuracy = propagation.accuracy
-  if build_disorder:
-    H.generate_disorder(seed=i_seed+1234)
+  if H.randomize_hamiltonian or H.seed==0:
+    if geometry.reproducible_randomness:        
+      seed = i_seed+1234+H.custom_seed
+    else:
+      seed = None
+#      print(i_seed,seed)  
+    H.generate_disorder(seed) 
     measurement.perform_measurement_potential(H)
-    if propagation.method=='che':
-      H.energy_range(accurate=propagation.accurate_bounds)
+ #      H.energy_range(accurate=propagation.accurate_bounds)
+#  print(initial_state.randomize_initial_state)
+  if initial_state.randomize_initial_state or initial_state.seed==0:
+    if geometry.reproducible_randomness:        
+      seed = i_seed+2345+H.custom_seed
+    else:
+      seed = None
+    initial_state.prepare_initial_state(seed)  
+  psi = Wavefunction(geometry)
+  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)  
+  if propagation.method=='che':
+    H.energy_range(accurate=propagation.accurate_bounds)
 #    H.energy_range(accurate=True)
 #    print('  accurate bounds',H.e_min,H.e_max)
 #    H.energy_range(accurate=False)
 #  print('inaccurate bounds',H.e_min,H.e_max)
-  if build_initial_state:
+#  if build_initial_state:
 #     print('multi_point initial state, randomized')
-     anderson.wavefunction.Wavefunction.prepare_initial_state(initial_state,seed=i_seed+2345)
+#     anderson.wavefunction.Wavefunction.prepare_initial_state(initial_state,seed=i_seed+2345)
 #     print(initial_state.wfc.ravel()[0])
   if propagation.data_layout=='real':
     y = np.concatenate((np.real(initial_state.wfc.ravel()),np.imag(initial_state.wfc.ravel())))
@@ -936,7 +951,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 #        print(j_spectral_function,psi.wfc[0])
 #        print(propagation_spectral.delta_t,propagation_spectral.t_max)
         measurement.tab_spectrum[:,j_spectral_function] = spectral_function.compute_spectral_function(\
-          i_seed, geometry, psi, H, timing, build_disorder=False)
+          i_seed, geometry, psi, H, timing, build_disorder=False, build_initial_state=False)
 #        print(j_spectral_function,psi.wfc[0])
 #        print('j_spectral_function = ',j_spectral_function)
         j_spectral_function+=1
