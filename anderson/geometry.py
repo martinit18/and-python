@@ -62,17 +62,9 @@ class Geometry:
         self.use_mkl_random=False
         print('No mkl_random found; Fallback to Numpy random')
     if self.use_mkl_random:
-#      mkl_random.RandomState(77777, brng='SFMT19937')
-#      self.rng = mkl_rng
       self.rng = lambda seed: mkl_random.RandomState(seed, brng='SFMT19937')
-#      self.my_random_set_seed = self.mkl_random.seed
     else:
-#      self.rng = np_rng
       self.rng = lambda seed: np.random.default_rng(seed)
-#      np.random.default_rng(0)
-#      self.my_random_set_seed = np.random.default_rng
-#    self.my_random_normal = self.rng.standard_normal
-#    self.my_random_uniform = self.rng.uniform
     return
   
 """
