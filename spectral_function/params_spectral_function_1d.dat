@@ -22,7 +22,6 @@ V0 = 0.2
 # Either plane_wave or gaussian_wave_packet
 initial_state = plane_wave
 k_0_over_2_pi_1 = 0.1
-k_0_over_2_pi_2 = 0.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
@@ -60,10 +59,6 @@ range = 100.0
 resolution = 0.01
 e_min= -1.
 e_max= 10.
-# method can be either:
-#       fft (old method by Fourier transform of temporal propagation)
-#       kpm (kernel polynomial method) which uses Chebyshev polynomials in energy space
-method = kpm
 n_kpm = 1000
 # Multiplicative factor for the interaction coefficient
-multiplicative_factor_for_interaction = 0.0
+#multiplicative_factor_for_interaction = 0.0
