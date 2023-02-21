@@ -66,6 +66,7 @@ import sys
 import argparse
 sys.path.append('/users/champ/delande/git/and-python')
 sys.path.append('/home/lkb/delande/git/and-python')
+sys.path.append('/home/delande/git/and-python')
 import anderson
 
 
@@ -108,11 +109,11 @@ def main():
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranted
   my_list_of_sections = ['Wavefunction','Nonlinearity','Propagation','Measurement','Spectral','Spin']
-  geometry, H, initial_state, propagation_spectral, spectral_function, measurement_spectral, measurement_spectral_global, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  geometry, H, initial_state, spectral_function, propagation, measurement, measurement_global, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 #  propagation.chebyshev_propagation = anderson.propagation.chebyshev_propagation_generic
 #  propagation.chebyshev_step = eval("anderson.propagation.chebyshev_step_generic_"+propagation.data_layout)
 #  H.apply_h = H.apply_h_generic
-
+#  print(initial_state.randomize_initial_state)
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
 
@@ -124,21 +125,11 @@ def main():
 #  print(header_string)
 # Print the initial density and wavefunction
 #  anderson.io.print_measurements_initial(measurement_global,initial_state,header_string=header_string)
-# If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
-  if not  H.randomize_hamiltonian:
-    H.generate_disorder(seed=1234)
-    measurement.perform_measurement_potential(H)
-    if propagation.method=='che':
-      H.generate_sparse_matrix()
-      H.energy_range(accurate=propagation.accurate_bounds)
-# If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
-  if not initial_state.randomize_initial_state:
-    initial_state.prepare_initial_state(seed=2345) 
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 # Propagation for one realization of disorder
 #    print(propagation.delta_t,propagation.t_max,propagation_spectral.delta_t,propagation_spectral.t_max,)
-    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation, propagation_spectral,measurement, my_timing,measurement_spectral=measurement_spectral,spectral_function=spectral_function,build_disorder=H.randomize_hamiltonian,build_initial_state=initial_state.randomize_initial_state)
+    anderson.propagation.gpe_evolution(i+rank*n_config, geometry, initial_state, H, propagation,measurement, my_timing,spectral_function=spectral_function)
 # Add the current contribution to the sum of previous ones
     measurement_global.merge_measurement(measurement)
 # The following lines just for generating and printing a single realization of disorder
@@ -188,18 +179,29 @@ def main():
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
     if (propagation.method=='ode'):
-      print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
+      print("ODE time             = {0:.3f}".format(my_timing.ODE_TIME))
+      print("ODE nops is unknown")    
+      print("    GPE time         = {0:.3f}".format(my_timing.GPE_TIME))
+      print("    GPE nops         = {0:.4e}".format(my_timing.GPE_NOPS))
       print("Number of time steps =",my_timing.N_SOLOUT)
     else:
       print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
+      print("CHE nops             = {0:.4e}".format(my_timing.CHE_NOPS))
       print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
       print("Max order            =",my_timing.MAX_CHE_ORDER)
     print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
+    print("Expect nops          = {0:.4e}".format(my_timing.EXPECT_NOPS))
+    if measurement.measure_spectral_function:
+      print("KPM time             = {0:.3f}".format(my_timing.KPM_TIME))
+      print("KPM nops             = {0:.4e}".format(my_timing.KPM_NOPS))
+      print("SPECTRUM time        = {0:.3f}".format(my_timing.SPECTRUM_TIME))
+      print("SPECTRUM nops        = {0:.4e}".format(my_timing.SPECTRUM_NOPS))     
     if mpi_version:
       print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
     print("Dummy time           = {0:.3f}".format(my_timing.DUMMY_TIME))
-    print("Number of ops        = {0:.4e}".format(my_timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
+    my_timing.TOTAL_NOPS = my_timing.CHE_NOPS+my_timing.EXPECT_NOPS+my_timing.GPE_NOPS+my_timing.KPM_NOPS+my_timing.ODE_NOPS+my_timing.SPECTRUM_NOPS
+    print("Total number of ops  = {0:.4e}".format(my_timing.TOTAL_NOPS))
+    print("Total CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

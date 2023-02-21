@@ -76,6 +76,7 @@ dispersion_energy = True
 #wavefunction = True
 #wavefunction_momentum = True
 #autocorrelation = True
+#spectral_function = True
 g1 = True
 
 [Spectral]

@@ -1,15 +1,17 @@
 # README
 # and-python project
-# Version 3.2
+# Version 4.1
 # Author: Dominique Delande
-# September, 15, 2022
+# February, 21, 2023
 
-WARNING: In this version, the following features are not yet implemented:
+WARNING: In this version, the following features are new or not yet implemented:
 * Lyapounov. Not implemented at all for multidimensional systems. C interface in 1d is obsolete.
-* Fast C versions of the most CPU intensive routines, using the ctypes interface are not implemented
+* Fast C versions of the most CPU intensive routines, using the ctypes interface are ony partially implemented
 in dimension 3 and larger. 1d and 2d version are working well and are as fast as a pure C code.
-* The spectral function calculation is basically implemented, but requires some additional work and tests.
-Probably not working on Oct, 16, 2020, but should be fixed rapidly.
+* The spectral function calculation is completely new. It now uses the Kernel Polynomial Method (KPM) with
+Chebyshev polynomials, rather than the old Time->Energy Fourier transform of the evolution operator. 
+* There is a new optiun to choose between reproducible and irreproducible randomness. In the first case, 
+  the same RNG is used between runs, so that the results should be identical.  
 * There are inconsistencies on which file is used for reading parameters. See section II.9
 
 I. Physics
@@ -38,7 +40,8 @@ could be easily added.
 The resulting discretized Hamiltonian is a sparse matrix (tridiagonal in 1D),
 which can be efficiently manipulated.
 For the Gross-Pitaevskii, the additional nonlinear term is purely diagonal.
-The choice of units is hbar=m=1.
+The choice of units is hbar=1, with the mass usually m=1, 
+but can be adjusted with the parameter "one_over_mass".
 
 I.3. Exact diagonalization
 The simplest calculation is to diagonalize the discretized Hamliltonian to obtain
@@ -120,27 +123,45 @@ is that it should be smaller than 0.1. Sometimes,
 it has been observed that smaller values, say 0.02-0.05, are needed for
 good convergence. When the interaction is larger than the disorder, the density |\psi|^2
 is more uniform and larger values of the nonlinear phase can be used.
-In any case, it is always good to check the conservation of the total energy (setting 
+In any case, it is always good to check the conservation of the total energy, setting 
 "dispersion_energy" to True in the parameter file.
 
 I.6. Spectral function
-The spectral function can be computed by Fourier transform of the autocorrelation
-function C(t)=<\psi(0)|\psi(t)>, with \psi(0) an arbitrary state. For the standard
-spectral function, \psi(0) is a plane wave, but the program allows any initial
-state. Especially, if \psi(0) is localized on a single site, the Fourier transform
-of C(t) is the local density of states, which, after configuration averaging, gives 
-the average density of states per unit volume.
-One has to specify the requires energy resolution (which will give the total
-propagation time 2\pi/energy_resolution) and the total energy range: because of 
-the performed FFT, the spectrum is folded in an interval Delta E = 2\pi/dt,
-where dt is the elementary time step for propagation. Thus, the program uses 
-dt=2\pi/energy_range. The spectrum is output as symmeytric around E=0, but this
-is easy to change. Note that the CPU time spent in the Fourier transform 
-time->energy is usually negligible.
-The spectral function can be computed in the interacting case, simply as the
-Fourier transform of the nonlinear C(t), but its physical meaning is not 
-completely clear.
+NOTE: The spectral function calculation is completely new for version 4.0.
+Previously it was using temporal propagation followed by a Time->Energy Fourier transform.
+The new version uses direct calculation with the Kernel Polynomial Method (KPM) and Chebyshev polynomials.
+It is very significantly faster, less noisy, meaning that less disorder realizations are needed.
 
+The spectral function is defined as:
+  A_\psi(E) = \overline{<\psi|\delta(H-E)|\psi>}
+where the overline denotes averaging over disorder realizations.
+In the KPM method, the function \delta(H-E) is computed as a sum over Chebyshev polynomials of the
+Hamiltonian H acting on the initial state |\psi>. The method is more detailed in the documentation.
+
+For the standard
+spectral function, \psi is a plane wave, but the program allows any initial
+state. Especially, if \psi is localized on a single site (option "point" for the "initial_state" variable
+in the [Wavefunction] section of the parameter file, the spectral function is 
+the local density of states, which, after configuration averaging, gives 
+the average density of states per unit volume. 
+A better option, leading to less noisy density of states is to use:
+  intiial_state = random
+which chooses uncorrelated complex Gaussian variables on each site and also provides the density of states.
+
+One has to specify the requested energy resolution and the total energy range.
+It is IMPORTANT that the energy range covers the full energy spectrum. Otherwise, disaster is guaranteed
+at the edges of the energy range which spoils everything. This is in contrast with the versions before 4.0,
+where the spectral function was computed by Fourier transform and the full spectral function was folded in 
+the requested energy range.
+
+The spectral function can be computed in the interacting case, where the Hamitonian used in \delta(H-E) is now
+  H = H-0 + disorder + multiplicative_factor_for_interaction*g*|\psi|^2
+where the "multiplicative_factor_for_interaction" (default"0) is defined in the [Spectral] section of the parametre file.
+  multiplicative_factor_for_interaction = 0.5
+ensures that the average energy (preserved during the nonlinear evolution) is given by \int{dE E A_\psi(E)} and constant during the 
+temporal evolution of \psi.
+
+  
 II. Implementation
 II.1. Python modules
 The software is almost entirely written in Python, using mostly the standard
@@ -163,19 +184,18 @@ The list of modules used is:
   scipy.integrate
   scipy.sparse
   scipy.special
-  ctypes
-  numba
-
   
-In addition, there are 3 optional modules: mkl, mkl_random and mkl_fft.
+In addition, there are 6 optional modules: mkl, mkl_random, mkl_fft, numba, ctypes and  numpy.ctypeslib.
 The mkl module is only used to set the number of OpenMP threads, it is probably useless.
 If the mkl_random module is present, the MKL random number generator is used. If not,
-the program uses numpy.random. First tests seem to indicate that mkl_random is slower |-(.
+the program uses numpy.random. 
 If the mkl_fft module is present, most FFTs (the ones which use a lot of CPU time) 
 are performed using the MKL FFT routines. If not present, the program uses numpy.fft,
 which is a bit slower.
-All the modules are available using anaconda (or miniforge), the former one being recommended.
-The ctypes module should also be made optional, but is not in this version.
+The ctypes and numpy.ctypeslib modules (if available) make it possible to use a C version of some numerically
+intensive routines. It is usually about 10 times faster than the Python code.
+The numba module is used to speed up a bit the pure Python code. 
+All the modules are available using anaconda.
 
 The last module "anderson" contains all the specific code of this software.
 
@@ -203,7 +223,7 @@ The code defines the following classes:
   Measurement in prop.py which defines the various measurements performed during 
     the temporal propagation
   Spectral_function in prop.py which defines the parameters for the calculation
-    of the spectral function
+    of the spectral function or the density of states
 In a future release, we should document all methods of these classes.
 At the moment, there are some routines which should be turned to methods in a
 class. Cleaning up these things should be done...
@@ -233,10 +253,7 @@ quantities. If the Chebyshev method is used, there is a C implementation availab
 about 10 times faster, see section II.12.
 
 II.7. Spectral function
-Everything is in the propagation.py file. It basically works by a temporal 
-propagation (see section II.6) followed by a time->energy Fourier transform in the 
-method Spectral_function.compute_spectral_function. It internally uses numpy FFT,
-which is usually very fast.
+Everything is in the propagation.py file, although it could probably be moved to a separate module.
 
 II.8. Basic examples
 There are basic examples in the files:
@@ -292,6 +309,8 @@ boundary_condition_1 = periodic
 boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
+use_mkl_random = True
+use_mkl_fft = True
 
 [Disorder]
 #  Various disorder types can be used
@@ -301,7 +320,6 @@ boundary_condition_4 = periodic
 type = konstanz
 # type = singapore
 # type = speckle
-use_mkl_random = True
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
@@ -348,11 +366,12 @@ dispersion_variance = True
 #wavefunction = True
 #wavefunction_momentum = True
 #autocorrelation = True
-use_mkl_fft = True
+
 
 [Spectral]
 range = 20.0
 resolution = 0.01
+
 #####################################################################
 
 The comments should be self-explanatory. 
@@ -366,7 +385,7 @@ The three obligatory sections are:
 
 WARNING: When MPI is used (see section II.12), the parameter n_config
 refers to the TOTAL number of configurations. This is different from
-the anxd_propxx.c programs, where it was the number of configurations
+the an{1,2,3}d_propyy.c programs, where it was the number of configurations
 per MPI process.
 
 Other sections are as follows:
@@ -429,9 +448,11 @@ The basic idea is to write a pure traditional C code implementing the calculatio
 For the temporal propagation using the Chebyshev method, there is for exemple in "anderson/ctypes/chebyshev.c" a C routine defined by:
   double chebyshev_real(const int dimension, const int * restrict tab_dim, const int max_order,  const int * restrict tab_boundary_condition, double * restrict wfc, double * restrict psi, double * restrict psi_old,  const double * restrict disorder, const double * restrict tab_coef, const double * tab_tunneling, const double two_over_delta_e, const double two_e0_over_delta_e, const double g_times_delta_t, const double e0_times_delta_t);
 The code is compiled using "make" with the Makefile in the "anderson/ctypes" directory.
-The GNU, clang and Intel compilers may be used, just by setting the COMPILER 
+The GNU, clang, Intel and Intel Oneapi compilers may be used, just by setting the COMPILER 
 environment variable (see in the Makefile). It seems that the Intel compiler
 gives the fastest code, it is thus recommended to use it if available.
+Note that, on recent distributions like Ubuntu 22.04, the old Intel-21 compiler "icc" does not work any longer. You may use the "icc" compiler from
+Intel Oneapi, setting the variable COMPILER to "intel". As this "icc" compiler is no longer developed, it will probably fail in a near future.
 
 WARNING: The code is generated in a routine typically name chebyshev.so
 Depending on the options in the Makefile, it may run only on the specific machine where it has been compiled.
@@ -440,34 +461,38 @@ If using the Intel compiler on Linux, the code should be portable and optimized 
 
 On the python side, nothing has to be modified in the main script. Only the code inside the "anderson/propagation.py" file
 is modified to use C routines if available. For exemple, in the "gpe_evolution" routine, there are the following lines:
-    if propagation.want_ctypes:
-#      print('I want ctypes')
+    if not H.spin_one_half and self.want_ctypes:
       try:
-        chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
-        if propagation.data_layout=='real':
-          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_real') and    hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')
-          chebyshev_ctypes_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+        import ctypes
+        import numpy.ctypeslib as ctl
+        self.has_specific_full_chebyshev_routine = True
+        self.chebyshev_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/chebyshev.so")
+        if self.data_layout=='real':
+          self.chebyshev_ctypes_lib.chebyshev_real.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
             ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
             ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
-          chebyshev_ctypes_lib.chebyshev_real.restype = ctypes.c_double
-        else:
-          propagation.use_ctypes =hasattr(chebyshev_ctypes_lib,'chebyshev_complex') and hasattr(chebyshev_ctypes_lib,'elementary_clenshaw_step_complex_'+str(H.dimension)+'d')
-          chebyshev_ctypes_lib.chebyshev_complex.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
+          self.chebyshev_ctypes_lib.chebyshev_real.restype = ctypes.c_double
+          if not (hasattr(self.chebyshev_ctypes_lib,'chebyshev_real') and    hasattr(self.chebyshev_ctypes_lib,'elementary_clenshaw_step_real_'+str(H.dimension)+'d')):
+            self.has_specific_full_chebyshev_routine = False
+            self.chebyshev_ctypes_lib = None
+            if H.seed == 0 :
+              print("\nWarning, chebyshev C library found, but without routine for real data layout and dimension "+str(H.dimension)+", this uses the slow Python version\n")
+        if self.data_layout=='complex':
+          self.chebyshev_ctypes_lib.chebyshev_complex.argtypes = [ctypes.c_int, ctl.ndpointer(np.intc), ctypes.c_int, ctl.ndpointer(np.intc),\
             ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.complex128), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64),\
             ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
-          chebyshev_ctypes_lib.chebyshev_complex.restype = ctypes.c_double
-        if propagation.use_ctypes == False:
-          chebyshev_ctypes_lib = None
-          if H.seed == 1234:
-            print("\nWarning, chebyshev C library found, but without routines for dimension "+str(H.dimension)+", this uses the slow Python version!\n")
+          self.chebyshev_ctypes_lib.chebyshev_complex.restype = ctypes.c_double
+          if not (hasattr(self.chebyshev_ctypes_lib,'chebyshev_real') and    hasattr(self.chebyshev_ctypes_lib,'elementary_clenshaw_step_complex_'+str(H.dimension)+'d')):
+            self.has_specific_full_chebyshev_routine = False
+            self.chebyshev_ctypes_lib = None
+            if H.seed == 0 :
+              print("\nWarning, chebyshev C library found, but without routine for complex data layout and dimension "+str(H.dimension)+", this uses the slow Python version\n")
       except:
-        propagation.use_ctypes = False
-        chebyshev_ctypes_lib = None
-        if H.seed == 1234:
-          print("\nWarning, no chebyshev C library found, this uses the slow Python version!\n")
-    else:
-      propagation.use_ctypes = False
-      chebyshev_ctypes_lib = None
+        self.has_specific_full_chebyshev_routine = False
+        self.chebyshev_ctypes_lib = None
+        if H.seed == 0 :
+          print("\nWarning, no ctypes module, no numpy.ctypeslib module or no chebyshev C library found, this uses the slow Python version!\n")
+    self.use_ctypes = self.has_specific_full_chebyshev_routine and self.want_ctypes
 
 which test if the proper routines exist in the "anderson/ctypes/chebyshev.so" library and, if succesful, defines the types of the arguments and return value of the useful routines. This uses the standard ctypes and numpy.ctypeslib modules.
 
@@ -480,12 +505,13 @@ If the C code is not available, an equivalent Python code is used, but it is MUC
  
 At the moment, there are only the two routines chebyshev_real and chebyshev_complex in chebyshev.c 
 (the two routines correspond to the choice of the data_layout). These routines internally manage both the 1d and 2d cases.
-The 3d case will be added in a later version. 
+The 3d case is only supported for the "complex" data_layout. In a near future, it could be that the "real" data layout will be completely remved,
+as it is not siginificantly faster.
 One routine could be developped for the calculation of the total energy as it is a
 bit costly. Computing <x>, <x^2>, <p>, <E_nonlinear> is significantly less
 expensive, thus a C version is not so important. 
        
-II.11.2 Old CFFI interface
+II.11.2 Old CFFI interface (no longer supported)
 The routines use the CFFI interface. Basically, it defines a proper C-Python interface
 and a C source code embedded in a Python wrapper.
 For example, the lyapounov_build.py file contains at the beginning:
@@ -545,7 +571,11 @@ The code can be parallelized using MPI. The parallelization is only the trivial
 one over disorder realizations (no use of the Python multiprocessing module). 
 The reason is that it is both easier to program and slightly more efficient to use MPI.
 This however requires the mpi4py module, which is not always available (not by default
-on anaconda and miniforge). Thus the code contains must contain near the beginning something like:
+on anaconda). When used on the LKB machines or on the ponyo cluster, there is a specific environment
+for the OpenMPI implementation of MPI, which can be activated using:
+  conda activate openmpi
+  
+The code must contain near the beginning something like:
 
   mpi_version, comm, nprocs, rank, mpi_string = anderson.determine_if_launched_by_mpi()
 
@@ -556,9 +586,8 @@ mpi_string contains some minimal MPI information
 If not run inside MPI, mpi_version=False, comm=None, nprocs=1, rank=0 and mpi_string contains proper information
 
 The MPI version is launched using e.g.:
-  mpiexec -n 8 python compute_prop.py
-If no mpi4py module is found, a standard sequential routine is used, which means
-that the same calculation is performed 8 times |-(.
+  mpiexec -n 8 python compute_prop.py my_parameter_file
+If no mpi4py module is found, the program stops with an error message.
 
 If MPI is activated, all I/O is done on process 0. Input data (parsed from the input
 file) are broadcasted to other processes. Then, each process builds its own objects

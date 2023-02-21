@@ -9,13 +9,22 @@ Created on Sun Nov 22 19:27:50 2020
 import numpy as np
 import scipy.sparse as ssparse
 import sys
-import ctypes
-import numpy.ctypeslib as ctl
-import anderson
+#import ctypes
+#import numpy.ctypeslib as ctl
+#import anderson
 from anderson.geometry import Geometry
 from anderson.wavefunction import Wavefunction
-import os
-import numba
+#import os
+#import numba
+
+def numba_decorator(x):
+  try:
+    import numba
+    return numba.jit(nopython=True,fastmath=True,cache=True)(x)
+  except: 
+    print('numba package not found, this will use the slower regular Python version')
+    return(x)
+  pass  
 
 """
 The class Hamiltonian contains all properties that define a disordered Hamiltonian discretized spatially
@@ -26,7 +35,7 @@ They are used in the rescaling of the Hamiltonian to bring its spectrum between 
 
 class Hamiltonian(Geometry):
   def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', randomize_hamiltonian=True, one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, interaction=0.0):
-    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft,spin_one_half=geometry.spin_one_half)
+    super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft,spin_one_half=geometry.spin_one_half, reproducible_randomness=geometry.reproducible_randomness, custom_seed=geometry.custom_seed)
 # seed is set to zero to recognize a generic Hamiltonian where the disorder has not been yet set
     self.seed = 0
     dimension = self.dimension
@@ -53,6 +62,7 @@ class Hamiltonian(Geometry):
     self.disorder_type = disorder_type
     self.randomize_hamiltonian = randomize_hamiltonian
     self.correlation_length = correlation_length
+    self.sparse_matrix = None
 #    self.diagonal_term = np.zeros(tab_dim)
 #    self.script_tunneling = 0.
 #    self.script_disorder = np.zeros(tab_dim)
@@ -69,9 +79,9 @@ class Hamiltonian(Geometry):
       self.has_specific_apply_h_routine = True
       self.apply_h = self.apply_h_1d
 # Standard 2d system
-    if self.dimension == 2 and not self.spin_one_half:
-      self.has_specific_apply_h_routine = True
-      self.apply_h = self.apply_h_2d
+#    if self.dimension == 2 and not self.spin_one_half:
+#      self.has_specific_apply_h_routine = True
+#      self.apply_h = self.apply_h_2d
 # 1d system with spin-orbit
     if self.dimension == 1 and self.spin_one_half:
       self.has_specific_apply_h_routine = True
@@ -171,46 +181,34 @@ class Hamiltonian(Geometry):
   def generate_disorder(self,seed):
 #    print(self.use_mkl_random)
     self.seed = seed
-    if self.use_mkl_random:
-      try:
-        import mkl_random
-      except ImportError:
-        self.use_mkl_random=False
-        print('No mkl_random found; Fallback to Numpy random')
-    if self.use_mkl_random:
-      mkl_random.RandomState(77777, brng='SFMT19937')
-      mkl_random.seed(seed,brng='SFMT19937')
-      my_random_normal = mkl_random.standard_normal
-      my_random_uniform = mkl_random.uniform
-    else:
-      np.random.seed(seed)
-      my_random_normal = np.random.standard_normal
-      my_random_uniform = np.random.uniform
+    my_rng = self.rng(seed)
+# No sparse matrix for the Hamiltonian has yet been generated    
+    self.sparse_matrix = None  
 #    print('seed=',seed)
 #    print(self.tab_dim_cumulative)
     if self.disorder_type=='anderson_uniform':
-      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.disorder = self.diagonal + self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
-      self.disorder = self.diagonal + self.disorder_strength*my_random_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.disorder = self.diagonal + self.disorder_strength*my_rng.standard_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
 #      print(self.disorder.shape,self.disorder.dtype)
       return
     if self.disorder_type=='nice':
 # Only in dimension 1
-      self.disorder = self.diagonal + self.disorder_strength*my_random_uniform(-0.5,0.5,self.ntot)/np.sqrt(self.delta_vol)
-      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_random_uniform(-1.0,1.0,self.b*(self.ntot+self.b)).reshape((self.ntot+self.b,self.b))
+      self.disorder = self.diagonal + self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot)/np.sqrt(self.delta_vol)
+      self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_rng.uniform(-1.0,1.0,self.b*(self.ntot+self.b)).reshape((self.ntot+self.b,self.b))
 #      print(self.disorder)
       return
     if self.generate=='simple mask':
-      self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(self.ntot).reshape(self.tab_dim))))
+      self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_rng.standard_normal(self.ntot).reshape(self.tab_dim))))
 #      self.print_potential()
       return
     if self.generate=='field mask':
 # When a field_mask is used, the initial data is a complex uncorrelated set of Gaussian distributed random numbers in configuration space
 # The Fourier transform in momentum space is also a complex uncorrelated set of Gaussian distributed random numbers
 # Thus the first FT is useless and can be short circuited
-      self.disorder =  self.diagonal + 0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2
+      self.disorder =  self.diagonal + 0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_rng.standard_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2
 # Alternatively (slower)
 #      self.disorder =  self.diagonal + 0.5*self.disorder_strength*np.abs(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))))**2
 #      self.print_potential()
@@ -506,6 +504,11 @@ class Hamiltonian(Geometry):
 
   def apply_h_generic(self,wfc):
 #    print('inside generic_apply_h')
+# This routines uses a sparse matrix-vector product
+# If the Hamiltonian has not been computed as a sparse matrix, do it now
+# It should be done only once per disorder realization
+    if self.sparse_matrix == None:
+      self.generate_sparse_matrix()
     return self.sparse_matrix.dot(wfc.ravel())
 
   def apply_minus_i_h_gpe_complex(self, wfc, rhs):
@@ -653,7 +656,7 @@ class Hamiltonian(Geometry):
     return
 
 #@numba.jit("c16[:](i4,f8,types.unicode_type,f8[:],c16[:])",nopython=True,fastmath=True,boundscheck=False,cache=True,nogil=True)
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def apply_h_1d_numba(dim_x,tunneling,boundary,disorder,wfc):
 #  if wfc.dtype==np.float64:
 #    rhs = np.empty(dim_x,dtype=np.float64)
@@ -670,7 +673,7 @@ def apply_h_1d_numba(dim_x,tunneling,boundary,disorder,wfc):
   rhs[1:dim_x-1] = -tunneling * (wfc[0:dim_x-2] + wfc[2:dim_x]) + disorder[1:dim_x-1] * wfc[1:dim_x-1]
   return rhs
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+@numba_decorator
 def apply_h_1d_so_numba(dim_x, tunneling, boundary, disorder, scaled_spin_orbit_interaction, sigma_x, sigma_y, sigma_z, scaled_alpha, wfc):
 #  print('apply_h_1d_so',scaled_spin_orbit_interaction)
 #  scaled_spin_orbit_interaction = -scaled_spin_orbit_interaction
@@ -724,7 +727,8 @@ def apply_h_1d_so_numba(dim_x, tunneling, boundary, disorder, scaled_spin_orbit_
                       + (sigma_minus)*wfc[hs_dim-2]
   return rhs
 
-@numba.jit(nopython=True,fastmath=True,cache=True)
+
+@numba_decorator
 def apply_h_2d_numba(dim_x, dim_y, tunneling_x, tunneling_y, b_x, b_y, disorder, wfc):
 #    print('apply_h_2d')
     local_wfc = wfc.ravel()

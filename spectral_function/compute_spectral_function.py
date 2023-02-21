@@ -66,6 +66,7 @@ import sys
 import argparse
 sys.path.append('/users/champ/delande/git/and-python')
 sys.path.append('/home/lkb/delande/git/and-python')
+sys.path.append('/home/delande/git/and-python')
 import anderson
 
 def main():
@@ -98,81 +99,65 @@ def main():
 # Parse parameter file and prepare the useful objects:
 # H for the Hamiltonian of the system
 # initial_state for the initial state
-# propagation for the propagation scheme
-# measurement for the measurement scheme
-# measurement_global is used to gather (average) the results for several disorder configurations
+# spectral_function for the charactertic properties of the spectral function to compute
 # my_list_of_sections is the list of sections needed for this particular calculation
 # Can be in any order
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranteed
-  my_list_of_sections = ['Wavefunction','Nonlinearity','Measurement','Propagation','Spectral','Spin']
-  geometry, H, initial_state,  propagation, spectral_function, measurement, measurement_global,_,_,_,n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  my_list_of_sections = ['Wavefunction','Nonlinearity','Spectral','Spin']
+  geometry, H, initial_state, spectral_function,n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 #  print(H.randomize_hamiltonian)
   t1=time.perf_counter()
   my_timing=anderson.timing.Timing()
-#  print(measurement.measure_potential)
-#  print(measurement.potential)
   if rank==0:
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function)
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function)
 #  print(header_string)
 # If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
-  if not  H.randomize_hamiltonian:
-    H.generate_disorder(seed=1234)
-    measurement.perform_measurement_potential(H)
-    if propagation.method=='che':
-      H.generate_sparse_matrix()
-      H.energy_range(accurate=propagation.accurate_bounds)
+#  if not  H.randomize_hamiltonian:
+#    H.generate_disorder(seed=1234)
+#    H.generate_sparse_matrix()
+#    H.energy_range(accurate=propagation.accurate_bounds)
 # If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
-  if not initial_state.randomize_initial_state:
-    initial_state.prepare_initial_state(seed=2345)  
+#  if not initial_state.randomize_initial_state:
+#    initial_state.prepare_initial_state(seed=2345)  
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 #    print(i,H.randomize_hamiltonian)
- #   print(measurement.tab_spectrum)
- # Measure the spectral by propagation
-    measurement.tab_spectrum = anderson.propagation.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, propagation, measurement, spectral_function, my_timing, build_disorder=H.randomize_hamiltonian, build_initial_state=initial_state.randomize_initial_state)
- #   print(measurement.tab_spectrum)
-    measurement_global.merge_measurement(measurement)
-#  print(measurement_global.tab_position)
-#
+# Compute the spectral function and accumulate it
+    spectral_function.tab_spectrum += spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
   if mpi_version:
-    measurement_global.mpi_merge_measurement(comm,my_timing)
+    spectral_function.mpi_merge(comm,my_timing)
   t2 = time.perf_counter()
   my_timing.TOTAL_TIME = t2-t1
   if mpi_version:
     my_timing.mpi_merge(comm)
-#    print('Before: ',rank,measurement_global.tab_autocorrelation[-1])
-#    toto = np.empty_like(measurement_global.tab_autocorrelation)
-#    comm.Reduce(measurement_global.tab_autocorrelation,toto,op=MPI.SUM)
-#    measurement_global.tab_autocorrelation = toto
-#    timing.CHE_TIME = comm.reduce(timing.CHE_TIME)
-#    global_timing=comm.reduce(timing)
-#    print(rank,global_timing.CHE_TIME)
-#    print('After: ',rank,measurement_global.tab_autocorrelation[-1])
   if rank==0:
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
-    measurement_global.normalize(n_config*nprocs)
-    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,propagation=propagation,measurement=measurement_global,spectral_function=spectral_function, timing=my_timing)
-    anderson.io.print_measurements_final(measurement_global,initial_state=initial_state,header_string=header_string)
+    spectral_function.normalize(n_config*nprocs)
+    header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function, timing=my_timing)
+    anderson.io.print_spectral_function(spectral_function,geometry,initial_state=initial_state,header_string=header_string)
 
 
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
-    if (propagation.method=='ode'):
-      print("GPE time             = {0:.3f}".format(my_timing.GPE_TIME))
-      print("Number of time steps =",my_timing.N_SOLOUT)
-    else:
-      print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
-      print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
-      print("Max order            =",my_timing.MAX_CHE_ORDER)
-    print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
+    print("KPM time             = {0:.3f}".format(my_timing.KPM_TIME))
+    print("KPM nops             = {0:.4e}".format(my_timing.KPM_NOPS))
+    print("SPECTRUM time        = {0:.3f}".format(my_timing.SPECTRUM_TIME))
+    print("SPECTRUM nops        = {0:.4e}".format(my_timing.SPECTRUM_NOPS))
+#      print("Number of time steps =",my_timing.N_SOLOUT)
+#    else:
+#      print("CHE time             = {0:.3f}".format(my_timing.CHE_TIME))
+#      print("Max nonlinear phase  = {0:.3f}".format(my_timing.MAX_NONLINEAR_PHASE))
+#      print("Max order            =",my_timing.MAX_CHE_ORDER)
+#    print("Expect time          = {0:.3f}".format(my_timing.EXPECT_TIME))
     if mpi_version:
       print("MPI time             = {0:.3f}".format(my_timing.MPI_TIME))
     print("Dummy time           = {0:.3f}".format(my_timing.DUMMY_TIME))
-    print("Number of ops        = {0:.4e}".format(my_timing.NUMBER_OF_OPS))
-    print("Total_CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
+    my_timing.TOTAL_NOPS = my_timing.KPM_NOPS+my_timing.SPECTRUM_NOPS
+    print("Total number of ops  = {0:.4e}".format(my_timing.TOTAL_NOPS))
+    print("Total CPU time       = {0:.3f}".format(my_timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()
