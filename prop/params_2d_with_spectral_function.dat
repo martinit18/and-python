@@ -15,6 +15,7 @@ boundary_condition_1 = periodic
 boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
+reproducible_randomness = False
 
 [Spin]
 #spin_one_half = True
@@ -64,7 +65,6 @@ t_max = 1000.
 # Elementary time step
 delta_t = 1.0
 
-
 [Averaging]
 n_config = 64
 
@@ -79,4 +79,10 @@ density_momentum = True
 dispersion_energy = True
 autocorrelation = True
 g1 = True
+spectral_function = True
+
+[Spectral]
+resolution = 0.01
+e_min = 0.
+e_max = 10.0
 

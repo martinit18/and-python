@@ -1,25 +1,34 @@
 [System]
-dimension = 1
+dimension = 3
 # System size in natural units
-size_1 = 1000.
-size_2 = 60.
+size_1 = 25.
+size_2 = 25.
+size_3 = 25.
 # Spatial discretization
-delta_1 = 0.5
-delta_2 = 0.5
+delta_1 = 1.0
+delta_2 = 1.0
+delta_3 = 1.0
 one_over_mass = 1.0
 # either periodic or open
 boundary_condition_1 = periodic
 boundary_condition_2 = periodic
+boundary_condition_3 = periodic
 
 [Disorder]
 #  Various disorder types can be used
-type = anderson_gaussian
+type = konstanz
 # Disorder strength
-V0 = 0.2
+V0 = 0.5
+# Correlation length
+sigma = 1.0
 
 
 [Wavefunction]
-initial_state = random
+# Either plane_wave or gaussian_wave_packet
+initial_state = plane_wave
+k_0_over_2_pi_1 = 0.0
+k_0_over_2_pi_2 = 0.0
+k_0_over_2_pi_3 = 0.0
 
 [Propagation]
 # Propagation method can be either 'ode' or 'che' (for Chebyshev)
@@ -30,7 +39,7 @@ t_max = 1200.0
 delta_t = 5.0
 
 [Averaging]
-n_config = 64
+n_config = 640
 
 [Measurement]
 delta_t_dispersion = 5.0
@@ -53,9 +62,10 @@ spectral_function = False
 # You may either use the pair [e_min,e_max]
 # or the range variable, in which case the interval is [-range/2,range/2]
 # [e_min,e_max] has precedence over range if both are specified
-range = 100.0
-resolution = 0.01
-e_min= -1.
-e_max= 10.
+range = 10.0
+resolution = 0.002
+e_min= 0.
+e_max= 25.
+n_kpm = 2500
 # Multiplicative factor for the interaction coefficient
 multiplicative_factor_for_interaction = 0.0

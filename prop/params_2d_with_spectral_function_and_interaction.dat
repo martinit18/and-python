@@ -15,6 +15,7 @@ boundary_condition_1 = periodic
 boundary_condition_2 = periodic
 boundary_condition_3 = periodic
 boundary_condition_4 = periodic
+#reproducible_randomness = False
 
 [Spin]
 #spin_one_half = True
@@ -40,7 +41,7 @@ V0 = 0.5
 
 [Nonlinearity]
 # g is the nonlinear interaction
-g_over_volume = 0.0
+g_over_volume = 0.01
 
 [Wavefunction]
 # Either plane_wave or gaussian_wave_packet
@@ -60,18 +61,17 @@ teta_measurement = 0.0
 data_layout = real
 #data_layout = complex
 # Total duration of the propagation
-t_max = 1000.
+t_max = 10000.
 # Elementary time step
-delta_t = 1.0
-
+delta_t = 0.5
 
 [Averaging]
 n_config = 64
 
 [Measurement]
-delta_t_dispersion = 500.0
-delta_t_density = 500.
-delta_t_spectral_function = 500.
+delta_t_dispersion = 1000.0
+delta_t_density = 5000.
+delta_t_spectral_function = 1000.
 potential = True
 potential_correlation = True
 density = True
@@ -79,4 +79,12 @@ density_momentum = True
 dispersion_energy = True
 autocorrelation = True
 g1 = True
+spectral_function = True
+
+[Spectral]
+resolution = 0.01
+e_min = 0.
+e_max = 10.0
+multiplicative_factor_for_interaction = 0.5
+
 

@@ -137,7 +137,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Optional Wavefunction section
     if 'Wavefunction' in my_list_of_sections:
       if not config.has_section('Wavefunction'):
-        my_abort(mpi_version,comm,'Parameter file does not have a Wavefuntion section, I stop!\n')
+        my_abort(mpi_version,comm,'Parameter file does not have a Wavefunction section, I stop!\n')
       Wavefunction = config['Wavefunction']
       all_options_ok=True
       initial_state_type = Wavefunction.get('initial_state')
@@ -258,7 +258,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       number_of_eigenvalues = Diagonalization.getint('number_of_eigenvalues',1)
 
 # Optional Spectral section
-    if 'Spectral' in my_list_of_sections:
+    if ('Measurement' in my_list_of_sections and measure_spectral_function) or ('Measurement' not in my_list_of_sections and 'Spectral' in my_list_of_sections):
       if not config.has_section('Spectral'):
         my_abort(mpi_version,comm,'Parameter file does not have a Spectral section, I stop!\n')
       Spectral = config['Spectral']
@@ -444,13 +444,13 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     return_list.append(initial_state)
 
 # Define the structure of spectral_function
-  if 'Spectral' in my_list_of_sections:
+  if ('Measurement' in my_list_of_sections and measure_spectral_function) or ('Measurement' not in my_list_of_sections and 'Spectral' in my_list_of_sections):
+ # if 'Spectral' in my_list_of_sections:
 #    measure_spectral_function_local = not 'Measurement' in my_list_of_sections
 #    measure_spectral_function_local = True
     spectral_function = anderson.propagation.Spectral_function(spectre_min,spectre_max,spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds, H)
 #    propagation_spectral = anderson.propagation.Temporal_Propagation(spectral_function.t_max,spectral_function.delta_t,method=method, accuracy=accuracy, accurate_bounds=accurate_bounds, data_layout=data_layout,want_ctypes=want_ctypes, H=H)
 #    return_list.append(propagation_spectral)
-    return_list.append(spectral_function)
 #    measurement_spectral = anderson.measurement.Measurement(geometry, spectral_function.delta_t, spectral_function.t_max, spectral_function.t_max, \
 #      measure_autocorrelation=True, measure_spectral_function=measure_spectral_function_local, \
 #      measure_potential=measure_potential, measure_potential_correlation=measure_potential_correlation, use_mkl_fft=use_mkl_fft)
@@ -465,6 +465,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 #    return_list.append(measurement_spectral_global)
   else:
     spectral_function = None
+  return_list.append(spectral_function)
 
 # Define the structure of measurements
   if 'Measurement' in my_list_of_sections:
@@ -599,8 +600,10 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
   if not measurement == None:
     params_string += \
                   'time step for dispersion measurement    = '+str(measurement.delta_t_dispersion)+'\n'\
-                 +'time step for density measurement       = '+str(measurement.delta_t_density)+'\n'\
-                 +'time step for spectral function         = '+str(measurement.delta_t_spectral_function)+'\n'
+                 +'time step for density measurement       = '+str(measurement.delta_t_density)+'\n'
+    if measurement.measure_spectral_function:
+      params_string +=\
+                  'time step for spectral function         = '+str(measurement.delta_t_spectral_function)+'\n'
     if initial_state.type=='plane_wave':
       params_string += \
                   'remove hot pixel in momentum density    = '+str(measurement.remove_hot_pixel)+'\n'

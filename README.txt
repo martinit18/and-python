@@ -1,15 +1,17 @@
 # README
 # and-python project
-# Version 4.0
+# Version 4.1
 # Author: Dominique Delande
-# January, 26, 2023
+# February, 21, 2023
 
-WARNING: In this version, the following features are not yet implemented:
+WARNING: In this version, the following features are new or not yet implemented:
 * Lyapounov. Not implemented at all for multidimensional systems. C interface in 1d is obsolete.
 * Fast C versions of the most CPU intensive routines, using the ctypes interface are ony partially implemented
 in dimension 3 and larger. 1d and 2d version are working well and are as fast as a pure C code.
 * The spectral function calculation is completely new. It now uses the Kernel Polynomial Method (KPM) with
 Chebyshev polynomials, rather than the old Time->Energy Fourier transform of the evolution operator. 
+* There is a new optiun to choose between reproducible and irreproducible randomness. In the first case, 
+  the same RNG is used between runs, so that the results should be identical.  
 * There are inconsistencies on which file is used for reading parameters. See section II.9
 
 I. Physics
@@ -121,7 +123,7 @@ is that it should be smaller than 0.1. Sometimes,
 it has been observed that smaller values, say 0.02-0.05, are needed for
 good convergence. When the interaction is larger than the disorder, the density |\psi|^2
 is more uniform and larger values of the nonlinear phase can be used.
-In any case, it is always good to check the conservation of the total energy (setting 
+In any case, it is always good to check the conservation of the total energy, setting 
 "dispersion_energy" to True in the parameter file.
 
 I.6. Spectral function
@@ -133,8 +135,8 @@ It is very significantly faster, less noisy, meaning that less disorder realizat
 The spectral function is defined as:
   A_\psi(E) = \overline{<\psi|\delta(H-E)|\psi>}
 where the overline denotes averaging over disorder realizations.
-In the KPM method, the function \delta(H-E) is computed as a sun over Chebyshev polynomials of the
-Hamiltonian H acting on the initial  state |\psi>. The method is more detailed in the documentation.
+In the KPM method, the function \delta(H-E) is computed as a sum over Chebyshev polynomials of the
+Hamiltonian H acting on the initial state |\psi>. The method is more detailed in the documentation.
 
 For the standard
 spectral function, \psi is a plane wave, but the program allows any initial
@@ -190,6 +192,9 @@ the program uses numpy.random.
 If the mkl_fft module is present, most FFTs (the ones which use a lot of CPU time) 
 are performed using the MKL FFT routines. If not present, the program uses numpy.fft,
 which is a bit slower.
+The ctypes and numpy.ctypeslib modules (if available) make it possible to use a C version of some numerically
+intensive routines. It is usually about 10 times faster than the Python code.
+The numba module is used to speed up a bit the pure Python code. 
 All the modules are available using anaconda.
 
 The last module "anderson" contains all the specific code of this software.
