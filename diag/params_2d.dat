@@ -1,14 +1,14 @@
 [System]
-dimension = 1
+dimension = 2
 # System size in natural units
-size_1 = 800.
-size_2 = 1.e1
+size_1 = 100.
+size_2 = 100.
 # Spatial discretization
 delta_1 = 0.25
 delta_2 = 0.25
 # either periodic or open
 boundary_condition_1 = periodic
-boundary_condition_2 = open
+boundary_condition_2 = periodic
 
 [Disorder]
 #  Various disorder types can be used
@@ -16,7 +16,7 @@ type = konstanz
 # Correlation length of disorder
 sigma = 1.0
 # Disorder strength
-V0 = 0.1
+V0 = 0.2
 
 [Averaging]
 n_config = 1

@@ -119,7 +119,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     if 'Nonlinearity' in my_list_of_sections:
       if not config.has_section('Nonlinearity'):
         interaction_strength = 0.0
-      else:  
+      else:
         Nonlinearity = config['Nonlinearity']
 # First try to see if g_over_volume is defined
         interaction_strength = Nonlinearity.getfloat('g_over_volume')
@@ -166,7 +166,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       if initial_state_type in ["gaussian_randomized"]:
         for i in range(dimension):
           if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
-          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
+          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
         randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',False)
       if initial_state_type in ["gaussian_with_speckle"]:
         for i in range(dimension):
@@ -176,7 +176,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 # Renormalize k_0_over_2_pi to ensure it
           tab_k_0.append(2.0*math.pi*round(k_0_over_2_pi*tab_size[i])/tab_size[i])
           if not config.has_option('Wavefunction','sigma_0_'+str(i+1)): all_options_ok=False
-          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))                
+          tab_sigma_0.append(Wavefunction.getfloat('sigma_0_'+str(i+1)))
         randomize_initial_state = Wavefunction.getboolean('randomize_initial_state',True)
         wfc_correlation_length = Wavefunction.getfloat('wfc_correlation_length')
         epsilon_speckle = Wavefunction.getfloat('epsilon_speckle',0.0)
@@ -276,7 +276,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spectre_resolution = Spectral.getfloat('resolution')
       multiplicative_factor_for_interaction_in_spectral_function = Spectral.getfloat('multiplicative_factor_for_interaction',0.0)
       n_kpm = Spectral.getint('n_kpm',0)
-# Determine the default value of n_kpm      
+# Determine the default value of n_kpm
       if n_kpm==0:
         n_kpm=int(0.5*(spectre_max-spectre_min)/spectre_resolution)
       want_ctypes_for_spectral_function = Spectral.getboolean('want_ctypes_for_spectral_function',True)
@@ -420,7 +420,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
   H = anderson.hamiltonian.Hamiltonian(geometry, tab_boundary_condition=tab_boundary_condition, one_over_mass=one_over_mass, \
       disorder_type=disorder_type, randomize_hamiltonian=randomize_hamiltonian, correlation_length=correlation_length, disorder_strength=disorder_strength, non_diagonal_disorder_strength=non_diagonal_disorder_strength, \
       b=b, interaction=interaction_strength)
-#  print(H.randomize_hamiltonian)    
+#  print(H.randomize_hamiltonian)
   if spin_one_half:
     H.add_spin_one_half(spin_orbit_interaction=spin_orbit_interaction, sigma_x=sigma_x, sigma_y=sigma_y, sigma_z=sigma_z, alpha=alpha)
   return_list = [geometry, H]
@@ -529,7 +529,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                   'Disorder type                           = '+H.disorder_type+'\n'\
                  +'randomize disorder for each config      = '+str(H.randomize_hamiltonian)+'\n'\
                  +'Use reproducible randomness             = '+str(H.reproducible_randomness)+'\n'
-  if H.reproducible_randomness:    
+  if H.reproducible_randomness:
     params_string += \
                   'Custom seed for random number generator = '+str(H.custom_seed)+'\n'\
                  +'use MKL random number generator         = '+str(H.use_mkl_random)+'\n'\
@@ -567,7 +567,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if initial_state.type == 'gaussian_with_speckle':
       params_string += \
                   'correlation length of the speckle       = '+str(initial_state.wfc_correlation_length)+'\n'\
-                  'weight of the speckle/background        = '+str(initial_state.epsilon_speckle)+'\n'  
+                  'weight of the speckle/background        = '+str(initial_state.epsilon_speckle)+'\n'
     if initial_state.type == 'multi_point':
       params_string += \
                   'minimum distance between points         = '+str(initial_state.minimum_distance)+'\n'
@@ -610,14 +610,14 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
     if measurement.measure_overlap:
       params_string += \
                   '|overlap|**2 with initial state         = '+str(abs(measurement.overlap)**2)+'\n'
-  if (not measurement == None and measurement.measure_spectral_function) or (not spectral_function == None): 
+  if (not measurement == None and measurement.measure_spectral_function) or (not spectral_function == None):
     params_string += \
                   'minimum energy for spectral function    = '+str(spectral_function.e_min)+'\n'\
                  +'maximum energy for spectral function    = '+str(spectral_function.e_max)+'\n'\
                  +'energy resolution                       = '+str(spectral_function.e_resolution)+'\n'\
                  +'multiplicative factor for interaction   = '+str(spectral_function.multiplicative_factor_for_interaction)+'\n'\
                  +'kpm order                               = '+str(spectral_function.n_kpm)+'\n'\
-                 +'use ctypes implementation               = '+str(spectral_function.use_ctypes)+'\n' 
+                 +'use ctypes implementation               = '+str(spectral_function.use_ctypes)+'\n'
   if not diagonalization == None:
     params_string += \
                   'targeted_energy                         = '+str(diagonalization.targeted_energy)+'\n'\
@@ -764,6 +764,7 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       if dimension==2:
  # Add at the beginning of the file minimal info describing the data
         if data_type=='density':
+#          print('toto')
           header_string=str(geometry.tab_dim[0])+' '+str(geometry.tab_delta[0])+'\n'\
                        +str(geometry.tab_dim[1])+' '+str(geometry.tab_delta[1])+'\n'\
                        +header_string
@@ -901,7 +902,7 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       next_column += 1
 
       array_to_print=np.column_stack(list_of_columns)
-#   print(list_of_columns,len(list_of_columns))
+ #   print(list_of_columns,len(list_of_columns))
  #   if len(list_of_columns) == 1:
  #     array_to_print = list_of_columns
  #   else:
@@ -965,7 +966,7 @@ def print_measurements_final(measurement,initial_state=None,header_string='Origi
     anderson.io.output_density('wavefunction_initial.dat',initial_state.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
     anderson.io.output_density('wavefunction_final.dat',measurement.wfc,measurement,header_string=header_string,tab_abscissa=measurement.grid_position,data_type='wavefunction')
   if (measurement.measure_wavefunction_momentum):
-# Ugly hack for the initial wavefunction in momentum space    
+# Ugly hack for the initial wavefunction in momentum space
     anderson.io.output_density('wavefunction_momentum_initial.dat',initial_state.convert_from_configuration_space_to_momentum_space(),measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
     anderson.io.output_density('wavefunction_momentum_final.dat',measurement.wfc_momentum,measurement,header_string=header_string,tab_abscissa=measurement.frequencies,data_type='wavefunction_momentum')
   if (measurement.measure_autocorrelation):
