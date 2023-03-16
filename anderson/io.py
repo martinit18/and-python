@@ -258,6 +258,14 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       number_of_eigenvalues = Diagonalization.getint('number_of_eigenvalues',1)
 
 # Optional Spectral section
+# Default values (should never be used, only to ensure they are defined for MPI broadcasting)
+    spectre_min = None
+    spectre_max = None
+    spectre_resolution = None
+    n_kpm = 0
+    want_ctypes_for_spectral_function = True
+    allow_unsafe_energy_bounds = False
+    multiplicative_factor_for_interaction_in_spectral_function = 0.0
     if ('Measurement' in my_list_of_sections and measure_spectral_function) or ('Measurement' not in my_list_of_sections and 'Spectral' in my_list_of_sections):
       if not config.has_section('Spectral'):
         my_abort(mpi_version,comm,'Parameter file does not have a Spectral section, I stop!\n')
