@@ -305,7 +305,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
       lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
       number_of_bins = Lyapounov.getint('number_of_bins',0)
-      want_ctypes = Lyapounov.getboolean('want_ctypes',True)
+      want_ctypes_for_lyapounov = Lyapounov.getboolean('want_ctypes',True)
 
 
   else:
@@ -388,6 +388,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     e_histogram = None
     lyapounov_min = None
     lyapounov_max = None
+    want_ctypes_for_lyapounov = None
 
 
   if mpi_version:
@@ -419,8 +420,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds = \
         comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds))
     if 'Lyapounov' in my_list_of_sections:
-      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes = \
-        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes))
+      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov = \
+        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov))
 
 
   geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, reproducible_randomness=reproducible_randomness, custom_seed=custom_seed )
@@ -504,7 +505,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of lyapounov
   if 'Lyapounov' in my_list_of_sections:
-    lyapounov = anderson.lyapounov.Lyapounov(e_min,e_max,number_of_e_steps,want_ctypes=want_ctypes)
+    lyapounov = anderson.lyapounov.Lyapounov(e_min,e_max,number_of_e_steps,want_ctypes=want_ctypes_for_lyapounov)
     return_list.append(lyapounov)
 
   return_list.append(n_config)
@@ -720,7 +721,7 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       column_1='Energy'
       column_2='Lyapounov for the intensity (halve it for wavefunction)'
       column_3='Std. deviation of Lyapounov'
-      column_4='Localization length for intensity (double it for wavefunction'
+      column_4='Localization length for intensity (double it for wavefunction)'
       column_5='Std. deviation of localization length'
       specific_string='Lyapounov and localization length vs. energy\n'
     list_of_columns = []

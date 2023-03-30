@@ -13,6 +13,7 @@ import copy
 import anderson
 import ctypes
 import numpy.ctypeslib as ctl
+import scipy.linalg.lapack as lapack
 
 def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
   psi_cur=1.0
@@ -34,6 +35,68 @@ def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
     psi_cur=1.0
 #  gamma+=math.log(abs(psi_cur))
   return gamma
+
+def new_core_lyapounov(H, energy):
+  if H.dimension==1:
+    dim_x = H.tab_dim[0]
+    inv_tunneling = 1.0/H.tab_tunneling[0]
+    loop_step = 16
+    psi_cur=1.0
+    psi_old=math.pi/math.sqrt(13.0)
+#  psi_old=0.0
+    gamma=0.0
+#  h=0.0
+    for i in range(0, dim_x, loop_step):
+      jmax=min(i+loop_step,dim_x)
+      for j in range(i,jmax):
+        psi_new=psi_cur*inv_tunneling*(H.disorder[j]-energy)-psi_old
+        psi_old=psi_cur
+        psi_cur=psi_new
+  # The next line can be used to count the number of sign changes, directly related to integrated density of states
+  # disabled because the if has a large speed impact
+  #      if psi_cur*psi_old<0.0: h+=1.0
+      gamma+=math.log(abs(psi_cur))
+      psi_old/=psi_cur
+      psi_cur=1.0
+#  gamma+=math.log(abs(psi_cur))
+    return gamma
+  if H.dimension==2:
+# Propagation is along the x direction
+    dim_x = H.tab_dim[0]
+    dim_y = H.tab_dim[1]
+#    print('dim_y=',dim_y)
+    if dim_y==1:
+      energy += 4.0
+    tunneling_x = H.tab_tunneling[0]
+    tunneling_y = H.tab_tunneling[1]
+    gnn = np.identity(dim_y)
+    g1n = np.identity(dim_y)#/math.sqrt(dim_y)
+    gnn_old = np.zeros((dim_y,dim_y))
+#    tab_log_trans = np.zeros(dim_x)
+#    tab_log_trans_2 = np.zeros(dim_x)
+    x = 0.0
+# Here starts the main loop for propagation along the x direction
+    for i in range(dim_x):
+      b, piv, info = lapack.dgetrf(gnn)
+#      print(b, piv, info)
+      g1n, info = lapack.dgetrs(b, piv, g1n)
+      if i>0:
+        small_b = np.linalg.norm(g1n)
+#        print(i,g1n,small_b)
+        x -= math.log(small_b)
+        g1n *= 1.0/small_b
+#        print(i,np.linalg.norm(g1n))
+#      tab_log_trans[i] += x
+#      tab_log_trans_2[i] += x*x
+      gnn_old, info = lapack.dgetrs(b, piv, gnn_old)
+      gnn = -gnn_old
+      for j in range(dim_y):
+        gnn[j,j] += energy-H.disorder[i,j]
+        gnn[j,(j+1)%dim_y] -= tunneling_y
+        gnn[j,(j-1+dim_y)%dim_y] -= tunneling_y
+      gnn_old = np.identity(dim_y)
+    return x
+
 
 def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, b, non_diagonal_disorder, energy, tunneling):
   if b==1:
@@ -171,14 +234,19 @@ class Lyapounov:
           tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.b, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
 #          tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder,  H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
         else:
-          tab_gamma[i_energy] = core_lyapounov(dim_x, loop_step, H.disorder, self.tab_energy[i_energy], inv_tunneling)
+#          tab_gamma[i_energy] = core_lyapounov(dim_x, loop_step, H.disorder, self.tab_energy[i_energy], inv_tunneling)
+          tab_gamma[i_energy] = new_core_lyapounov(H, self.tab_energy[i_energy])
+#    print(2.0*new_core_lyapounov(H, 0.0)/(dim_x*H.tab_delta[0]))
 
 
     timing.LYAPOUNOV_TIME += timeit.default_timer() - start_lyapounov_time
-    if H.disorder_type=='nice':
-      timing.LYAPOUNOV_NOPS += 10*dim_x*number_of_energies
-    else:
-      timing.LYAPOUNOV_NOPS += 5*dim_x*number_of_energies
+    if H.dimension==1:
+      if H.disorder_type=='nice':
+        timing.LYAPOUNOV_NOPS += 10*dim_x*number_of_energies
+      else:
+        timing.LYAPOUNOV_NOPS += 5*dim_x*number_of_energies
+#    if H.dimension==2:
+
   #  lyapounov = gamma/(dim_x*H.delta_x)
   #  integrated_dos = h/(dim_x*H.delta_x)
   #  return (lyapounov,integrated_dos)

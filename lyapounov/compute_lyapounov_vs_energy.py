@@ -77,10 +77,10 @@ def main():
 # The list determines the various structures returned by the routine
 # Must be consistent otherwise disaster guaranted
   my_list_of_sections = ['Lyapounov']
-  H, lyapounov, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
+  geometry, H, _, lyapounov, n_config = anderson.io.parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_sections)
 
   t1=time.perf_counter()
-  timing=anderson.Timing()
+  timing=anderson.timing.Timing()
 
   if rank==0: header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,lyapounov=lyapounov)
   number_of_e_steps = lyapounov.number_of_e_steps

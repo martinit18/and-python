@@ -1,0 +1,68 @@
+[System]
+dimension = 1
+# System size in natural units
+size_1 = 1000.
+size_2 = 60.
+# Spatial discretization
+delta_1 = 1.0
+delta_2 = 0.5
+one_over_mass = 2.0
+# either periodic or open
+boundary_condition_1 = periodic
+boundary_condition_2 = periodic
+
+[Disorder]
+#  Various disorder types can be used
+type = anderson_uniform
+# Disorder strength
+V0 = 1.0
+
+
+[Wavefunction]
+initial_state = random
+
+[Propagation]
+# Propagation method can be either 'ode' or 'che' (for Chebyshev)
+method = che
+# Total duration of the propagation
+t_max = 1200.0
+# Elementary time step
+delta_t = 5.0
+
+[Averaging]
+n_config = 100
+
+[Measurement]
+delta_t_dispersion = 5.0
+delta_t_density = 10.
+delta_t_spectral_function = 100.
+#density = True
+#density_momentum = True
+dispersion_position = True
+dispersion_position2 = True
+#dispersion_momentum = True
+#dispersion_energy = True
+#dispersion_variance = True
+#wavefunction = True
+#wavefunction_momentum = True
+#autocorrelation = True
+spectral_function = False
+
+[Spectral]
+# To specifiy the energy interval where the spectral function or the density of states is computed
+# You may either use the pair [e_min,e_max]
+# or the range variable, in which case the interval is [-range/2,range/2]
+# [e_min,e_max] has precedence over range if both are specified
+range = 100.0
+resolution = 0.01
+e_min= -1.
+e_max= 10.
+# Multiplicative factor for the interaction coefficient
+multiplicative_factor_for_interaction = 0.0
+
+[Lyapounov]
+e_min = -0.5
+e_max = 4.5
+number_of_e_steps = 50
+want_ctypes = False
+
