@@ -251,4 +251,5 @@ class Lyapounov:
   #  integrated_dos = h/(dim_x*H.delta_x)
   #  return (lyapounov,integrated_dos)
   # The Lyapounov is here computed for the intensity (halve it for wavefunction), hence the multiplicative factor 2
-    return 2.0*tab_gamma/(dim_x*H.tab_delta[0])
+  # The Lyapounov is now computed for the wavefunction (no factor 2)
+    return tab_gamma/(dim_x*H.tab_delta[0])
