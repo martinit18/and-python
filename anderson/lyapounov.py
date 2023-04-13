@@ -7,6 +7,7 @@ Created on Thu Dec 12 16:33:12 2019
 """
 
 import math
+import mkl
 import numpy as np
 import timeit
 import copy
@@ -14,6 +15,8 @@ import anderson
 import ctypes
 import numpy.ctypeslib as ctl
 import scipy.linalg.lapack as lapack
+#cimport scipy.linalg.cython_lapack as lapack
+#import numpy.linalg.lapack_lite as lapack
 
 def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
   psi_cur=1.0
@@ -36,7 +39,7 @@ def core_lyapounov(dim_x, loop_step, disorder, energy, inv_tunneling):
 #  gamma+=math.log(abs(psi_cur))
   return gamma
 
-def new_core_lyapounov(H, energy):
+def new_core_lyapounov(H, energy, i0, nrescale, debug=False):
   if H.dimension==1:
     dim_x = H.tab_dim[0]
     inv_tunneling = 1.0/H.tab_tunneling[0]
@@ -69,33 +72,112 @@ def new_core_lyapounov(H, energy):
       energy += 4.0
     tunneling_x = H.tab_tunneling[0]
     tunneling_y = H.tab_tunneling[1]
-    gnn = np.identity(dim_y)
-    g1n = np.identity(dim_y)#/math.sqrt(dim_y)
-    gnn_old = np.zeros((dim_y,dim_y))
+    if dim_y==2:
+      tunneling_y *= 0.5
+#    gnn = np.identity(dim_y)
+#    g1n = np.zeros((dim_y,dim_y))
+#    gnn_old = np.zeros((dim_y,dim_y))
+    if debug:
+      tab_log_trans = np.zeros((dim_x-1-i0)//nrescale+1)
 #    tab_log_trans = np.zeros(dim_x)
 #    tab_log_trans_2 = np.zeros(dim_x)
+#    x = math.log(dim_y)
     x = 0.0
 # Here starts the main loop for propagation along the x direction
+    """
     for i in range(dim_x):
-      b, piv, info = lapack.dgetrf(gnn)
+      if i%nrescale == 0:
+        b, piv, info = lapack.dgetrf(gnn)
 #      print(b, piv, info)
-      g1n, info = lapack.dgetrs(b, piv, g1n)
-      if i>0:
+        if i>i0:
+          g1n, info = lapack.dgetrs(b, piv, g1n)
+          small_b = np.linalg.norm(g1n)
+#        print(i,g1n,small_b)
+          x -= math.log(small_b)
+          g1n *= 1.0/small_b
+        if i==i0:
+#          small_b = math.sqrt(dim_y)
+#          x -= math.log(small_b)
+          g1n = np.identity(dim_y)
+        if debug:
+          tab_log_trans[i//nrescale] = x
+        gnn_old, info = lapack.dgetrs(b, piv, gnn_old)
+        gnn = -gnn_old
+        for j in range(dim_y):
+          gnn[j,j] += energy-H.disorder[i,j]
+          gnn[j,(j+1)%dim_y] -= tunneling_y
+          gnn[j,(j-1+dim_y)%dim_y] -= tunneling_y
+        gnn_old = np.identity(dim_y)
+      else:
+        continue
+    """
+
+    """
+    gnn = np.zeros((dim_y,dim_y))
+    g1n = np.identity(dim_y)
+    gnn_old = np.identity(dim_y)
+    for i in range(dim_x):
+      if i%nrescale==0:
+        for j in range(dim_y):
+          gnn[j,j] += energy-H.disorder[i,j]
+          gnn[j,(j+1)%dim_y] -= tunneling_y
+          gnn[j,(j-1+dim_y)%dim_y] -= tunneling_y
+        b, piv, info = lapack.dgetrf(gnn)
+        g1n, info = lapack.dgetrs(b, piv, g1n)
         small_b = np.linalg.norm(g1n)
+        g1n *= 1.0/small_b
 #        print(i,g1n,small_b)
         x -= math.log(small_b)
-        g1n *= 1.0/small_b
-#        print(i,np.linalg.norm(g1n))
-#      tab_log_trans[i] += x
-#      tab_log_trans_2[i] += x*x
-      gnn_old, info = lapack.dgetrs(b, piv, gnn_old)
-      gnn = -gnn_old
-      for j in range(dim_y):
-        gnn[j,j] += energy-H.disorder[i,j]
-        gnn[j,(j+1)%dim_y] -= tunneling_y
-        gnn[j,(j-1+dim_y)%dim_y] -= tunneling_y
-      gnn_old = np.identity(dim_y)
-    return x
+        if debug:
+          tab_log_trans[i//nrescale] = x
+        gnn, info = lapack.dgetrs(b, piv, -gnn_old)
+#        gnn_old = np.identity(dim_y)
+      else:
+        for j in range(dim_y):
+#          x2 = energy-H.disorder[i,j]
+#          jp1y = (j+1)%dim_y
+#          jm1y = (j+dim_y-1)%dim_y
+#          for k in range(dim_y):
+          gnn_old[j,0:dim_y] = (energy-H.disorder[i,j])*gnn[j,0:dim_y] - gnn[(j+1)%dim_y,0:dim_y] - gnn[(j+dim_y-1)%dim_y,0:dim_y] - gnn_old[j,0:dim_y]
+        gnn, gnn_old = gnn_old, gnn
+    """
+    Bn_old = np.zeros((dim_y,dim_y))
+    g1n = np.identity(dim_y)
+    Bn = np.identity(dim_y)
+    for i in range(((dim_x-1)//nrescale)*nrescale+1):
+      if i%nrescale==1:
+        for j in range(dim_y):
+          Bn_old[j,j] += (energy-H.disorder[i,j])
+          Bn_old[j,(j+1)%dim_y] -= 1.0
+          Bn_old[j,(j+dim_y-1)%dim_y] -= 1.0
+      else:
+        for j in range(dim_y):
+          Bn_old[0:dim_y,j] += (energy-H.disorder[i,j])*Bn[0:dim_y,j] - Bn[0:dim_y,(j+1)%dim_y] - Bn[0:dim_y,(j+dim_y-1)%dim_y]
+#        Bn_old[j,0:dim_y] = (energy-H.disorder[i,j])*Bn[j,0:dim_y] - Bn[(j+1)%dim_y,0:dim_y] - Bn[(j+dim_y-1)%dim_y,0:dim_y] - Bn_old[j,0:dim_y]
+      Bn, Bn_old = Bn_old, -Bn
+      if i%nrescale==0:
+#        if i<=2:
+#          print(i,'Bn',Bn)
+#          print(i,'Bn_old',Bn_old)
+        b, piv, info = lapack.dgetrf(Bn)
+        if i>=i0:
+          g1n, info = lapack.dgetrs(b, piv, g1n)
+          small_b = np.linalg.norm(g1n)
+          g1n *= 1.0/small_b
+#        print(i,g1n,small_b)
+        if i>i0:
+          x -= math.log(small_b)
+#        if i<=2:
+#          print(i,'g1n',g1n)
+        if debug:
+          tab_log_trans[(i-i0)//nrescale] = x
+        Bn_old, info = lapack.dgetrs(b, piv, Bn_old)
+        Bn = np.identity(dim_y)
+    x /= H.tab_delta[0]*((dim_x-i0-1)//nrescale)*nrescale
+    if debug:
+      return x, tab_log_trans
+    else:
+      return x
 
 
 def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, b, non_diagonal_disorder, energy, tunneling):
@@ -141,12 +223,14 @@ def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, b, non_diag
   return gamma
 
 class Lyapounov:
-  def __init__(self, e_min, e_max, number_of_e_steps, want_ctypes=True):
+  def __init__(self, e_min, e_max, number_of_e_steps, want_ctypes=True, i0=10, nrescale=10):
     self.e_min = e_min
     self.e_max = e_max
     self.number_of_e_steps = number_of_e_steps
     self.want_ctypes = want_ctypes
     self.use_ctypes = want_ctypes
+    self.i0 = i0
+    self.nrescale = nrescale
     self.tab_energy = np.zeros(number_of_e_steps+1)
     if number_of_e_steps==0:
       self.e_step = 0.0
@@ -157,7 +241,7 @@ class Lyapounov:
       self.tab_energy[i_e] = e
     return
 
-  def compute_lyapounov(self, i_seed, H, timing):
+  def compute_lyapounov(self, i_seed, H, timing, debug=False):
     """
     try:
       from anderson._lyapounov import ffi,lib
@@ -235,7 +319,11 @@ class Lyapounov:
 #          tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder,  H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
         else:
 #          tab_gamma[i_energy] = core_lyapounov(dim_x, loop_step, H.disorder, self.tab_energy[i_energy], inv_tunneling)
-          tab_gamma[i_energy] = new_core_lyapounov(H, self.tab_energy[i_energy])
+          if debug:
+            tab_gamma[i_energy], tab_log_trans = new_core_lyapounov(H, self.tab_energy[i_energy], self.i0, self.nrescale, debug=debug)
+          else:
+            tab_gamma[i_energy] = new_core_lyapounov(H, self.tab_energy[i_energy], self.i0, self.nrescale, debug=debug)
+
 #    print(2.0*new_core_lyapounov(H, 0.0)/(dim_x*H.tab_delta[0]))
 
 
@@ -252,4 +340,9 @@ class Lyapounov:
   #  return (lyapounov,integrated_dos)
   # The Lyapounov is here computed for the intensity (halve it for wavefunction), hence the multiplicative factor 2
   # The Lyapounov is now computed for the wavefunction (no factor 2)
-    return tab_gamma/(dim_x*H.tab_delta[0])
+    if H.dimension==1:
+      return tab_gamma/(dim_x*H.tab_delta[0])
+    if debug:
+      return tab_gamma, tab_log_trans
+    else:
+      return tab_gamma

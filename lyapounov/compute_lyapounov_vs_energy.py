@@ -39,6 +39,7 @@ import timeit
 import argparse
 sys.path.append('/users/champ/delande/git/and-python')
 sys.path.append('/home/lkb/delande/git/and-python')
+sys.path.append('/home/delande/git/and-python')
 import anderson
 
 #import matplotlib.pyplot as plt
@@ -90,10 +91,17 @@ def main():
 #  tab_std_lyapounov = np.zeros(number_of_e_steps+1)
   tab_lyapounov = np.zeros(number_of_e_steps+1)
   tab_global_lyapounov = np.zeros((2,number_of_e_steps+1))
-
+  debug = True
+#  debug = False
 # Here starts the loop over disorder configurations
   for i in range(n_config):
-    tab_lyapounov = lyapounov.compute_lyapounov(i+rank*n_config, H, timing)
+    if debug:
+      tab_lyapounov, tab_log_trans = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=debug)
+      if i==0:
+        tab_global_log_trans = np.zeros_like(tab_log_trans)
+      tab_global_log_trans += tab_log_trans
+    else:
+      tab_lyapounov = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=debug)
     tab_global_lyapounov[0] += tab_lyapounov
     tab_global_lyapounov[1] += tab_lyapounov**2
   if mpi_version:
@@ -107,6 +115,8 @@ def main():
   if mpi_version:
     timing.mpi_merge(comm)
 
+  if debug:
+    np.savetxt('log_trans.dat',tab_global_log_trans/n_config)
 # Compute mean value and standard deviation
   if rank==0:
     tab_global_lyapounov /= n_config*nprocs

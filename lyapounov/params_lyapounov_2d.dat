@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 10000.
-size_2 = 20.
+size_1 = 1000.
+size_2 = 100.
 # Spatial discretization
 delta_1 = 1.0
 delta_2 = 1.0
@@ -27,7 +27,7 @@ method = che
 # Total duration of the propagation
 t_max = 1200.0
 # Elementary time step
-delta_t = 5.0
+delta_t = 10.0
 
 [Averaging]
 n_config = 10
@@ -61,8 +61,9 @@ e_max= 10.
 multiplicative_factor_for_interaction = 0.0
 
 [Lyapounov]
-e_min = 0.0
-e_max = 8.0
-number_of_e_steps = 2
+e_min = 4.0
+e_max = 4.0
+number_of_e_steps = 0
 want_ctypes = False
-
+number_of_skipped_layers = 0
+nrescale = 10

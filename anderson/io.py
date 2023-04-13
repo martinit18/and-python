@@ -301,6 +301,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       e_min = Lyapounov.getfloat('e_min',0.0)
       e_max = Lyapounov.getfloat('e_max',0.0)
       number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
+      i0 = Lyapounov.getint('number_of_skipped_layers',10)
+      nrescale = Lyapounov.getint('nrescale',10)
+      if i0%nrescale!=0:
+        i0 = ((i0-1)//nrescale+1)*nrescale
+        print('Info: number_of_skipped_layers must be an integer multiple of nrescale. It is changed to',i0,'\n')
       e_histogram = Lyapounov.getfloat('e_histogram',0.0)
       lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
       lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
@@ -389,6 +394,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     lyapounov_min = None
     lyapounov_max = None
     want_ctypes_for_lyapounov = None
+    i0 = None
+    nrescale = None
 
 
   if mpi_version:
@@ -420,8 +427,8 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds = \
         comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds))
     if 'Lyapounov' in my_list_of_sections:
-      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov = \
-        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov))
+      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale = \
+        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov), i0, nrescale)
 
 
   geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, reproducible_randomness=reproducible_randomness, custom_seed=custom_seed )
@@ -505,7 +512,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of lyapounov
   if 'Lyapounov' in my_list_of_sections:
-    lyapounov = anderson.lyapounov.Lyapounov(e_min,e_max,number_of_e_steps,want_ctypes=want_ctypes_for_lyapounov)
+    lyapounov = anderson.lyapounov.Lyapounov(e_min,e_max,number_of_e_steps,want_ctypes=want_ctypes_for_lyapounov, i0=i0, nrescale=nrescale)
     return_list.append(lyapounov)
 
   return_list.append(n_config)
@@ -638,7 +645,9 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'maximum energy                          = '+str(lyapounov.e_max)+'\n'\
                  +'energy step                             = '+str(lyapounov.e_step)+'\n'\
                  +'number of energy steps                  = '+str(lyapounov.number_of_e_steps)+'\n'\
-                 +'use ctypes implementation               = '+str(lyapounov.use_ctypes)+'\n'
+                 +'use ctypes implementation               = '+str(lyapounov.use_ctypes)+'\n'\
+                 +'number of skipped layers                = '+str(lyapounov.i0)+'\n'\
+                 +'nrescale                                = '+str(lyapounov.nrescale)+'\n'
   params_string += '\n'
   return params_string
 
