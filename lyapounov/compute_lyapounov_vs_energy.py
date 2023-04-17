@@ -91,17 +91,21 @@ def main():
 #  tab_std_lyapounov = np.zeros(number_of_e_steps+1)
   tab_lyapounov = np.zeros(number_of_e_steps+1)
   tab_global_lyapounov = np.zeros((2,number_of_e_steps+1))
-  debug = True
-#  debug = False
-# Here starts the loop over disorder configurations
+#  debug = True
+  debug = False
+  if mpi_version and debug:
+    debug = False
+    if rank==0:
+      print('Debugging is not supported in the MPI version, I switch it off\n')
+ # Here starts the loop over disorder configurations
   for i in range(n_config):
     if debug:
-      tab_lyapounov, tab_log_trans = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=debug)
+      tab_lyapounov, tab_log_trans = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=True)
       if i==0:
         tab_global_log_trans = np.zeros_like(tab_log_trans)
       tab_global_log_trans += tab_log_trans
     else:
-      tab_lyapounov = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=debug)
+      tab_lyapounov = lyapounov.compute_lyapounov(i+rank*n_config, H, timing)
     tab_global_lyapounov[0] += tab_lyapounov
     tab_global_lyapounov[1] += tab_lyapounov**2
   if mpi_version:
@@ -144,11 +148,16 @@ def main():
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))
     print()
-    print("Lyapounov time       = {0:.3f}".format(timing.LYAPOUNOV_TIME))
-    print("Number of ops        = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
+    print("Lyapounov Matrix Factorization time = {0:.3f}".format(timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME))
+    print("Number of ops                       = {0:.4e}".format(timing.LYAPOUNOV_MATRIX_FACTORIZATION_NOPS))
+    print("Lyapounov Matrix Solution time      = {0:.3f}".format(timing.LYAPOUNOV_MATRIX_SOLUTION_TIME))
+    print("Number of ops                       = {0:.4e}".format(timing.LYAPOUNOV_MATRIX_SOLUTION_NOPS))
+    print("Lyapounov scalar time               = {0:.3f}".format(timing.LYAPOUNOV_SCALAR_TIME))
+    print("Number of ops                       = {0:.4e}".format(timing.LYAPOUNOV_SCALAR_NOPS))
+#    print("Number of ops        = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
     if mpi_version:
-      print("MPI time             = {0:.3f}".format(timing.MPI_TIME))
-    print("Total_time           = {0:.3f}".format(timing.TOTAL_TIME))
+      print("MPI time                            = {0:.3f}".format(timing.MPI_TIME))
+    print("Total_time                          = {0:.3f}".format(timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()

@@ -12,13 +12,14 @@ CC=icc
 export CFLAGS=-Ofast -xCORE-AVX2 -mauto-arch=core-avx512 -ftz -qopt-report=4 -qopt-report-phase=vec -qopt-zmm-usage=high
 #export CFLAGS=-Ofast -xCORE-AVX2 -qopt-report=4 -qopt-report-phase=vec -ftz
 #export CFLAGS=-Ofast -xHost -qopt-report=4 -qopt-report-phase=vec -ftz
+export CFLAGS=-O0
 endif
 
 ifeq ($(COMPILER),oneapi)
 CC=icx 
 CFLAGS=-O3 -xskylake-avx512 -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
 CFLAGS=-O3 -xHost -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize  -ftz
-
+CFLAGS=-O0 
 endif
 
 ifeq ($(COMPILER),gnu)

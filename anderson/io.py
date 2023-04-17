@@ -311,6 +311,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
       number_of_bins = Lyapounov.getint('number_of_bins',0)
       want_ctypes_for_lyapounov = Lyapounov.getboolean('want_ctypes',True)
+      tab_boundary_condition[0] = 'open'
 
 
   else:
@@ -428,7 +429,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
         comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds))
     if 'Lyapounov' in my_list_of_sections:
       e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale = \
-        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov), i0, nrescale)
+        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale))
 
 
   geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, reproducible_randomness=reproducible_randomness, custom_seed=custom_seed )
