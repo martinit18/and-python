@@ -157,7 +157,8 @@ def new_core_lyapounov(H, energy, i0, nrescale, timing, debug=False):
     use_c = True
     if use_c:
       lyapounov_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/lyapounov.so")
-      lyapounov_ctypes_lib.update_B_c.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctl.ndpointer(np.float64)]
+      POINTER_DOUBLE = ctypes.POINTER(ctypes.c_double)
+      lyapounov_ctypes_lib.update_B_c.argtypes = [ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, ctypes.c_double, ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, POINTER_DOUBLE]
       lyapounov_ctypes_lib.update_B_c.restype = None
       x = 0.0
       g1n = np.identity(dim_y).reshape(dim_y*dim_y)
@@ -168,7 +169,7 @@ def new_core_lyapounov(H, energy, i0, nrescale, timing, debug=False):
         start_scalar_time = timeit.default_timer()
 #      print('i=',i,'Bn_old before =',Bn_old)
 #      print('i=',i,'Bn before =',Bn)
-        lyapounov_ctypes_lib.update_B_c(dim_x, dim_y, H.disorder, energy, nrescale, i, Bn, Bn_old)
+        lyapounov_ctypes_lib.update_B_c(dim_x, dim_y, H.disorder.ctypes.data_as(POINTER_DOUBLE), energy, nrescale, i, Bn.ctypes.data_as(POINTER_DOUBLE), Bn_old.ctypes.data_as(POINTER_DOUBLE))
         Bn, Bn_old = Bn_old, -Bn
         timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
         if i%nrescale==0:
