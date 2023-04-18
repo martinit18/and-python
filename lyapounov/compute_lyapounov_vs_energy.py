@@ -91,8 +91,8 @@ def main():
 #  tab_std_lyapounov = np.zeros(number_of_e_steps+1)
   tab_lyapounov = np.zeros(number_of_e_steps+1)
   tab_global_lyapounov = np.zeros((2,number_of_e_steps+1))
-#  debug = True
-  debug = False
+  debug = True
+#  debug = False
   if mpi_version and debug:
     debug = False
     if rank==0:

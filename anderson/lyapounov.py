@@ -55,28 +55,30 @@ def core_lyapounov_2d(dim_x, dim_y, disorder, energy, nrescale, i0, timing):
   Bn_old = np.zeros((dim_y,dim_y))
   if use_c:
     lyapounov_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/lyapounov.so")
-    lyapounov_ctypes_lib.core_lyapounov_2d_c.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctl.ndpointer(np.float64), ctl.ndpointer(np.float64)]
-    lyapounov_ctypes_lib.core_lyapounov_2d_c.restype = ctypes.c_double
-    x = lyapounov_ctypes_lib.core_lyapounov_2d_c(dim_x, dim_y, disorder, energy, nrescale, i0, Bn, Bn_old, g1n)
-#    print("x=",x)
-    return x;
+    lyapounov_ctypes_lib.update_B_c.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctl.ndpointer(np.float64)]
+    lyapounov_ctypes_lib.update_B_c.restype = None
   x = 0.0
 # Here starts the main loop for propagation along the x direction
   for i in range(((dim_x-1)//nrescale)*nrescale+1):
     start_scalar_time = timeit.default_timer()
-    if i%nrescale==1:
-      for j in range(dim_y):
-        Bn_old[j,j] += (energy-disorder[i,j])
-        Bn_old[j,(j+1)%dim_y] -= 1.0
-        Bn_old[j,(j+dim_y-1)%dim_y] -= 1.0
+    print(use_c)
+    if use_c:
+      print('toto')
+      lyapounov_ctypes_lib.update_B_c(dim_x, dim_y, disorder, energy, nrescale, i, Bn, Bn_old)
     else:
-      for j in range(dim_y):
-#        Bn_old[j,1:dim_y-1] += (energy-disorder[i,1:dim_y-1])*Bn[j,1:dim_y-1] - Bn[j,2:dim_y] - Bn[j,0:dim_y-2]
-#        Bn_old[j,0] += (energy-disorder[i,0])*Bn[j,0] - Bn[j,dim_y-1] - Bn[j,1]
-#        Bn_old[j,dim_y-1] += (energy-disorder[i,dim_y-1])*Bn[j,dim_y-1] - Bn[j,dim_y-2] - Bn[j,0]
-        Bn_old[0:dim_y,j] += (energy-disorder[i,j])*Bn[0:dim_y,j] - Bn[0:dim_y,(j+1)%dim_y] - Bn[0:dim_y,(j+dim_y-1)%dim_y]
+      if i%nrescale==1:
+        for j in range(dim_y):
+          Bn_old[j,j] += (energy-disorder[i,j])
+          Bn_old[j,(j+1)%dim_y] -= 1.0
+          Bn_old[j,(j+dim_y-1)%dim_y] -= 1.0
+      else:
+        for j in range(dim_y):
+  #        Bn_old[j,1:dim_y-1] += (energy-disorder[i,1:dim_y-1])*Bn[j,1:dim_y-1] - Bn[j,2:dim_y] - Bn[j,0:dim_y-2]
+  #        Bn_old[j,0] += (energy-disorder[i,0])*Bn[j,0] - Bn[j,dim_y-1] - Bn[j,1]
+  #        Bn_old[j,dim_y-1] += (energy-disorder[i,dim_y-1])*Bn[j,dim_y-1] - Bn[j,dim_y-2] - Bn[j,0]
+          Bn_old[0:dim_y,j] += (energy-disorder[i,j])*Bn[0:dim_y,j] - Bn[0:dim_y,(j+1)%dim_y] - Bn[0:dim_y,(j+dim_y-1)%dim_y]
     Bn, Bn_old = Bn_old, -Bn
-    print('i=',i,'Bn=',Bn,'Bn_old=',Bn_old)
+#    print('i=',i,'Bn=',Bn,'Bn_old=',Bn_old)
     timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
     if i%nrescale==0:
 #        if i<=2:
@@ -84,15 +86,15 @@ def core_lyapounov_2d(dim_x, dim_y, disorder, energy, nrescale, i0, timing):
 #          print(i,'Bn_old',Bn_old)
       start_factorization_time = timeit.default_timer()
       b, piv, info = lapack.dgetrf(Bn)
-      print("i=",i,"piv=",piv,"b=",b)
+#      print("i=",i,"piv=",piv,"b=",b)
       timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
       if i>=i0:
         start_solution_time = timeit.default_timer()
         g1n, info = lapack.dgetrs(b, piv, g1n)
         timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
         small_b = np.linalg.norm(g1n)
-        print('i=',i,'g1n=',g1n)
-        print('i=',i,'small_b=',small_b)
+#        print('i=',i,'g1n=',g1n)
+#        print('i=',i,'small_b=',small_b)
         g1n *= 1.0/small_b
 #        print(i,g1n,small_b)
       if i>i0:
@@ -149,67 +151,98 @@ def new_core_lyapounov(H, energy, i0, nrescale, timing, debug=False):
 #    tab_log_trans = np.zeros(dim_x)
 #    tab_log_trans_2 = np.zeros(dim_x)
 #    x = math.log(dim_y)
-    if not(debug):
-      x = core_lyapounov_2d(dim_x, dim_y, H.disorder, energy, nrescale, i0, timing)
+#    if not(debug):
+#      x = core_lyapounov_2d(dim_x, dim_y, H.disorder, energy, nrescale, i0, timing)
+#    else:
+    use_c = True
+    if use_c:
+      lyapounov_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/lyapounov.so")
+      lyapounov_ctypes_lib.update_B_c.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctl.ndpointer(np.float64), ctl.ndpointer(np.float64)]
+      lyapounov_ctypes_lib.update_B_c.restype = None
+      x = 0.0
+      g1n = np.identity(dim_y).reshape(dim_y*dim_y)
+      Bn = np.identity(dim_y).reshape(dim_y*dim_y)
+      Bn_old = np.zeros(dim_y*dim_y)
+# Here starts the main loop for propagation along the x direction
+      for i in range(((dim_x-1)//nrescale)*nrescale+1):
+        start_scalar_time = timeit.default_timer()
+#      print('i=',i,'Bn_old before =',Bn_old)
+#      print('i=',i,'Bn before =',Bn)
+        lyapounov_ctypes_lib.update_B_c(dim_x, dim_y, H.disorder, energy, nrescale, i, Bn, Bn_old)
+        Bn, Bn_old = Bn_old, -Bn
+        timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
+        if i%nrescale==0:
+ #        if i<=2:
+ #          print(i,'Bn',Bn)
+ #          print(i,'Bn_old',Bn_old)
+          start_factorization_time = timeit.default_timer()
+          b, piv, info = lapack.dgetrf(Bn.reshape(dim_y,dim_y))
+          timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
+          if i>=i0:
+            start_solution_time = timeit.default_timer()
+            g1n = lapack.dgetrs(b, piv, g1n.reshape(dim_y,dim_y))[0].reshape(-1)
+            timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+            small_b = np.linalg.norm(g1n)
+            g1n *= 1.0/small_b
+ #        print(i,g1n,small_b)
+          if i>i0:
+            x -= math.log(small_b)
+ #        if i<=2:
+ #          print(i,'g1n',g1n)
+          if debug:
+            tab_log_trans[(i-i0)//nrescale] = x
+          start_solution_time = timeit.default_timer()
+          Bn_old = lapack.dgetrs(b, piv, Bn_old.reshape(dim_y,dim_y))[0].reshape(-1)
+          timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+          Bn = np.identity(dim_y).reshape(dim_y*dim_y)
     else:
       x = 0.0
-      use_mkl = False
-      if use_mkl:
-        mkl = ctypes.cdll.LoadLibrary("libmkl_rt.so")
-        Order = 101  # 101 for row-major, 102 for column major data structures
-        TransA = 111 # 111 for no transpose, 112 for transpose, and 113 for conjugate transpose
-        TransB = 111
-        POINTER_DOUBLE = ctypes.POINTER(ctypes.c_double)
-        POINTER_INT = ctypes.POINTER(ctypes.c_int)
-        piv = np.zeros(dim_y,dtype=int)
       g1n = np.identity(dim_y)
       Bn = np.identity(dim_y)
       Bn_old = np.zeros((dim_y,dim_y))
-  # Here starts the main loop for propagation along the x direction
+# Here starts the main loop for propagation along the x direction
       for i in range(((dim_x-1)//nrescale)*nrescale+1):
         start_scalar_time = timeit.default_timer()
         if i%nrescale==1:
           for j in range(dim_y):
+#            Bn_old[j,j] += (energy-H.disorder[i,j])
+#            Bn_old[j,(j+1)%dim_y] -= 1.0
+#            Bn_old[j,(j+dim_y-1)%dim_y] -= 1.0
             Bn_old[j,j] += (energy-H.disorder[i,j])
             Bn_old[j,(j+1)%dim_y] -= 1.0
             Bn_old[j,(j+dim_y-1)%dim_y] -= 1.0
         else:
           for j in range(dim_y):
+#              print(Bn_old[k*dim_y+j])
+#              Bn_old[k*dim_y+j] = Bn_old[k*dim_y+j]+(energy-H.disorder[i,j])*Bn[k*dim_y+j] - Bn[k*dim_y+(j+1)%dim_y] - Bn[k*dim_y+(j+dim_y-1)%dim_y]
+#              Bn_old[k,j] = Bn_old[k,j]+(energy-H.disorder[i,j])*Bn[k,j] - Bn[k,(j+1)%dim_y] - Bn[k,(j+dim_y-1)%dim_y]
+
             Bn_old[0:dim_y,j] += (energy-H.disorder[i,j])*Bn[0:dim_y,j] - Bn[0:dim_y,(j+1)%dim_y] - Bn[0:dim_y,(j+dim_y-1)%dim_y]
-   #        Bn_old[j,0:dim_y] = (energy-H.disorder[i,j])*Bn[j,0:dim_y] - Bn[(j+1)%dim_y,0:dim_y] - Bn[(j+dim_y-1)%dim_y,0:dim_y] - Bn_old[j,0:dim_y]
+ #        Bn_old[j,0:dim_y] = (energy-H.disorder[i,j])*Bn[j,0:dim_y] - Bn[(j+1)%dim_y,0:dim_y] - Bn[(j+dim_y-1)%dim_y,0:dim_y] - Bn_old[j,0:dim_y]
         Bn, Bn_old = Bn_old, -Bn
         timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
         if i%nrescale==0:
-  #        if i<=2:
-  #          print(i,'Bn',Bn)
-  #          print(i,'Bn_old',Bn_old)
+#        if i<=2:
+#          print(i,'Bn',Bn)
+#          print(i,'Bn_old',Bn_old)
           start_factorization_time = timeit.default_timer()
-          if use_mkl:
-            mkl.lapacke_dgetrf(ctypes.c_int(Order), ctypes.c_int(dim_y), ctypes.c_int(dim_y), Bn.ctypes.data_as(POINTER_DOUBLE), ctypes.c_int(dim_y), piv.ctypes.data_as(POINTER_INT))
-          else:
-            b, piv, info = lapack.dgetrf(Bn)
+          b, piv, info = lapack.dgetrf(Bn)
           timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
           if i>=i0:
-           start_solution_time = timeit.default_timer()
-           if use_mkl:
-             mkl.lapacke_dgetrs(ctypes.c_int(Order), ctypes.c_wchar('n'), ctypes.c_int(dim_y), ctypes.c_int(dim_y), Bn.ctypes.data_as(POINTER_DOUBLE), ctypes.c_int(dim_y), piv.ctypes.data_as(POINTER_INT), g1n.ctypes.data_as(POINTER_DOUBLE), ctypes.c_int(dim_y))
-           else:
-             g1n, info = lapack.dgetrs(b, piv, g1n)
-           timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
-           small_b = np.linalg.norm(g1n)
-           g1n *= 1.0/small_b
-  #        print(i,g1n,small_b)
+            start_solution_time = timeit.default_timer()
+            g1n,_ = lapack.dgetrs(b, piv, g1n)
+            timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+            small_b = np.linalg.norm(g1n)
+            g1n *= 1.0/small_b
+#        print(i,g1n,small_b)
           if i>i0:
             x -= math.log(small_b)
-  #        if i<=2:
-  #          print(i,'g1n',g1n)
+#        if i<=2:
+#          print(i,'g1n',g1n)
           if debug:
             tab_log_trans[(i-i0)//nrescale] = x
           start_solution_time = timeit.default_timer()
-          if use_mkl:
-            mkl.lapacke_dgetrs(ctypes.c_int(Order), ctypes.c_wchar('n'), ctypes.c_int(dim_y), ctypes.c_int(dim_y), Bn.ctypes.data_as(POINTER_DOUBLE), ctypes.c_int(dim_y), piv.ctypes.data_as(POINTER_INT), Bn_old.ctypes.data_as(POINTER_DOUBLE), ctypes.c_int(dim_y))
-          else:
-            Bn_old, info = lapack.dgetrs(b, piv, Bn_old)
+          Bn_old,_ = lapack.dgetrs(b, piv, Bn_old)
           timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
           Bn = np.identity(dim_y)
     x /= H.tab_delta[0]*((dim_x-i0-1)//nrescale)*nrescale

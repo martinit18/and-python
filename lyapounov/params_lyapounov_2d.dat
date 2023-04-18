@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 10.
-size_2 = 3.
+size_1 = 1000.
+size_2 = 100.
 # Spatial discretization
 delta_1 = 1.0
 delta_2 = 1.0
@@ -66,4 +66,4 @@ e_max = 4.0
 number_of_e_steps = 0
 want_ctypes = False
 number_of_skipped_layers = 0
-nrescale = 2
+nrescale = 10

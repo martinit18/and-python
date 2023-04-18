@@ -145,3 +145,24 @@ double core_lyapounov_2d_c(const int dim_x, const int dim_y, const double * rest
   printf("xfinal = %lf\n",x);
   return(x);
 }
+
+void update_B_c(const int dim_x, const int dim_y, const double * restrict disorder, const double energy, const int nrescale, const int i, double *  Bn, double *  Bn_old)
+{
+  int j, k;
+  if (i%nrescale==1) {
+    for (j=0; j<dim_y; j++) {
+      Bn_old[j*(dim_y+1)] += (energy-disorder[i*dim_y+j]);
+      Bn_old[j*dim_y+(j+1)%dim_y] -= 1.0;
+      Bn_old[j*dim_y+(j+dim_y-1)%dim_y] -= 1.0;
+    } 
+  } else {
+    for (k=0; k<dim_y; k++) {
+#pragma ivdep
+#pragma unroll
+      for (j=0; j<dim_y; j++) {
+        Bn_old[k*dim_y+j] += (energy-disorder[i*dim_y+j])*Bn[k*dim_y+j] - Bn[k*dim_y+(j+1)%dim_y] - Bn[k*dim_y+(j+dim_y-1)%dim_y];
+      }
+    }
+  }
+  return;
+}
