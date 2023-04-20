@@ -81,22 +81,24 @@ double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step
 }
 
 
-void update_A_2d(const int dim_y, const double * restrict disorder, const double energy, const int nrescale, const int i, double *  An, double *  An_old)
+void update_A_2d(const int dim_y, const double * restrict disorder, const double tunneling_x, const double tunneling_y, const double energy, const int nrescale, const int i, double *  An, double *  An_old)
 {
   int j, k;
   double ener;
   int jm1, jp1;
+  double inv_tunneling_x;
+  inv_tunneling_x = 1.0/tunneling_x;
   if (i%nrescale==1) {
-// Fills An_old with the local E_H_n (i is n)    
+// Fills An_old with the local (E_H_n)/tunneling_x (i is n)    
     for (j=0; j<dim_y; j++) {
-      An_old[j*(dim_y+1)] += (energy-disorder[i*dim_y+j]);
-      An_old[j*dim_y+(j+1)%dim_y] -= 1.0;
-      An_old[j*dim_y+(j+dim_y-1)%dim_y] -= 1.0;
+      An_old[j*(dim_y+1)] += inv_tunneling_x*(energy-disorder[i*dim_y+j]);
+      An_old[j*dim_y+(j+1)%dim_y] -= inv_tunneling_x*tunneling_y;
+      An_old[j*dim_y+(j+dim_y-1)%dim_y] -= inv_tunneling_x*tunneling_y;
     } 
   } else {
-// Fills An_old with the local (E_H_n)*An+An_old    
+// Fills An_old with the local (E_H_n)*An/tunneling_x+An_old    
     for (j=0; j<dim_y; j++) {
-      ener = energy-disorder[i*dim_y+j];
+      ener = (energy-disorder[i*dim_y+j]);
       jm1 = (j+dim_y-1)%dim_y;
       jp1 = (j+1)%dim_y;
  #ifdef __INTEL_LLVM_COMPILER
@@ -115,7 +117,7 @@ void update_A_2d(const int dim_y, const double * restrict disorder, const double
   #endif
 #endif
       for (k=0; k<dim_y; k++) {
-        An_old[j*dim_y+k] += ener*An[j*dim_y+k] - An[jp1*dim_y+k] - An[jm1*dim_y+k];
+        An_old[j*dim_y+k] += inv_tunneling_x*(ener*An[j*dim_y+k] - tunneling_y*(An[jp1*dim_y+k]+An[jm1*dim_y+k]));
       }
     }
   }

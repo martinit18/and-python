@@ -52,12 +52,14 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
 #    print('dim_y=',dim_y)
   if dim_y==1:
     energy += 4.0
-#  tunneling_x = H.tab_tunneling[0]
+  tunneling_x = H.tab_tunneling[0]
+  inv_tunneling_x = 1.0/tunneling_x
   tunneling_y = H.tab_tunneling[1]
   if dim_y==2:
     tunneling_y *= 0.5
   if debug:
     tab_log_trans = np.zeros((dim_x-1-i0)//nrescale+1)
+    tab_x = H.tab_delta[0]*nrescale*np.arange((dim_x-1-i0)//nrescale+1)
   if use_ctypes:
     import ctypes
 #    import numpy.ctypeslib as ctl
@@ -65,7 +67,7 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
     POINTER_DOUBLE = ctypes.POINTER(ctypes.c_double)
 #      lyapounov_ctypes_lib.update_B_c.argtypes = [ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, ctypes.c_double, ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, POINTER_DOUBLE]
 #      lyapounov_ctypes_lib.update_B_c.restype = None
-    lyapounov_ctypes_lib.update_A_2d.argtypes = [ctypes.c_int, POINTER_DOUBLE, ctypes.c_double, ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, POINTER_DOUBLE]
+    lyapounov_ctypes_lib.update_A_2d.argtypes = [ctypes.c_int, POINTER_DOUBLE, ctypes.c_double, ctypes.c_double, ctypes.c_double,ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, POINTER_DOUBLE]
     lyapounov_ctypes_lib.update_A_2d.restype = None
     x = 0.0
     g1n = np.identity(dim_y).reshape(dim_y*dim_y)
@@ -74,7 +76,7 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
 # Here starts the main loop for propagation along the x direction
     for i in range(((dim_x-1)//nrescale)*nrescale+1):
       start_scalar_time = timeit.default_timer()
-      lyapounov_ctypes_lib.update_A_2d(dim_y, H.disorder.ctypes.data_as(POINTER_DOUBLE), energy, nrescale, i, An.ctypes.data_as(POINTER_DOUBLE), An_old.ctypes.data_as(POINTER_DOUBLE))
+      lyapounov_ctypes_lib.update_A_2d(dim_y, H.disorder.ctypes.data_as(POINTER_DOUBLE), tunneling_x, tunneling_y, energy, nrescale, i, An.ctypes.data_as(POINTER_DOUBLE), An_old.ctypes.data_as(POINTER_DOUBLE))
       An, An_old = An_old, -An
       timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
       if i%nrescale==0:
@@ -101,23 +103,23 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
     An = np.identity(dim_y)
     An_old = np.zeros((dim_y,dim_y))
     offsets = np.array([1-dim_y,-1,0,1,dim_y-1])
-    sub_diagonals = -np.ones(dim_y)
+    sub_diagonals = -tunneling_y*inv_tunneling_x*np.ones(dim_y)
     data = np.array([sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals])
-    e_minus_H_local = scipy.sparse.dia_array((data,offsets), shape=(dim_y,dim_y))
-    e_minus_H_local_linear_operator= scipy.sparse.linalg.aslinearoperator(e_minus_H_local)
+    e_minus_H_local_over_tx = scipy.sparse.dia_array((data,offsets), shape=(dim_y,dim_y))
+    e_minus_H_local_over_tx_linear_operator= scipy.sparse.linalg.aslinearoperator(e_minus_H_local_over_tx)
 # Here starts the main loop for propagation along the x direction
     for i in range(((dim_x-1)//nrescale)*nrescale+1):
       start_scalar_time = timeit.default_timer()
-      e_minus_H_local.setdiag(energy-H.disorder[i,:])
+      e_minus_H_local_over_tx.setdiag(inv_tunneling_x*(energy-H.disorder[i,:]))
       if i%nrescale==1:
-        An_old += e_minus_H_local
+        An_old += e_minus_H_local_over_tx
 # The code in the previous line should be equivalent to the following 4 lines
 #          for j in range(dim_y):
 #            An_old[j,j] += (energy-H.disorder[i,j])
 #            An_old[j,(j+1)%dim_y] -= 1.0
 #            An_old[j,(j+dim_y-1)%dim_y] -= 1.0
       else:
-        An_old += e_minus_H_local_linear_operator.matmat(An)
+        An_old += e_minus_H_local_over_tx_linear_operator.matmat(An)
 # The code in the previous line should be equivalent to the following 4 lines
 #          for j in range(dim_y):
 #            An_old[j,0:dim_y] += (energy-H.disorder[i,j])*An[j,0:dim_y] - An[(j+1)%dim_y,0:dim_y] - An[(j+dim_y-1)%dim_y,0:dim_y]
@@ -146,7 +148,7 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
   timing.LYAPOUNOV_MATRIX_SOLUTION_NOPS += 4*((dim_x-1)//nrescale)*dim_y**3
   timing.LYAPOUNOV_SCALAR_NOPS += 4*dim_y*((dim_x-1)//nrescale) + 5*dim_y**2*((dim_x-1)//nrescale)*(nrescale-1) + dim_y**2*((dim_x-1)//nrescale)*nrescale
   if debug:
-    return x, tab_log_trans
+    return x, tab_x, tab_log_trans
   else:
     return x
 
@@ -298,7 +300,7 @@ class Lyapounov:
             tab_gamma[i_energy] = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.b, H.non_diagonal_disorder, self.tab_energy[i_energy], tunneling)
       if H.dimension == 2:
         if debug:
-          tab_gamma[i_energy], tab_log_trans = core_lyapounov_2d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes, debug=True)
+          tab_gamma[i_energy], tab_x, tab_log_trans = core_lyapounov_2d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes, debug=True)
         else:
           tab_gamma[i_energy] = core_lyapounov_2d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes)
 
@@ -321,7 +323,7 @@ class Lyapounov:
       return tab_gamma/(dim_x*H.tab_delta[0])
     if H.dimension==2:
       if debug:
-        return 2.0*tab_gamma, tab_log_trans
+        return 2.0*tab_gamma, tab_x, tab_log_trans
       else:
         return 2.0*tab_gamma
 

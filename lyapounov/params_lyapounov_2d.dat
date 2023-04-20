@@ -2,7 +2,7 @@
 dimension = 2
 # System size in natural units
 size_1 = 10000.
-size_2 = 500.
+size_2 = 200.
 # Spatial discretization
 delta_1 = 1.0
 delta_2 = 1.0
@@ -16,7 +16,7 @@ boundary_condition_2 = periodic
 #  Various disorder types can be used
 type = anderson_uniform
 # Disorder strength
-V0 = 3.0
+V0 = 2.0
 
 
 [Wavefunction]
@@ -31,7 +31,7 @@ t_max = 1200.0
 delta_t = 10.0
 
 [Averaging]
-n_config = 1
+n_config = 10
 
 [Measurement]
 delta_t_dispersion = 5.0
@@ -62,9 +62,9 @@ e_max= 10.
 multiplicative_factor_for_interaction = 0.0
 
 [Lyapounov]
-e_min = 4.0
-e_max = 4.0
+e_min = 0.0
+e_max = 0.0
 number_of_e_steps = 0
 want_ctypes = True
 number_of_skipped_layers = 0
-nrescale = 40
+nrescale = 10

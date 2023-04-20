@@ -100,7 +100,7 @@ def main():
  # Here starts the loop over disorder configurations
   for i in range(n_config):
     if debug:
-      tab_lyapounov, tab_log_trans = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=True)
+      tab_lyapounov, tab_x, tab_log_trans = lyapounov.compute_lyapounov(i+rank*n_config, H, timing, debug=True)
       if i==0:
         tab_global_log_trans = np.zeros_like(tab_log_trans)
       tab_global_log_trans += tab_log_trans
@@ -120,7 +120,7 @@ def main():
     timing.mpi_merge(comm)
 
   if debug:
-    np.savetxt('log_trans.dat',tab_global_log_trans/n_config)
+    np.savetxt('log_trans.dat',np.column_stack((tab_x,tab_global_log_trans/n_config)))
 # Compute mean value and standard deviation
   if rank==0:
     tab_global_lyapounov /= n_config*nprocs
@@ -160,7 +160,7 @@ def main():
     if mpi_version:
       print("MPI time                            = {0:.3f}".format(timing.MPI_TIME))
     print()
-    print("Total_time                          = {0:.3f}".format(timing.TOTAL_TIME))
+    print("Total time                          = {0:.3f}".format(timing.TOTAL_TIME))
 
 if __name__ == "__main__":
   main()
