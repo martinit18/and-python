@@ -6,8 +6,8 @@
 #else
 #include <math.h>
 #endif
-#include "mkl.h"
-#include "mkl_lapacke.h"
+//#include "mkl.h"
+//#include "mkl_lapacke.h"
 
 #define min(x,y) ((x>y) ? y : x)
     
@@ -80,6 +80,49 @@ double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step
   return(gamma);
 }
 
+
+void update_A_2d(const int dim_y, const double * restrict disorder, const double energy, const int nrescale, const int i, double *  An, double *  An_old)
+{
+  int j, k;
+  double ener;
+  int jm1, jp1;
+  if (i%nrescale==1) {
+// Fills An_old with the local E_H_n (i is n)    
+    for (j=0; j<dim_y; j++) {
+      An_old[j*(dim_y+1)] += (energy-disorder[i*dim_y+j]);
+      An_old[j*dim_y+(j+1)%dim_y] -= 1.0;
+      An_old[j*dim_y+(j+dim_y-1)%dim_y] -= 1.0;
+    } 
+  } else {
+// Fills An_old with the local (E_H_n)*An+An_old    
+    for (j=0; j<dim_y; j++) {
+      ener = energy-disorder[i*dim_y+j];
+      jm1 = (j+dim_y-1)%dim_y;
+      jp1 = (j+1)%dim_y;
+ #ifdef __INTEL_LLVM_COMPILER
+  #pragma vector
+  #pragma unroll
+#else
+  #ifdef __clang__
+    #pragma clang loop vectorize(enable) 
+  #else
+    #ifdef __ICC
+      #pragma vector always
+      #pragma ivdep
+    #else      
+      #pragma GCC ivdep
+    #endif
+  #endif
+#endif
+      for (k=0; k<dim_y; k++) {
+        An_old[j*dim_y+k] += ener*An[j*dim_y+k] - An[jp1*dim_y+k] - An[jm1*dim_y+k];
+      }
+    }
+  }
+  return;
+}
+
+/*
 double core_lyapounov_2d_c(const int dim_x, const int dim_y, const double * restrict disorder, const double energy, const int nrescale, const int i0, double * Bn, double * Bn_old, double * g1n)
 {
   int i, j, k;
@@ -145,7 +188,9 @@ double core_lyapounov_2d_c(const int dim_x, const int dim_y, const double * rest
   printf("xfinal = %lf\n",x);
   return(x);
 }
+*/
 
+/*
 void update_B_c(const int dim_x, const int dim_y, const double * restrict disorder, const double energy, const int nrescale, const int i, double *  Bn, double *  Bn_old)
 {
   int j, k;
@@ -166,3 +211,4 @@ void update_B_c(const int dim_x, const int dim_y, const double * restrict disord
   }
   return;
 }
+*/

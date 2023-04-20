@@ -154,9 +154,12 @@ def main():
     print("Number of ops                       = {0:.4e}".format(timing.LYAPOUNOV_MATRIX_SOLUTION_NOPS))
     print("Lyapounov scalar time               = {0:.3f}".format(timing.LYAPOUNOV_SCALAR_TIME))
     print("Number of ops                       = {0:.4e}".format(timing.LYAPOUNOV_SCALAR_NOPS))
+    print("Total Lyapounov time                = {0:.3f}".format(timing.LYAPOUNOV_TIME))
+    print("Total Lyapounov ops                 = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
 #    print("Number of ops        = {0:.4e}".format(timing.LYAPOUNOV_NOPS))
     if mpi_version:
       print("MPI time                            = {0:.3f}".format(timing.MPI_TIME))
+    print()
     print("Total_time                          = {0:.3f}".format(timing.TOTAL_TIME))
 
 if __name__ == "__main__":
