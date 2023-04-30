@@ -9,6 +9,7 @@ Created on Fri Aug 16 17:05:10 2019
 
 import os
 import time
+import numpy as np
 from . import geometry, diag, io, lyapounov, propagation, hamiltonian, wavefunction, measurement, timing
 
 __all__ = ["diag","io","lyapounov","propagation","geometry","hamiltonian","wavefunction","measurement","timing"]
@@ -22,12 +23,12 @@ __all__ = ["diag","io","lyapounov","propagation","geometry","hamiltonian","wavef
 #  x = np.sum(density*local_operator)
 #  return x/norm
 
-#def compute_correlation(x,y,shift_center=False):
-#  z = np.fft.ifftn(np.fft.fftn(x)*np.conj(np.fft.fftn(y)))/x.size
-#  if shift_center:
-#    return np.fft.fftshift(z)
-#  else:
-#    return z
+def compute_correlation(x,y,shift_center=False):
+  z = np.fft.ifftn(np.fft.fftn(x)*np.conj(np.fft.fftn(y)))/x.size
+  if shift_center:
+    return np.fft.fftshift(z)
+  else:
+    return z
 
 
 # The following routine determines a unique name not already in use when one wants to create a file

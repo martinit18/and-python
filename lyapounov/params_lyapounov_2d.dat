@@ -1,8 +1,8 @@
 [System]
 dimension = 2
 # System size in natural units
-size_1 = 10000.
-size_2 = 200.
+size_1 = 1000.
+size_2 = 100.
 # Spatial discretization
 delta_1 = 1.0
 delta_2 = 1.0
@@ -10,13 +10,12 @@ one_over_mass = 2.0
 # either periodic or open
 boundary_condition_1 = periodic
 boundary_condition_2 = periodic
-#use_mkl_random = False
 
 [Disorder]
 #  Various disorder types can be used
 type = anderson_uniform
 # Disorder strength
-V0 = 2.0
+V0 = 5.0
 
 
 [Wavefunction]
@@ -31,7 +30,7 @@ t_max = 1200.0
 delta_t = 10.0
 
 [Averaging]
-n_config = 10
+n_config = 1
 
 [Measurement]
 delta_t_dispersion = 5.0
@@ -56,15 +55,15 @@ spectral_function = False
 # [e_min,e_max] has precedence over range if both are specified
 range = 100.0
 resolution = 0.01
-e_min= -1.
+e_min= -1.5
 e_max= 10.
 # Multiplicative factor for the interaction coefficient
 multiplicative_factor_for_interaction = 0.0
 
 [Lyapounov]
-e_min = 0.0
-e_max = 0.0
+e_min = 9.0
+e_max = 9.0
 number_of_e_steps = 0
-want_ctypes = True
+want_ctypes = False
 number_of_skipped_layers = 0
-nrescale = 10
+nrescale = 1

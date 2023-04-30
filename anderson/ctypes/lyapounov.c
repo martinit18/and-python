@@ -81,7 +81,7 @@ double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step
 }
 
 
-void update_A_2d(const int dim_y, const double * restrict disorder, const double tunneling_x, const double tunneling_y, const double energy, const int nrescale, const int i, double *  An, double *  An_old)
+void update_A_2d(const int dim_y, const double * disorder, const double tunneling_x, const double tunneling_y, const double energy, const int nrescale, const int i, double *  An, double *  An_old)
 {
   int j, k;
   double ener;
@@ -96,9 +96,13 @@ void update_A_2d(const int dim_y, const double * restrict disorder, const double
       An_old[j*dim_y+(j+dim_y-1)%dim_y] -= inv_tunneling_x*tunneling_y;
     } 
   } else {
-// Fills An_old with the local (E_H_n)*An/tunneling_x+An_old    
+// Fills An_old with the local (E_H_n)*An/tunneling_x+An_old 
+/*    for (j=0;j<6;j++) {
+      printf("%d %lf\n",j,disorder[j]);
+    } */  
     for (j=0; j<dim_y; j++) {
       ener = (energy-disorder[i*dim_y+j]);
+//      printf("i= %d j=%d ener= %lf\n",i,j,ener);
       jm1 = (j+dim_y-1)%dim_y;
       jp1 = (j+1)%dim_y;
  #ifdef __INTEL_LLVM_COMPILER

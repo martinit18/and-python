@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" 
+"""
 Created on Sun Nov 22 19:27:50 2020
 
 @author: delande
@@ -21,10 +21,10 @@ def numba_decorator(x):
   try:
     import numba
     return numba.jit(nopython=True,fastmath=True,cache=True)(x)
-  except: 
+  except:
     print('numba package not found, this will use the slower regular Python version')
     return(x)
-  pass  
+  pass
 
 """
 The class Hamiltonian contains all properties that define a disordered Hamiltonian discretized spatially
@@ -97,17 +97,17 @@ class Hamiltonian(Geometry):
       return
 # Build mask for correlated potentials
     if disorder_type=='regensburg':
-      self.generate = 'simple mask'    
+      self.generate = 'simple mask'
       self.mask = np.zeros(tab_dim)
       tab_k = list()
       for i in range(dimension):
         toto = np.zeros(tab_dim[i])
         half_size = tab_dim[i]//2+1
-# Old code which does not work too well when the correlation length is shorter than the spatial grid spacing        
+# Old code which does not work too well when the correlation length is shorter than the spatial grid spacing
 #        toto[0:half_size] = -0.25*(np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
 #        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
-        toto[0:half_size] = -0.5*(np.arange(half_size)*self.tab_delta[i]/self.correlation_length)**2  
-        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]     
+        toto[0:half_size] = -0.5*(np.arange(half_size)*self.tab_delta[i]/self.correlation_length)**2
+        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
         tab_k.append(toto)
       tab_distance = np.meshgrid(*tab_k,indexing='ij')
       for i in range(dimension):
@@ -131,6 +131,22 @@ class Hamiltonian(Geometry):
       for i in range(dimension):
          self.mask += tab_distance[i]
       self.mask = np.exp(self.mask)
+      self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
+      return
+    if disorder_type=='circular_speckle':
+      self.generate = 'field mask'
+      self.mask = np.zeros(tab_dim)
+      tab_k = list()
+      for i in range(dimension):
+        toto = np.zeros(tab_dim[i])
+        half_size = tab_dim[i]//2+1
+        toto[0:half_size] = (np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
+        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
+        tab_k.append(toto)
+      tab_distance = np.meshgrid(*tab_k,indexing='ij')
+      for i in range(dimension):
+         self.mask += tab_distance[i]
+      self.mask = np.exp(-1000.0*(np.maximum(self.mask,1.0)-1.0)**2)
       self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
       return
     """
@@ -182,33 +198,37 @@ class Hamiltonian(Geometry):
 #    print(self.use_mkl_random)
     self.seed = seed
     my_rng = self.rng(seed)
-# No sparse matrix for the Hamiltonian has yet been generated    
-    self.sparse_matrix = None  
+# No sparse matrix for the Hamiltonian has yet been generated
+    self.sparse_matrix = None
 #    print('seed=',seed)
 #    print(self.tab_dim_cumulative)
+# In order to be able to use the ctypes version of some routines, it is essential that the disorder numpy array to be in C order
+# Here, this is forced using the np.add() routine with the optional argument order='C'
+# Thus, do not use the simple addition which looks simpler
     if self.disorder_type=='anderson_uniform':
-      self.disorder = self.diagonal + self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.disorder = np.add(self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim),self.diagonal,order='C')/np.sqrt(self.delta_vol)
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
-      self.disorder = self.diagonal + self.disorder_strength*my_rng.standard_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol)
+      self.disorder = np.add(self.disorder_strength*my_rng.standard_normal(self.ntot).reshape(self.tab_dim),self.diagonal,order='C')/np.sqrt(self.delta_vol)
 #      print(self.disorder.shape,self.disorder.dtype)
       return
     if self.disorder_type=='nice':
 # Only in dimension 1
+# Thus no ordering needs to be specified
       self.disorder = self.diagonal + self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot)/np.sqrt(self.delta_vol)
       self.non_diagonal_disorder = self.non_diagonal_disorder_strength*my_rng.uniform(-1.0,1.0,self.b*(self.ntot+self.b)).reshape((self.ntot+self.b,self.b))
 #      print(self.disorder)
       return
     if self.generate=='simple mask':
-      self.disorder =  self.diagonal + self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_rng.standard_normal(self.ntot).reshape(self.tab_dim))))
+      self.disorder =  np.add(self.disorder_strength*np.real(np.fft.ifftn(self.mask*np.fft.fftn(my_rng.standard_normal(self.ntot).reshape(self.tab_dim)))),self.diagonal,order='C')
 #      self.print_potential()
       return
     if self.generate=='field mask':
 # When a field_mask is used, the initial data is a complex uncorrelated set of Gaussian distributed random numbers in configuration space
 # The Fourier transform in momentum space is also a complex uncorrelated set of Gaussian distributed random numbers
 # Thus the first FT is useless and can be short circuited
-      self.disorder =  self.diagonal + 0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_rng.standard_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2
+      self.disorder =  np.add(0.5*self.disorder_strength*self.ntot*np.abs(np.fft.ifftn(self.mask*my_rng.standard_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim)))**2,self.diagonal,order='C')
 # Alternatively (slower)
 #      self.disorder =  self.diagonal + 0.5*self.disorder_strength*np.abs(np.fft.ifftn(self.mask*np.fft.fftn(my_random_normal(2*self.ntot).view(np.complex128).reshape(self.tab_dim))))**2
 #      self.print_potential()

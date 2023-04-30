@@ -60,89 +60,66 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
   if debug:
     tab_log_trans = np.zeros((dim_x-1-i0)//nrescale+1)
     tab_x = H.tab_delta[0]*nrescale*np.arange((dim_x-1-i0)//nrescale+1)
+#  print('Disorder',H.disorder)
+#  print(H.disorder.dtype,H.disorder.shape,H.disorder.flags)
+  x = 0.0
+  g1n = np.identity(dim_y)
+  An = np.identity(dim_y)
+  An_old = np.zeros((dim_y,dim_y))
   if use_ctypes:
     import ctypes
-#    import numpy.ctypeslib as ctl
+    import numpy.ctypeslib as ctl
     lyapounov_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/lyapounov.so")
-    POINTER_DOUBLE = ctypes.POINTER(ctypes.c_double)
-#      lyapounov_ctypes_lib.update_B_c.argtypes = [ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, ctypes.c_double, ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, POINTER_DOUBLE]
-#      lyapounov_ctypes_lib.update_B_c.restype = None
-    lyapounov_ctypes_lib.update_A_2d.argtypes = [ctypes.c_int, POINTER_DOUBLE, ctypes.c_double, ctypes.c_double, ctypes.c_double,ctypes.c_int, ctypes.c_int, POINTER_DOUBLE, POINTER_DOUBLE]
+    lyapounov_ctypes_lib.update_A_2d.argtypes = [ctypes.c_int, ctl.ndpointer(flags='C'), ctypes.c_double, ctypes.c_double, ctypes.c_double,ctypes.c_int, ctypes.c_int, ctl.ndpointer(flags='C'), ctl.ndpointer(flags='C')]
     lyapounov_ctypes_lib.update_A_2d.restype = None
-    x = 0.0
-    g1n = np.identity(dim_y).reshape(dim_y*dim_y)
-    An = np.identity(dim_y).reshape(dim_y*dim_y)
-    An_old = np.zeros(dim_y*dim_y)
-# Here starts the main loop for propagation along the x direction
-    for i in range(((dim_x-1)//nrescale)*nrescale+1):
-      start_scalar_time = timeit.default_timer()
-      lyapounov_ctypes_lib.update_A_2d(dim_y, H.disorder.ctypes.data_as(POINTER_DOUBLE), tunneling_x, tunneling_y, energy, nrescale, i, An.ctypes.data_as(POINTER_DOUBLE), An_old.ctypes.data_as(POINTER_DOUBLE))
-      An, An_old = An_old, -An
-      timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
-      if i%nrescale==0:
-        start_factorization_time = timeit.default_timer()
-        b, piv, info = lapack.dgetrf(An.reshape(dim_y,dim_y))
-        timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
-        if i>=i0:
-          start_solution_time = timeit.default_timer()
-          g1n = lapack.dgetrs(b, piv, g1n.reshape(dim_y,dim_y), 1)[0].reshape(-1)
-          timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
-          one_over_small_b = 1.0/np.linalg.norm(g1n)
-          g1n *= one_over_small_b
-          if i>i0:
-            x += math.log(one_over_small_b)
-          if debug:
-            tab_log_trans[(i-i0)//nrescale] = -2.0*x
-          start_solution_time = timeit.default_timer()
-          An_old = lapack.dgetrs(b, piv, An_old.reshape(dim_y,dim_y).T, 1)[0].T.reshape(-1)
-          timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
-          An = np.identity(dim_y).reshape(dim_y*dim_y)
   else:
-    x = 0.0
-    g1n = np.identity(dim_y)
-    An = np.identity(dim_y)
-    An_old = np.zeros((dim_y,dim_y))
     offsets = np.array([1-dim_y,-1,0,1,dim_y-1])
     sub_diagonals = -tunneling_y*inv_tunneling_x*np.ones(dim_y)
     data = np.array([sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals])
     e_minus_H_local_over_tx = scipy.sparse.dia_array((data,offsets), shape=(dim_y,dim_y))
     e_minus_H_local_over_tx_linear_operator= scipy.sparse.linalg.aslinearoperator(e_minus_H_local_over_tx)
 # Here starts the main loop for propagation along the x direction
-    for i in range(((dim_x-1)//nrescale)*nrescale+1):
-      start_scalar_time = timeit.default_timer()
+  for i in range(((dim_x-1)//nrescale)*nrescale+1):
+    start_scalar_time = timeit.default_timer()
+    if use_ctypes:
+      lyapounov_ctypes_lib.update_A_2d(dim_y, H.disorder, tunneling_x, tunneling_y, energy, nrescale, i, An, An_old)
+    else:
       e_minus_H_local_over_tx.setdiag(inv_tunneling_x*(energy-H.disorder[i,:]))
       if i%nrescale==1:
         An_old += e_minus_H_local_over_tx
 # The code in the previous line should be equivalent to the following 4 lines
-#          for j in range(dim_y):
-#            An_old[j,j] += (energy-H.disorder[i,j])
-#            An_old[j,(j+1)%dim_y] -= 1.0
-#            An_old[j,(j+dim_y-1)%dim_y] -= 1.0
+#         for j in range(dim_y):
+#           An_old[j,j] += inv_tunneling_x*(energy-H.disorder[i,j])
+#           An_old[j,(j+1)%dim_y] -= tunneling_y*inv_tunneling_x
+#           An_old[j,(j+dim_y-1)%dim_y] -= tunneling_y*inv_tunneling_x
       else:
         An_old += e_minus_H_local_over_tx_linear_operator.matmat(An)
 # The code in the previous line should be equivalent to the following 4 lines
-#          for j in range(dim_y):
-#            An_old[j,0:dim_y] += (energy-H.disorder[i,j])*An[j,0:dim_y] - An[(j+1)%dim_y,0:dim_y] - An[(j+dim_y-1)%dim_y,0:dim_y]
-      An, An_old = An_old, -An
-      timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
-      if i%nrescale==0:
-        start_factorization_time = timeit.default_timer()
-        b, piv, info = lapack.dgetrf(An)
-        timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
-        if i>=i0:
-          start_solution_time = timeit.default_timer()
-          g1n, info = lapack.dgetrs(b, piv, g1n, 1, 0)
-          timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
-          one_over_small_b = 1.0/np.linalg.norm(g1n)
-          g1n *= one_over_small_b
-          if i>i0:
-            x += math.log(one_over_small_b)
-          if debug:
-            tab_log_trans[(i-i0)//nrescale] = -2.0*x
-          start_solution_time = timeit.default_timer()
-          An_old = lapack.dgetrs(b, piv, An_old.T, 1, 0)[0].T
-          timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
-          An = np.identity(dim_y)
+#        for j in range(dim_y):
+#          An_old[j,0:dim_y] += inv_tunneling_x*((energy-H.disorder[i,j])*An[j,0:dim_y] - tunneling_y*(An[(j+1)%dim_y,0:dim_y] + An[(j+dim_y-1)%dim_y,0:dim_y]))
+    An, An_old = An_old, -An
+#      print('False ener i=',i,energy-H.disorder[i,:])
+#      print('False Hamitonian i=',i,e_minus_H_local_over_tx)
+#      print('False i=',i,An,An_old)
+    timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
+    if i%nrescale==0:
+      start_factorization_time = timeit.default_timer()
+      b, piv, info = lapack.dgetrf(An)
+      timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
+      if i>=i0:
+        start_solution_time = timeit.default_timer()
+        g1n, info = lapack.dgetrs(b, piv, g1n, 1, 0)
+        timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+        one_over_small_b = 1.0/np.linalg.norm(g1n)
+        g1n *= one_over_small_b
+        if i>i0:
+          x += math.log(one_over_small_b)
+        if debug:
+          tab_log_trans[(i-i0)//nrescale] = -2.0*x
+        start_solution_time = timeit.default_timer()
+        An_old = lapack.dgetrs(b, piv, An_old.T, 1, 0)[0].T
+        timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+        An = np.identity(dim_y)
   x /= H.tab_delta[0]*((dim_x-i0-1)//nrescale)*nrescale
   timing.LYAPOUNOV_MATRIX_FACTORIZATION_NOPS += 2*((dim_x-1)//nrescale)*dim_y**3/3
   timing.LYAPOUNOV_MATRIX_SOLUTION_NOPS += 4*((dim_x-1)//nrescale)*dim_y**3
