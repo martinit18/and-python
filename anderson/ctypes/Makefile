@@ -17,8 +17,9 @@ endif
 
 ifeq ($(COMPILER),oneapi)
 CC=icx 
-CFLAGS=-O3 -xskylake-avx512 -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
-CFLAGS=-O3 -xHost -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize  -ftz
+CFLAGS=-O3 -xavx -axcore-avx2 -axskylake-avx512 -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
+#CFLAGS=-O3 -xskylake-avx512 -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize
+#CFLAGS=-O3 -xHost -Wunknown-pragmas -fp-model fast -fno-alias -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize  -ftz
 #CFLAGS=-O0 
 endif
 

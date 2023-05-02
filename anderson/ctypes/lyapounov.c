@@ -81,7 +81,7 @@ double core_lyapounov_non_diagonal_disorder(const int dim_x, const int loop_step
 }
 
 
-void update_A_2d(const int dim_y, const double * disorder, const double tunneling_x, const double tunneling_y, const double energy, const int nrescale, const int i, double *  An, double *  An_old)
+void update_A_2d(const int dim_y, const double * restrict disorder, const double tunneling_x, const double tunneling_y, const double energy, const int nrescale, const int i, double * restrict An, double * restrict An_old)
 {
   int j, k;
   double ener;
