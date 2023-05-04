@@ -73,10 +73,18 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
     lyapounov_ctypes_lib.update_A_2d.argtypes = [ctypes.c_int, ctl.ndpointer(flags='C'), ctypes.c_double, ctypes.c_double, ctypes.c_double,ctypes.c_int, ctypes.c_int, ctl.ndpointer(flags='C'), ctl.ndpointer(flags='C')]
     lyapounov_ctypes_lib.update_A_2d.restype = None
   else:
-    offsets = np.array([1-dim_y,-1,0,1,dim_y-1])
-    sub_diagonals = -tunneling_y*inv_tunneling_x*np.ones(dim_y)
-    data = np.array([sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals])
-    e_minus_H_local_over_tx = scipy.sparse.dia_array((data,offsets), shape=(dim_y,dim_y))
+    e_minus_H_local_over_tx = scipy.sparse.dia_array((dim_y,dim_y))
+#    e_minus_H_local_over_tx.setdiag(0.0)
+    non_diagonal_element = -tunneling_y*inv_tunneling_x
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element,-1)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element,1)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element,dim_y-1)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element,1-dim_y)
+#    print(e_minus_H_local_over_tx)
+#    offsets = np.array([1-dim_y,-1,0,1,dim_y-1])
+#    sub_diagonals = -tunneling_y*inv_tunneling_x*np.ones(dim_y)
+#    data = np.array([sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals,sub_diagonals])
+#    e_minus_H_local_over_tx = scipy.sparse.dia_array((data,offsets), shape=(dim_y,dim_y))
     e_minus_H_local_over_tx_linear_operator= scipy.sparse.linalg.aslinearoperator(e_minus_H_local_over_tx)
 # Here starts the main loop for propagation along the x direction
   for i in range(((dim_x-1)//nrescale)*nrescale+1):
@@ -129,6 +137,104 @@ def core_lyapounov_2d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
   else:
     return x
 
+def core_lyapounov_3d(H, energy, i0, nrescale, timing, use_ctypes, debug=False):
+# Propagation is along the x direction
+  dim_x = H.tab_dim[0]
+  dim_y = H.tab_dim[1]
+  dim_z = H.tab_dim[2]
+  dim_trans = dim_y*dim_z
+  tunneling_x = H.tab_tunneling[0]
+  inv_tunneling_x = 1.0/tunneling_x
+  tunneling_y = H.tab_tunneling[1]
+  tunneling_z = H.tab_tunneling[2]
+  if debug:
+    tab_log_trans = np.zeros((dim_x-1-i0)//nrescale+1)
+    tab_x = H.tab_delta[0]*nrescale*np.arange((dim_x-1-i0)//nrescale+1)
+#  print('Disorder',H.disorder)
+#  print(H.disorder.dtype,H.disorder.shape,H.disorder.flags)
+  x = 0.0
+  g1n = np.identity(dim_trans)
+  An = np.identity(dim_trans)
+  An_old = np.zeros((dim_trans,dim_trans))
+  if use_ctypes:
+    import ctypes
+    import numpy.ctypeslib as ctl
+    lyapounov_ctypes_lib=ctypes.CDLL(anderson.__path__[0]+"/ctypes/lyapounov.so")
+    lyapounov_ctypes_lib.update_A_3d.argtypes = [ctypes.c_int, ctypes.c_int, ctl.ndpointer(flags='C'), ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_int, ctl.ndpointer(flags='C'), ctl.ndpointer(flags='C')]
+    lyapounov_ctypes_lib.update_A_3d.restype = None
+  else:
+    e_minus_H_local_over_tx = scipy.sparse.dia_array((dim_trans,dim_trans))
+#    e_minus_H_local_over_tx.setdiag(0.0)
+    non_diagonal_element_y = -tunneling_y*inv_tunneling_x
+    non_diagonal_element_z = -tunneling_z*inv_tunneling_x
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element_y,-dim_z)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element_y,dim_z)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element_y,-dim_z*(dim_y-1))
+    e_minus_H_local_over_tx.setdiag(non_diagonal_element_y,dim_z*(dim_y-1))
+    non_diagonal_vector = non_diagonal_element_z*np.ones(dim_z)
+    non_diagonal_vector[dim_z-1] = 0.0
+    non_diagonal_vector = np.tile(non_diagonal_vector,dim_y)
+#    print('non_diagonal_vector_1',non_diagonal_vector)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_vector,1)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_vector,-1)
+    non_diagonal_vector = np.zeros(dim_z)
+    non_diagonal_vector[0] = non_diagonal_element_z
+    non_diagonal_vector = np.tile(non_diagonal_vector,dim_y)
+#    print('non_diagonal_vector_2',non_diagonal_vector)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_vector,dim_z-1)
+    e_minus_H_local_over_tx.setdiag(non_diagonal_vector,1-dim_z)
+#    print(e_minus_H_local_over_tx)
+    e_minus_H_local_over_tx_linear_operator= scipy.sparse.linalg.aslinearoperator(e_minus_H_local_over_tx)
+# Here starts the main loop for propagation along the x direction
+  for i in range(((dim_x-1)//nrescale)*nrescale+1):
+    start_scalar_time = timeit.default_timer()
+    if use_ctypes:
+      lyapounov_ctypes_lib.update_A_3d(dim_y,dim_z, H.disorder, tunneling_x, tunneling_y, tunneling_z, energy, nrescale, i, An, An_old)
+    else:
+      e_minus_H_local_over_tx.setdiag(inv_tunneling_x*(energy-H.disorder[i,:,:].reshape(dim_trans)))
+      if i%nrescale==1:
+        An_old += e_minus_H_local_over_tx
+# The code in the previous line should be equivalent to the following 4 lines
+#         for j in range(dim_y):
+#           An_old[j,j] += inv_tunneling_x*(energy-H.disorder[i,j])
+#           An_old[j,(j+1)%dim_y] -= tunneling_y*inv_tunneling_x
+#           An_old[j,(j+dim_y-1)%dim_y] -= tunneling_y*inv_tunneling_x
+      else:
+        An_old += e_minus_H_local_over_tx_linear_operator.matmat(An)
+# The code in the previous line should be equivalent to the following 4 lines
+#        for j in range(dim_y):
+#          An_old[j,0:dim_y] += inv_tunneling_x*((energy-H.disorder[i,j])*An[j,0:dim_y] - tunneling_y*(An[(j+1)%dim_y,0:dim_y] + An[(j+dim_y-1)%dim_y,0:dim_y]))
+    An, An_old = An_old, -An
+#      print('False ener i=',i,energy-H.disorder[i,:])
+#      print('False Hamitonian i=',i,e_minus_H_local_over_tx)
+#      print('False i=',i,An,An_old)
+    timing.LYAPOUNOV_SCALAR_TIME+=(timeit.default_timer() - start_scalar_time)
+    if i%nrescale==0:
+      start_factorization_time = timeit.default_timer()
+      b, piv, info = lapack.dgetrf(An)
+      timing.LYAPOUNOV_MATRIX_FACTORIZATION_TIME+=(timeit.default_timer() - start_factorization_time)
+      if i>=i0:
+        start_solution_time = timeit.default_timer()
+        g1n, info = lapack.dgetrs(b, piv, g1n, 1, 0)
+        timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+        one_over_small_b = 1.0/np.linalg.norm(g1n)
+        g1n *= one_over_small_b
+        if i>i0:
+          x += math.log(one_over_small_b)
+        if debug:
+          tab_log_trans[(i-i0)//nrescale] = -2.0*x
+        start_solution_time = timeit.default_timer()
+        An_old = lapack.dgetrs(b, piv, An_old.T, 1, 0)[0].T
+        timing.LYAPOUNOV_MATRIX_SOLUTION_TIME+=(timeit.default_timer() - start_solution_time)
+        An = np.identity(dim_trans)
+  x /= H.tab_delta[0]*((dim_x-i0-1)//nrescale)*nrescale
+  timing.LYAPOUNOV_MATRIX_FACTORIZATION_NOPS += 2*((dim_x-1)//nrescale)*dim_trans**3/3
+  timing.LYAPOUNOV_MATRIX_SOLUTION_NOPS += 4*((dim_x-1)//nrescale)*dim_trans**3
+  timing.LYAPOUNOV_SCALAR_NOPS += 4*dim_trans*((dim_x-1)//nrescale) + 5*dim_trans**2*((dim_x-1)//nrescale)*(nrescale-1) + dim_trans**2*((dim_x-1)//nrescale)*nrescale
+  if debug:
+    return x, tab_x, tab_log_trans
+  else:
+    return x
 
 def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, b, non_diagonal_disorder, energy, tunneling):
   if b==1:
@@ -173,22 +279,20 @@ def core_lyapounov_non_diagonal_disorder(dim_x, loop_step, disorder, b, non_diag
   return gamma
 
 class Lyapounov:
-  def __init__(self, e_min, e_max, number_of_e_steps, want_ctypes=True, i0=10, nrescale=10):
-    self.e_min = e_min
-    self.e_max = e_max
-    self.number_of_e_steps = number_of_e_steps
+  def __init__(self, energy, want_ctypes=True, i0=10, nrescale=10):
+    self.energy = energy
     self.want_ctypes = want_ctypes
     self.use_ctypes = want_ctypes
     self.i0 = i0
     self.nrescale = nrescale
-    self.tab_energy = np.zeros(number_of_e_steps+1)
-    if number_of_e_steps==0:
-      self.e_step = 0.0
-    else:
-      self.e_step = (e_max - e_min)/number_of_e_steps
-    for i_e in range(number_of_e_steps+1):
-      e = e_min + self.e_step*i_e
-      self.tab_energy[i_e] = e
+#    self.tab_energy = np.zeros(number_of_e_steps+1)
+#    if number_of_e_steps==0:
+#      self.e_step = 0.0
+#    else:
+#      self.e_step = (e_max - e_min)/number_of_e_steps
+#    for i_e in range(number_of_e_steps+1):
+#      e = e_min + self.e_step*i_e
+#      self.tab_energy[i_e] = e
     return
 
   def compute_lyapounov(self, i_seed, H, timing, debug=False):
@@ -238,6 +342,11 @@ class Lyapounov:
           if not(self.use_ctypes):
             if H.seed == 1234:
               print("\nWarning, lyapounov C library found, but without routine update_A_2d, this uses the slow Python version!\n")
+        if H.dimension ==3:
+          self.use_ctypes =hasattr(lyapounov_ctypes_lib,'update_A_3d')
+          if not(self.use_ctypes):
+            if H.seed == 1234:
+              print("\nWarning, lyapounov C library found, but without routine update_A_3d, this uses the slow Python version!\n")
       except:
         self.use_ctypes = False
         lyapounov_ctypes_lib = None
@@ -261,6 +370,8 @@ class Lyapounov:
       gamma += math.log(abs(r))
       if r<0.0: h+=1.0
     """
+
+    """
     loop_step=16
     number_of_energies = self.tab_energy.size
     tab_gamma = np.zeros(number_of_energies)
@@ -280,6 +391,33 @@ class Lyapounov:
           tab_gamma[i_energy], tab_x, tab_log_trans = core_lyapounov_2d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes, debug=True)
         else:
           tab_gamma[i_energy] = core_lyapounov_2d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes)
+      if H.dimension == 3:
+        if debug:
+          tab_gamma[i_energy], tab_x, tab_log_trans = core_lyapounov_3d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes, debug=True)
+        else:
+          tab_gamma[i_energy] = core_lyapounov_3d(H, self.tab_energy[i_energy], self.i0, self.nrescale, timing, self.use_ctypes)
+    """
+
+    loop_step=16
+    if H.dimension == 1:
+      if self.use_ctypes:
+        if H.disorder_type=='nice':
+          gamma= lyapounov_ctypes_lib.core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.b, H.non_diagonal_disorder, self.energy, tunneling)
+        else:
+          gamma = lyapounov_ctypes_lib.core_lyapounov(dim_x, loop_step, H.disorder, self.energy, inv_tunneling)
+      else:
+        if H.disorder_type=='nice':
+          gamma = core_lyapounov_non_diagonal_disorder(dim_x, loop_step, H.disorder, H.b, H.non_diagonal_disorder, self.energy, tunneling)
+    if H.dimension == 2:
+      if debug:
+        gamma, tab_x, tab_log_trans = core_lyapounov_2d(H, self.energy, self.i0, self.nrescale, timing, self.use_ctypes, debug=True)
+      else:
+        gamma = core_lyapounov_2d(H, self.energy, self.i0, self.nrescale, timing, self.use_ctypes)
+    if H.dimension == 3:
+      if debug:
+        gamma, tab_x, tab_log_trans = core_lyapounov_3d(H, self.energy, self.i0, self.nrescale, timing, self.use_ctypes, debug=True)
+      else:
+        gamma = core_lyapounov_3d(H, self.energy, self.i0, self.nrescale, timing, self.use_ctypes)
 
 #    print(2.0*new_core_lyapounov(H, 0.0)/(dim_x*H.tab_delta[0]))
 
@@ -287,22 +425,23 @@ class Lyapounov:
     timing.LYAPOUNOV_TIME += timeit.default_timer() - start_lyapounov_time
     if H.dimension==1:
       if H.disorder_type=='nice':
-        timing.LYAPOUNOV_NOPS += 10*dim_x*number_of_energies
+        timing.LYAPOUNOV_NOPS += 10*dim_x
       else:
-        timing.LYAPOUNOV_NOPS += 5*dim_x*number_of_energies
+        timing.LYAPOUNOV_NOPS += 5*dim_x
     if H.dimension==2:
       timing.LYAPOUNOV_NOPS += timing.LYAPOUNOV_MATRIX_FACTORIZATION_NOPS+timing.LYAPOUNOV_MATRIX_SOLUTION_NOPS+timing.LYAPOUNOV_SCALAR_NOPS
   #  lyapounov = gamma/(dim_x*H.delta_x)
   #  integrated_dos = h/(dim_x*H.delta_x)
   #  return (lyapounov,integrated_dos)
   # The Lyapounov is here computed for the intensity (halve it for wavefunction), hence the multiplicative factor 2
+  # Change on May, 3, 2023, so that it is now for the wavefucntion
     if H.dimension==1:
-      return tab_gamma/(dim_x*H.tab_delta[0])
-    if H.dimension==2:
+      return 0.5*gamma/(dim_x*H.tab_delta[0])
+    if H.dimension==2 or H.dimension==3:
       if debug:
-        return 2.0*tab_gamma, tab_x, tab_log_trans
+        return gamma, tab_x, tab_log_trans
       else:
-        return 2.0*tab_gamma
+        return gamma
 
 """
 Old stuff

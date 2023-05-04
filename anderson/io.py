@@ -79,6 +79,11 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     randomize_hamiltonian = Disorder.getboolean('randomize_hamiltonian',True)
     if disorder_type=='nice' and dimension!=1:
       my_abort(mpi_version,comm,"The 'nice' disorder is implemented only in dimension 1, I stop!\n")
+    if disorder_type=='speckle':
+      if dimension<3:
+        disorder_type = 'circular_speckle'
+      else:
+        disorder_type = 'spherical_speckle'
     correlation_length = Disorder.getfloat('sigma',0.0)
     V0 = Disorder.getfloat('V0',0.0)
     disorder_strength = V0
@@ -298,18 +303,19 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       if not config.has_section('Lyapounov'):
         my_abort(mpi_version,comm,'Parameter file does not have a Lyapounov section, I stop!\n')
       Lyapounov = config['Lyapounov']
-      e_min = Lyapounov.getfloat('e_min',0.0)
-      e_max = Lyapounov.getfloat('e_max',0.0)
-      number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
+#      e_min = Lyapounov.getfloat('e_min',0.0)
+#      e_max = Lyapounov.getfloat('e_max',0.0)
+#      number_of_e_steps = Lyapounov.getint('number_of_e_steps',0)
+      energy = Lyapounov.getfloat('energy',0.0)
       i0 = Lyapounov.getint('number_of_skipped_layers',10)
       nrescale = Lyapounov.getint('nrescale',10)
       if i0%nrescale!=0:
         i0 = ((i0-1)//nrescale+1)*nrescale
         print('Info: number_of_skipped_layers must be an integer multiple of nrescale. It is changed to',i0,'\n')
-      e_histogram = Lyapounov.getfloat('e_histogram',0.0)
-      lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
-      lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
-      number_of_bins = Lyapounov.getint('number_of_bins',0)
+#      e_histogram = Lyapounov.getfloat('e_histogram',0.0)
+#      lyapounov_min = Lyapounov.getfloat('lyapounov_min',0.0)
+#      lyapounov_max = Lyapounov.getfloat('lyapounov_max',0.0)
+#      number_of_bins = Lyapounov.getint('number_of_bins',0)
       want_ctypes_for_lyapounov = Lyapounov.getboolean('want_ctypes',True)
       tab_boundary_condition[0] = 'open'
 
@@ -388,12 +394,13 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     n_kpm = None
     want_ctypes_for_spectral_function = None
     allow_unsafe_energy_bounds = None
-    e_min = None
-    e_max = None
-    number_of_e_steps = None
-    e_histogram = None
-    lyapounov_min = None
-    lyapounov_max = None
+#    e_min = None
+#    e_max = None
+#    number_of_e_steps = None
+#    e_histogram = None
+#    lyapounov_min = None
+#    lyapounov_max = None
+    energy = None
     want_ctypes_for_lyapounov = None
     i0 = None
     nrescale = None
@@ -428,8 +435,10 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
       spectre_min, spectre_max, spectre_resolution, multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds = \
         comm.bcast((spectre_min, spectre_max, spectre_resolution,multiplicative_factor_for_interaction_in_spectral_function, n_kpm, want_ctypes_for_spectral_function, allow_unsafe_energy_bounds))
     if 'Lyapounov' in my_list_of_sections:
-      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale = \
-        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale))
+#      e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale = \
+#        comm.bcast((e_min, e_max, number_of_e_steps, e_histogram, lyapounov_min, lyapounov_max, number_of_bins, want_ctypes_for_lyapounov, i0, nrescale))
+      energy, want_ctypes_for_lyapounov, i0, nrescale = \
+        comm.bcast((energy, want_ctypes_for_lyapounov, i0, nrescale))
 
 
   geometry = anderson.geometry.Geometry(dimension, tab_dim, tab_delta, use_mkl_random=use_mkl_random, use_mkl_fft=use_mkl_fft, spin_one_half=spin_one_half, reproducible_randomness=reproducible_randomness, custom_seed=custom_seed )
@@ -513,7 +522,7 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 
 # Define the structure of lyapounov
   if 'Lyapounov' in my_list_of_sections:
-    lyapounov = anderson.lyapounov.Lyapounov(e_min,e_max,number_of_e_steps,want_ctypes=want_ctypes_for_lyapounov, i0=i0, nrescale=nrescale)
+    lyapounov = anderson.lyapounov.Lyapounov(energy=energy,want_ctypes=want_ctypes_for_lyapounov, i0=i0, nrescale=nrescale)
     return_list.append(lyapounov)
 
   return_list.append(n_config)
@@ -642,10 +651,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
                  +'number of computed eigenvalues          = '+str(diagonalization.number_of_eigenvalues)+'\n'
   if not lyapounov == None:
     params_string += \
-                  'minimum energy                          = '+str(lyapounov.e_min)+'\n'\
-                 +'maximum energy                          = '+str(lyapounov.e_max)+'\n'\
-                 +'energy step                             = '+str(lyapounov.e_step)+'\n'\
-                 +'number of energy steps                  = '+str(lyapounov.number_of_e_steps)+'\n'\
+                  'energy                                  = '+str(lyapounov.energy)+'\n'\
                  +'use ctypes implementation               = '+str(lyapounov.use_ctypes)+'\n'\
                  +'number of skipped layers                = '+str(lyapounov.i0)+'\n'\
                  +'nrescale                                = '+str(lyapounov.nrescale)+'\n'
@@ -728,12 +734,13 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       column_2 = 'Normalized distribution'
       specific_string='Distribution of the r value for the eigenstates closer to the targeted energy\n'
     if data_type=='lyapounov':
-      column_1='Energy'
-      column_2='Lyapounov for the intensity (halve it for wavefunction)'
-      column_3='Std. deviation of Lyapounov'
-      column_4='Localization length for intensity (double it for wavefunction)'
-      column_5='Std. deviation of localization length'
-      specific_string='Lyapounov and localization length vs. energy\n'
+      column_1 = 'V0'
+      column_2 = 'Energy'
+      column_3 = 'Lyapounov for the wavefunction (double it for intensity)'
+      column_4 = 'Std. deviation of Lyapounov'
+      column_5 = 'Localization length for wavefunction (halve it for intensity)'
+      column_6 = 'Std. deviation of localization length'
+      specific_string='Lyapounov and localization length\n'
     list_of_columns = []
     tab_strings = []
 #    print(specific_string)
@@ -904,20 +911,23 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       next_column += 1
       array_to_print=np.column_stack(list_of_columns)
     if data_type in ['lyapounov']:
-      list_of_columns.append(tab_abscissa)
+      list_of_columns.append(tab_abscissa[0])
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
-      list_of_columns.append(data[0])
+      list_of_columns.append(tab_abscissa[1])
       tab_strings.append('Column '+str(next_column)+': '+column_2)
       next_column += 1
-      list_of_columns.append(data[1])
+      list_of_columns.append(data[0])
       tab_strings.append('Column '+str(next_column)+': '+column_3)
       next_column += 1
-      list_of_columns.append(1.0/data[0])
+      list_of_columns.append(data[1])
       tab_strings.append('Column '+str(next_column)+': '+column_4)
       next_column += 1
-      list_of_columns.append(data[1]/data[0]**2)
+      list_of_columns.append(1.0/data[0])
       tab_strings.append('Column '+str(next_column)+': '+column_5)
+      next_column += 1
+      list_of_columns.append(data[1]/data[0]**2)
+      tab_strings.append('Column '+str(next_column)+': '+column_6)
       next_column += 1
 
       array_to_print=np.column_stack(list_of_columns)

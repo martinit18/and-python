@@ -149,6 +149,22 @@ class Hamiltonian(Geometry):
       self.mask = np.exp(-1000.0*(np.maximum(self.mask,1.0)-1.0)**2)
       self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
       return
+    if disorder_type=='spherical_speckle':
+      self.generate = 'field mask'
+      self.mask = np.zeros(tab_dim)
+      tab_k = list()
+      for i in range(dimension):
+        toto = np.zeros(tab_dim[i])
+        half_size = tab_dim[i]//2+1
+        toto[0:half_size] = (np.arange(half_size)*2.0*np.pi*self.correlation_length/(self.tab_dim[i]*self.tab_delta[i]))**2
+        toto[tab_dim[i]+1-half_size:tab_dim[i]] = toto[half_size-1:0:-1]
+        tab_k.append(toto)
+      tab_distance = np.meshgrid(*tab_k,indexing='ij')
+      for i in range(dimension):
+         self.mask += tab_distance[i]
+      self.mask = np.exp(-10.0*(self.mask-1.0)**2)
+      self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
+      return
     """
     if disorder_type=='singapore':
       self.generate = 'simple mask'
