@@ -37,7 +37,7 @@ t_max = 1200.0
 delta_t = 10.0
 
 [Averaging]
-n_config = 1
+n_config = 8
 
 [Measurement]
 delta_t_dispersion = 5.0
@@ -67,10 +67,7 @@ e_max= 10.
 # Multiplicative factor for the in#teraction coefficient
 multiplicative_factor_for_interaction = 0.0
 
-[Lyapounov]
-e_min = 1.5
-e_max = 1.5
-number_of_e_steps = 0
+energy = 1.5
 want_ctypes = True
 number_of_skipped_layers = 0
 nrescale = 10

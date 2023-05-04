@@ -61,8 +61,6 @@ e_max= 10.
 multiplicative_factor_for_interaction = 0.0
 
 [Lyapounov]
-e_min = -0.5
-e_max = 4.5
-number_of_e_steps = 50
+energy = -0.4
 want_ctypes = False
 

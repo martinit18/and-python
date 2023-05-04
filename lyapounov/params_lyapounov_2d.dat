@@ -61,9 +61,7 @@ e_max= 10.
 multiplicative_factor_for_interaction = 0.0
 
 [Lyapounov]
-e_min = 9.0
-e_max = 9.0
-number_of_e_steps = 0
+energy = 9.0
 want_ctypes = False
 number_of_skipped_layers = 0
-nrescale = 1
+nrescale = 10
