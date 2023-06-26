@@ -5,7 +5,7 @@ Created on Thu Dec 12 16:33:12 2019
 
 @author: delande
 """
- 
+
 import math
 import numpy as np
 from scipy.integrate import ode
@@ -19,15 +19,15 @@ def numba_decorator(x):
   try:
     import numba
     return numba.jit(nopython=True,fastmath=True,cache=True)(x)
-  except: 
+  except:
     print('numba package not found, this will use the slower regular Python version')
     return(x)
-  pass  
+  pass
 
 from anderson.wavefunction import Wavefunction
 
 class Temporal_Propagation:
-  def __init__(self, t_max, delta_t, method='che', accuracy=1.e-6, accurate_bounds=False, data_layout='real', want_ctypes=True, H=None):      
+  def __init__(self, t_max, delta_t, method='che', accuracy=1.e-6, accurate_bounds=False, data_layout='real', want_ctypes=True, H=None):
     self.t_max = t_max
     self.method = method
     self.want_ctypes = want_ctypes
@@ -569,7 +569,7 @@ def chebyshev_propagation_generic(wfc, H, propagation,timing):
   return
 
 
- 
+
 def gross_pitaevskii(t, wfc, H, data_layout, rhs, timing):
     """Returns rhs of Gross-Pitaevskii equation with discretized space
     For data_layout == 'complex':
@@ -605,7 +605,7 @@ class Spectral_function:
     self.n_pts = int(e_range/e_resolution+1.5)
 # In case e_range/e_resolution is not an integer, I keep e_resolution and rescale e_range
     self.e_min = e_middle - 0.5*e_resolution*(self.n_pts-1)
-    self.e_max = e_middle + 0.5*e_resolution*(self.n_pts-1)  
+    self.e_max = e_middle + 0.5*e_resolution*(self.n_pts-1)
 # The KPM calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
 # This avoids the divergence of the denominator at edges
 # Create the array of x values for which the spectral function is computed
@@ -629,7 +629,7 @@ class Spectral_function:
         print('The energy range for the spectral function is too small, I stop!\n'\
               'the minimum energy is ',self.e_min,' and should be smaller than 0.0\n'\
               'the maximum energy is ',self.e_max,' and should be larger  than ',2.0*H.diagonal)
-        sys.exit() 
+        sys.exit()
 # Is there a ctypes implementation?
     self.has_chebyshev_kpm_routine = False
     if not H.spin_one_half and self.want_ctypes_for_spectral_function:
@@ -658,7 +658,7 @@ class Spectral_function:
       self.chebyshev_kpm_routine = self.chebyshev_kpm_step
     return
 
-  
+
   def chebyshev_kpm_step(self, H, psi, psi_old, c1, c2):
 # Generic code uses the sparse multiplication
     psi_old[:] = c1*H.apply_h(psi)-c2*psi[:]-psi_old[:]
@@ -668,13 +668,13 @@ class Spectral_function:
 
   def chebyshev_kpm_step_ctypes(self, H, psi, psi_old, c1, c2):
     self.chebyshev_ctypes_lib.chebyshev_kpm_step(H.dimension, np.asarray(H.tab_dim,dtype=np.intc), H.array_boundary_condition,\
-      psi.ravel(), psi_old.ravel(), H.disorder.ravel(), np.asarray(H.tab_tunneling), c1, c2) 
-    return  
+      psi.ravel(), psi_old.ravel(), H.disorder.ravel(), np.asarray(H.tab_tunneling), c1, c2)
+    return
 
   def normalize(self, n):
     self.tab_spectrum /= n
     return
-  
+
   def mpi_merge(self, comm, timing):
     start_mpi_time = timeit.default_timer()
     try:
@@ -686,30 +686,30 @@ class Spectral_function:
     comm.Reduce(self.tab_spectrum,toto)
     self.tab_spectrum = np.copy(toto)
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
-    return    
+    return
 
 
   def compute_spectral_function(self, i_seed, geometry, initial_state, H, timing, debug=False, build_disorder=True, build_initial_state=True):
     start_dummy_time=timeit.default_timer()
     if build_disorder and (H.randomize_hamiltonian or H.seed==0):
-      if geometry.reproducible_randomness:        
+      if geometry.reproducible_randomness:
         seed = i_seed+1234+H.custom_seed
       else:
         seed = None
-#      print(i_seed,seed)  
-      H.generate_disorder(seed) 
+#      print(i_seed,seed)
+      H.generate_disorder(seed)
 #      H.energy_range(accurate=propagation.accurate_bounds)
-    print
+#    print(H.disorder)
     if build_initial_state and (initial_state.randomize_initial_state or initial_state.seed==0):
-      if geometry.reproducible_randomness:        
+      if geometry.reproducible_randomness:
         seed = i_seed+2345+H.custom_seed
       else:
         seed = None
-      initial_state.prepare_initial_state(seed)  
-    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)      
+      initial_state.prepare_initial_state(seed)
+    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
     start_kpm_time = timeit.default_timer()
-    if H.interaction*self.multiplicative_factor_for_interaction != 0.0:  
-# Modify the disorder to take into account part of the interaction term      
+    if H.interaction*self.multiplicative_factor_for_interaction != 0.0:
+# Modify the disorder to take into account part of the interaction term
       H.disorder = H.disorder + H.interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
 # If there is no specific apply_h routine, a sparse version of the Hamiltonian is used
 # This sparse matrix must be generated
@@ -720,12 +720,12 @@ class Spectral_function:
     psi_old = np.zeros_like(psi)
     n_kpm = self.n_kpm
 # The calculation is performed in the interval [e_min-e_resolution, e_max+e_resolution]
-# This avoids the divergence of the denominator at edges  
+# This avoids the divergence of the denominator at edges
     c1 = 2.0/(self.e_max-self.e_min+2.0*self.e_resolution)
     c2 = 0.5*c1*(self.e_max+self.e_min)
     tab_mu = np.zeros(n_kpm+1)
 # Jackson damping
-# tab_g = np.ones(n_kpm+1) 
+# tab_g = np.ones(n_kpm+1)
     tab_g = (np.linspace(n_kpm+2,1,num=n_kpm+1)*np.cos(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))\
            +np.sin(np.pi*np.linspace(0,n_kpm+1,num=n_kpm+1)/(n_kpm+2))/np.tan(np.pi/(n_kpm+2)))/(n_kpm+2)
 #  print(tab_g)
@@ -739,16 +739,16 @@ class Spectral_function:
     tab_T_old = np.ones(self.n_pts)
     tab_T = self.tab_x*tab_T_old
     tab_spectrum = tab_mu[0]*tab_T_old+2.0*tab_mu[1]*tab_T*tab_g[1]
-    """  
-# Range for the old method  
+    """
+# Range for the old method
     for i in range(2,n_kpm+1):
       psi_old, psi = psi, psi_old
       self.chebyshev_kpm_routine(H, psi, psi_old, c1, c2)
-# The old method    
+# The old method
       tab_mu[i] = np.vdot(initial_state.wfc.ravel(),psi_old).real*H.delta_vol
 #      print(i,tab_mu[i])
 
-    """  
+    """
 # The improved method which saves a factor 2
     tab_mu[2] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
 # Range for the improved method
@@ -760,19 +760,19 @@ class Spectral_function:
       if 2*i<n_kpm+1:
         tab_mu[2*i] = 2.0*np.vdot(psi_old,psi_old).real*H.delta_vol-tab_mu[0]
 #        print(2*i,tab_mu[2*i])
-# print(tab_mu)    
+# print(tab_mu)
     timing.KPM_TIME += (timeit.default_timer() - start_kpm_time)
 # Count of operations: (8+7*H.dimension)*H.hs_dim comes from each kpm routine (assuming it is the ctypes version)
-# 8*H.hs_dim comes from each scalar product (vdot operation)    
+# 8*H.hs_dim comes from each scalar product (vdot operation)
     timing.KPM_NOPS += n_kpm*(12.0+3.5*H.dimension)*H.hs_dim
     start_dummy_time = timeit.default_timer()
 # Restore the initial disorder
-    if H.interaction*self.multiplicative_factor_for_interaction != 0.0:  
+    if H.interaction*self.multiplicative_factor_for_interaction != 0.0:
       H.disorder = H.disorder - H.interaction*self.multiplicative_factor_for_interaction*(np.abs(initial_state.wfc)**2)
-    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)    
+    timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
     start_spectrum_time = timeit.default_timer()
 # If the number of operations is large enough, use the numba version
-# Otherwise, stick to the simple Python version    
+# Otherwise, stick to the simple Python version
     if self.n_pts*n_kpm>1.e6:
       tab_spectrum = compute_spectral_function_from_mu(n_kpm,tab_T,tab_T_old,self.tab_x,tab_mu,tab_g,tab_spectrum)
     else:
@@ -782,10 +782,10 @@ class Spectral_function:
         tab_T, tab_T_old = tab_T_old, tab_T
     timing.SPECTRUM_TIME += (timeit.default_timer() - start_spectrum_time)
     timing.SPECTRUM_NOPS += 7.0*self.n_pts*n_kpm
-    return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-self.tab_x**2)*(self.e_max-self.e_min+2.0*self.e_resolution))    
+    return 2.0*tab_spectrum/(np.pi*np.sqrt(1.0-self.tab_x**2)*(self.e_max-self.e_min+2.0*self.e_resolution))
 
 
-@numba_decorator  
+@numba_decorator
 def compute_spectral_function_from_mu(n_kpm,tab_T,tab_T_old,tab_x,tab_mu,tab_g,tab_spectrum):
   for i in range(2,n_kpm+1):
     tab_T_old = 2.0*tab_x*tab_T-tab_T_old
@@ -793,14 +793,14 @@ def compute_spectral_function_from_mu(n_kpm,tab_T,tab_T_old,tab_x,tab_mu,tab_g,t
     tab_T, tab_T_old = tab_T_old, tab_T
   return tab_spectrum
 
-     
+
 def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, timing, debug=False, spectral_function=None):
 
   def solout(t,y):
     timing.N_SOLOUT+=1
 #    print(t,timing.N_SOLOUT)
     return None
-  
+
 #  print('Inside GPE build_disorder = ',build_disorder)
 # print('0',initial_state.type)
   start_dummy_time=timeit.default_timer()
@@ -811,23 +811,23 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
   hs_dim = geometry.hs_dim
   accuracy = propagation.accuracy
   if H.randomize_hamiltonian or H.seed==0:
-    if geometry.reproducible_randomness:        
+    if geometry.reproducible_randomness:
       seed = i_seed+1234+H.custom_seed
     else:
       seed = None
-#      print(i_seed,seed)  
-    H.generate_disorder(seed) 
+#      print(i_seed,seed)
+    H.generate_disorder(seed)
     measurement.perform_measurement_potential(H)
  #      H.energy_range(accurate=propagation.accurate_bounds)
 #  print(initial_state.randomize_initial_state)
   if initial_state.randomize_initial_state or initial_state.seed==0:
-    if geometry.reproducible_randomness:        
+    if geometry.reproducible_randomness:
       seed = i_seed+2345+H.custom_seed
     else:
       seed = None
-    initial_state.prepare_initial_state(seed)  
+    initial_state.prepare_initial_state(seed)
   psi = Wavefunction(geometry)
-  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)  
+  timing.DUMMY_TIME+=(timeit.default_timer() - start_dummy_time)
   if propagation.method=='che':
     H.energy_range(accurate=propagation.accurate_bounds)
 #    H.energy_range(accurate=True)
@@ -862,7 +862,7 @@ def gpe_evolution(i_seed, geometry, initial_state, H, propagation, measurement, 
 
   start_expect_time = timeit.default_timer()
 # Keeping the initial state is needed when the autocorrelation <psi(0)|psi(t)> is measured
-  if measurement.measure_autocorrelation or measurement.measure_overlap: 
+  if measurement.measure_autocorrelation or measurement.measure_overlap:
     init_state_autocorr = copy.deepcopy(initial_state)
   else:
     init_state_autocorr = None
@@ -1295,7 +1295,7 @@ def compute_spectral_function(i_seed, geometry, initial_state, H, propagation, m
   save_interaction = H.interaction
   save_disorder = copy.deepcopy(H.disorder)
   if build_initial_state:
-    initial_state.prepare_initial_state(seed=i_seed+2345)  
+    initial_state.prepare_initial_state(seed=i_seed+2345)
 #  print(save_disorder)
 #  save_disorder = H.disorder
   H.interaction = 0.0

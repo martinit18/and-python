@@ -222,11 +222,11 @@ class Hamiltonian(Geometry):
 # Here, this is forced using the np.add() routine with the optional argument order='C'
 # Thus, do not use the simple addition which looks simpler
     if self.disorder_type=='anderson_uniform':
-      self.disorder = np.add(self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim),self.diagonal,order='C')/np.sqrt(self.delta_vol)
+      self.disorder = np.add(self.disorder_strength*my_rng.uniform(-0.5,0.5,self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol),self.diagonal,order='C')
 #      print(self.disorder)
       return
     if self.disorder_type=='anderson_gaussian':
-      self.disorder = np.add(self.disorder_strength*my_rng.standard_normal(self.ntot).reshape(self.tab_dim),self.diagonal,order='C')/np.sqrt(self.delta_vol)
+      self.disorder = np.add(self.disorder_strength*my_rng.standard_normal(self.ntot).reshape(self.tab_dim)/np.sqrt(self.delta_vol),self.diagonal,order='C')
 #      print(self.disorder.shape,self.disorder.dtype)
       return
     if self.disorder_type=='nice':
