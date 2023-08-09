@@ -661,7 +661,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
 
 
 def output_density(file,data,geometry,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
-#  print(data.shape)
+  print('data shape :',data.shape)
 #  print(tab_abscissa)
   if file_type=='savetxt':
     if data_type=='potential':
@@ -706,10 +706,12 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
     if data_type=='spectral_function':
       column_1='Energy'
       column_2='Spectral function'
+      column_3='Standard deviation of spectral function'
       specific_string='Spectral function\n'
     if data_type=='density_of_states':
       column_1='Energy'
       column_2='Density of states'
+      column_3='Standard deviation of density of states'
       specific_string='Density of states\n'
     if data_type=='g1':
       column_1='Relative position'
@@ -897,15 +899,19 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       tab_strings.append('Column '+str(next_column)+': '+column_3)
       next_column += 1
       array_to_print=np.column_stack(list_of_columns)
-    if data_type in ['spectral_function','density_of_states','histogram_IPR','rbar','histogram_r']:
+    if data_type in ['spectral_function','density_of_states']:
       list_of_columns.append(tab_abscissa)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
       list_of_columns.append(data)
       tab_strings.append('Column '+str(next_column)+': '+column_2)
       next_column += 1
+      list_of_columns.append(data**2)
+      tab_strings.append('Column '+str(next_column)+': '+column_3)
+      next_column += 1
       array_to_print=np.column_stack(list_of_columns)
-    if data_type in ['IPR']:
+      print('array to print = ',array_to_print)
+    if data_type in ['IPR','rbar','histogram_r']:
       list_of_columns.append(data)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
@@ -930,7 +936,8 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       tab_strings.append('Column '+str(next_column)+': '+column_6)
       next_column += 1
 
-      array_to_print=np.column_stack(list_of_columns)
+    array_to_print=np.column_stack(list_of_columns)
+ #   print(list_of_columns)
  #   print(list_of_columns,len(list_of_columns))
  #   if len(list_of_columns) == 1:
  #     array_to_print = list_of_columns

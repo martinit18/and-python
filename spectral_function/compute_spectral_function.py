@@ -112,19 +112,24 @@ def main():
   if rank==0:
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function)
 #  print(header_string)
-# If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop  
+# If the Hamiltonian is not randomized for each disorder configuration, it must be set once before the loop
 #  if not  H.randomize_hamiltonian:
 #    H.generate_disorder(seed=1234)
 #    H.generate_sparse_matrix()
 #    H.energy_range(accurate=propagation.accurate_bounds)
-# If the initial state is not randomized for each disorder configuration, it must be set once before the loop  
+# If the initial state is not randomized for each disorder configuration, it must be set once before the loop
 #  if not initial_state.randomize_initial_state:
-#    initial_state.prepare_initial_state(seed=2345)  
+#    initial_state.prepare_initial_state(seed=2345)
 # Here starts the loop over disorder configurations
   for i in range(n_config):
 #    print(i,H.randomize_hamiltonian)
-# Compute the spectral function and accumulate it
-    spectral_function.tab_spectrum += spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
+# Compute the spectral function and accumulate it, together with its square in order to have error bars
+    partial_spectral_function = spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
+    print('i=',i, 'partial spectral function = ',partial_spectral_function[0:3],'\n')
+    spectral_function.tab_spectrum += partial_spectral_function
+    spectral_function.tab_spectrum2 += partial_spectral_function**2
+#    print(spectral_function.tab_spectrum[0:3])
+    print('i=',i,'cumulative spectral_function and square',spectral_function.tab_spectrum[0:3],spectral_function.tab_spectrum2[0:3],'\n')
   if mpi_version:
     spectral_function.mpi_merge(comm,my_timing)
   t2 = time.perf_counter()
@@ -136,8 +141,9 @@ def main():
     spectral_function.normalize(n_config*nprocs)
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function, timing=my_timing)
     anderson.io.print_spectral_function(spectral_function,geometry,initial_state=initial_state,header_string=header_string)
-
-
+    print('Final spectral function = ',spectral_function.tab_spectrum[0:3])
+    print('Final spectral function square= ',spectral_function.tab_spectrum2[0:3])
+#   print(spectral_function.tab_spectrum2[0:3])
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))
     print("Wallclock time {0:.3f} seconds".format(t2-t1))

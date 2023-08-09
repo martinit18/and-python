@@ -613,6 +613,7 @@ class Spectral_function:
 #    print(self.tab_x)
     self.tab_energies = np.linspace(self.e_min,self.e_max,num=self.n_pts)
     self.tab_spectrum = np.zeros(self.n_pts)
+    self.tab_spectrum2 = np.zeros(self.n_pts)
     self.e_resolution = e_resolution
     self.multiplicative_factor_for_interaction = multiplicative_factor_for_interaction_in_spectral_function
     self.n_kpm = n_kpm
@@ -673,6 +674,7 @@ class Spectral_function:
 
   def normalize(self, n):
     self.tab_spectrum /= n
+    self.tab_spectrum2 /= n
     return
 
   def mpi_merge(self, comm, timing):
@@ -685,6 +687,9 @@ class Spectral_function:
     toto = np.empty_like(self.tab_spectrum)
     comm.Reduce(self.tab_spectrum,toto)
     self.tab_spectrum = np.copy(toto)
+    toto = np.empty_like(self.tab_spectrum2)
+    comm.Reduce(self.tab_spectrum2,toto)
+    self.tab_spectrum2 = np.copy(toto)
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 

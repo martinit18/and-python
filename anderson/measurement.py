@@ -74,7 +74,7 @@ class Measurement(Geometry):
 #        print(self.tab_spectrum)
 #    tab_time[0:dim_tab_time_propagation,1] = 1
     else:
-    """  
+    """
     dim_tab_time_propagation = int(t_max/delta_t+0.999)
     dim_tab_time_dispersion = int(t_max/self.delta_t_dispersion+0.999)
     number_of_measurements_dispersion = dim_tab_time_dispersion+1
@@ -166,8 +166,9 @@ class Measurement(Geometry):
 #      print('Measure spectral function = ',self.measure_spectral_function)
     if self.measure_spectral_function:
       self.tab_spectrum = np.zeros((spectral_function.n_pts,number_of_measurements_spectral_function))
+      self.tab_spectrum2 = np.zeros((spectral_function.n_pts,number_of_measurements_spectral_function))
       self.tab_energies = spectral_function.tab_energies
-    else:  
+    else:
       self.tab_time[:,3]=0.0
     self.tab_t_measurement_spectral_function = self.tab_time[self.tab_time[:,3]==1.0,0]
 # What follows is the code for the intermediate times
@@ -264,6 +265,8 @@ class Measurement(Geometry):
       self.overlap += measurement.overlap
     if self.measure_spectral_function:
       self.tab_spectrum += measurement.tab_spectrum
+      self.tab_spectrum2 += (measurement.tab_spectrum)**2
+      print('In merge_measurement',self.tab_spectrum[0:3],self.tab_spectrum2[0:3])
     return
 
   def mpi_merge_measurement(self,comm,timing):
@@ -360,6 +363,9 @@ class Measurement(Geometry):
       toto = np.empty_like(self.tab_spectrum)
       comm.Reduce(self.tab_spectrum,toto)
       self.tab_spectrum = np.copy(toto)
+      toto = np.empty_like(self.tab_spectrum2)
+      comm.Reduce(self.tab_spectrum2,toto)
+      self.tab_spectrum2 = np.copy(toto)
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 
@@ -497,6 +503,7 @@ class Measurement(Geometry):
       self.overlap /= n_config
     if self.measure_spectral_function:
       self.tab_spectrum /= n_config
+      self.tab_spectrum2 /= n_config
     self.tab_strings = tab_strings
     self.tab_dispersion = np.column_stack(list_of_columns)
     self.tab_dispersion_2 = np.column_stack(list_of_columns_2)
