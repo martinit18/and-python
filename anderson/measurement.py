@@ -502,8 +502,10 @@ class Measurement(Geometry):
     if self.measure_overlap:
       self.overlap /= n_config
     if self.measure_spectral_function:
+      print('grrrrr')
       self.tab_spectrum /= n_config
       self.tab_spectrum2 /= n_config
+      self.tab_spectrum2 = (np.sqrt(self.tab_spectrum2-self.tab_spectrum**2)/n_config)
     self.tab_strings = tab_strings
     self.tab_dispersion = np.column_stack(list_of_columns)
     self.tab_dispersion_2 = np.column_stack(list_of_columns_2)

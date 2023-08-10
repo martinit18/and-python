@@ -125,11 +125,16 @@ def main():
 #    print(i,H.randomize_hamiltonian)
 # Compute the spectral function and accumulate it, together with its square in order to have error bars
     partial_spectral_function = spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
-    print('i=',i, 'partial spectral function = ',partial_spectral_function[0:3],'\n')
+#    print('i=',i, 'partial spectral function = ',partial_spectral_function[105:108],'\n')
     spectral_function.tab_spectrum += partial_spectral_function
     spectral_function.tab_spectrum2 += partial_spectral_function**2
-#    print(spectral_function.tab_spectrum[0:3])
-    print('i=',i,'cumulative spectral_function and square',spectral_function.tab_spectrum[0:3],spectral_function.tab_spectrum2[0:3],'\n')
+# normalize spectral_function.tab_spectrum and put the error bar in spectral_function.tab_spectrum2
+  spectral_function.tab_spectrum /= n_config
+  spectral_function.tab_spectrum2 /= n_config
+  spectral_function.tab_spectrum2 = np.sqrt((spectral_function.tab_spectrum2-spectral_function.tab_spectrum**2)/n_config)
+#  spectral_function.tab_spectrum2 -= (spectral_function.tab_spectrum**2)/n_config
+#  print(spectral_function.tab_spectrum[0:3])
+#  print('i=',i,'cumulative spectral_function and square',spectral_function.tab_spectrum[105:108],spectral_function.tab_spectrum2[105:108]-spectral_function.tab_spectrum[105:108]**2,'\n')
   if mpi_version:
     spectral_function.mpi_merge(comm,my_timing)
   t2 = time.perf_counter()
@@ -138,11 +143,11 @@ def main():
     my_timing.mpi_merge(comm)
   if rank==0:
     environment_string+='Calculation   ended on: {}'.format(time.asctime())+'\n\n'
-    spectral_function.normalize(n_config*nprocs)
+#    spectral_function.normalize(n_config*nprocs)
     header_string = environment_string+anderson.io.output_string(H,n_config,nprocs,initial_state=initial_state,spectral_function=spectral_function, timing=my_timing)
     anderson.io.print_spectral_function(spectral_function,geometry,initial_state=initial_state,header_string=header_string)
-    print('Final spectral function = ',spectral_function.tab_spectrum[0:3])
-    print('Final spectral function square= ',spectral_function.tab_spectrum2[0:3])
+#    print('Final spectral function = ',spectral_function.tab_spectrum[0:3])
+#    print('Final spectral function square= ',spectral_function.tab_spectrum2[0:3])
 #   print(spectral_function.tab_spectrum2[0:3])
     final_time = time.asctime()
     print("Python script ended on: {}".format(final_time))

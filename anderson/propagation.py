@@ -684,12 +684,16 @@ class Spectral_function:
     except ImportError:
       print("mpi4py is not found!")
       return
+    nprocs = comm.Get_size()
+#    print('Inside mpi_merge: nprocs =', nprocs)
     toto = np.empty_like(self.tab_spectrum)
     comm.Reduce(self.tab_spectrum,toto)
-    self.tab_spectrum = np.copy(toto)
+    self.tab_spectrum = np.copy(toto)/nprocs
+# At this stage, self.tab_spectrum2 is already the error bar over n_config configurations, computed by each process
+# One first has to go back to raw data
     toto = np.empty_like(self.tab_spectrum2)
-    comm.Reduce(self.tab_spectrum2,toto)
-    self.tab_spectrum2 = np.copy(toto)
+    comm.Reduce(self.tab_spectrum2+self.tab_spectrum**2,toto)
+    self.tab_spectrum2 = np.sqrt(np.copy(toto/nprocs))
     timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
     return
 

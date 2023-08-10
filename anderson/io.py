@@ -661,7 +661,7 @@ def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measur
 
 
 def output_density(file,data,geometry,header_string='Origin of data not specified',data_type='density',tab_abscissa=[],file_type='savetxt'):
-  print('data shape :',data.shape)
+#  print('data shape :',data.shape)
 #  print(tab_abscissa)
   if file_type=='savetxt':
     if data_type=='potential':
@@ -903,14 +903,14 @@ def output_density(file,data,geometry,header_string='Origin of data not specifie
       list_of_columns.append(tab_abscissa)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
       next_column += 1
-      list_of_columns.append(data)
+      list_of_columns.append(data[:,0])
       tab_strings.append('Column '+str(next_column)+': '+column_2)
       next_column += 1
-      list_of_columns.append(data**2)
+      list_of_columns.append(data[:,1])
       tab_strings.append('Column '+str(next_column)+': '+column_3)
       next_column += 1
       array_to_print=np.column_stack(list_of_columns)
-      print('array to print = ',array_to_print)
+#      print('array to print = ',array_to_print)
     if data_type in ['IPR','rbar','histogram_r']:
       list_of_columns.append(data)
       tab_strings.append('Column '+str(next_column)+': '+column_1)
@@ -1044,9 +1044,8 @@ def print_spectral_function(spectral_function,geometry,initial_state=None,header
   else:
     base_string='spectral_function'
     data_type='spectral_function'
-  anderson.io.output_density(base_string+'.dat',spectral_function.tab_spectrum,geometry,header_string=header_string,tab_abscissa=spectral_function.tab_energies,data_type=data_type)
+  anderson.io.output_density(base_string+'.dat',np.column_stack((spectral_function.tab_spectrum,spectral_function.tab_spectrum2)),geometry,header_string=header_string,tab_abscissa=spectral_function.tab_energies,data_type=data_type)
   return
-
 """
 def print_measurements_initial(measurement,initial_state,header_string='Origin of data not specified'):
   if (measurement.measure_density):
