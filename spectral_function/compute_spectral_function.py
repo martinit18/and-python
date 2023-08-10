@@ -126,8 +126,10 @@ def main():
 # Compute the spectral function and accumulate it, together with its square in order to have error bars
     partial_spectral_function = spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
 #    print('i=',i, 'partial spectral function = ',partial_spectral_function[105:108],'\n')
+    print('process ',rank,' config ',i,':', partial_spectral_function[220])
     spectral_function.tab_spectrum += partial_spectral_function
     spectral_function.tab_spectrum2 += partial_spectral_function**2
+
 # normalize spectral_function.tab_spectrum and put the error bar in spectral_function.tab_spectrum2
   spectral_function.tab_spectrum /= n_config
   spectral_function.tab_spectrum2 /= n_config
