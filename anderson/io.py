@@ -89,7 +89,13 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
     disorder_strength = V0
     non_diagonal_disorder_strength = Disorder.getfloat('non_diagonal_disorder_strength',0.0)
     b = Disorder.getint('b',1)
-
+    
+# Addition by JPB for the Palaiseau disorder
+    wavelength_laser   = Disorder.getfloat('wavelength',0.0)
+    diameter_diaphragm = Disorder.getfloat('diaphragm',0.0)
+    waist_lense        = Disorder.getfloat('waist',0.0)
+    focal_length       = Disorder.getfloat('focal',0.0)
+    
 # Optional Spin section
     if 'Spin' in my_list_of_sections:
       if not config.has_section('Spin'):
