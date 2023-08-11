@@ -17,6 +17,10 @@ from anderson.wavefunction import Wavefunction
 #import os
 #import numba
 
+# added by JPB
+from anderson.functions_speckle import *
+# end JPB
+
 def numba_decorator(x):
   try:
     import numba
@@ -34,7 +38,7 @@ They are used in the rescaling of the Hamiltonian to bring its spectrum between 
 """
 
 class Hamiltonian(Geometry):
-  def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', randomize_hamiltonian=True, one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, interaction=0.0):
+  def __init__(self, geometry, tab_boundary_condition, disorder_type='anderson_gaussian', randomize_hamiltonian=True, one_over_mass=1.0,  correlation_length=0.0, disorder_strength=0.0, non_diagonal_disorder_strength=0.0, b=1, interaction=0.0, wavelength_laser=1.0, diameter_diaphragm = 1.0, waist_lense = 1.0, focal_length = 1.0):
     super().__init__(geometry.dimension,geometry.tab_dim,geometry.tab_delta,use_mkl_random=geometry.use_mkl_random,use_mkl_fft=geometry.use_mkl_fft,spin_one_half=geometry.spin_one_half, reproducible_randomness=geometry.reproducible_randomness, custom_seed=geometry.custom_seed)
 # seed is set to zero to recognize a generic Hamiltonian where the disorder has not been yet set
     self.seed = 0
@@ -67,6 +71,13 @@ class Hamiltonian(Geometry):
 #    self.script_tunneling = 0.
 #    self.script_disorder = np.zeros(tab_dim)
 #    self.medium_energy = 0.
+# added by JPB
+    self.wavelength_laser   = wavelength_laser
+    self.wavenumber_laser   = 2. * np.pi / (wavelength_laser)
+    self.diameter_diaphragm = diameter_diaphragm
+    self.waist_lense	    = waist_lense
+    self.focal_length	    = focal_length
+# end JPB
 
 # In general, there is no specific routine for applying Hamiltonian on vector
 # and one then uses sparse multiplication
@@ -133,6 +144,11 @@ class Hamiltonian(Geometry):
       self.mask = np.exp(self.mask)
       self.mask *= np.sqrt(self.ntot/np.sum(self.mask**2))
       return
+# added by JPB    
+    if disorder_type=='palaiseau':
+      self.generate = 'palaiseau'
+# end JPB
+
     if disorder_type=='circular_speckle':
       self.generate = 'field mask'
       self.mask = np.zeros(tab_dim)
@@ -250,13 +266,30 @@ class Hamiltonian(Geometry):
 #      self.print_potential()
 #      print(self.disorder.shape,self.disorder.dtype)
       return
-    sys.exit('Disorder '+self.disorder_type+' not yet implemented!')
+    
+# The disorder 'palaiseau' is a speckle corresponding to the Palaiseau experiment
+    if self.generate=='palaiseau':
+      kxgrid  = fourier_axis_k(self.tab_dim[0],self.tab_dim[0]*self.tab_delta[0])
+      kygrid  = fourier_axis_k(self.tab_dim[1],self.tab_dim[1]*self.tab_delta[1])
+      zgrid   = fourier_axis_x(self.tab_dim[2],self.tab_dim[2]*self.tab_delta[2])
+      px, py  = np.meshgrid(kxgrid,kygrid)
+      p       = np.sqrt(px**2+py**2)
+      power   = modulated_power_spectrum(p,self.wavenumber_laser,self.diameter_diaphragm,self.focal_length,self.waist_lense,zgrid)
+      ep      = generate_random_array(self.tab_dim[0],self.tab_dim[1])
+      speckle = generate_speckle(self.tab_dim[0],self.tab_dim[1],self.tab_dim[2],power,ep)
+      self.disorder = self.diagonal + self.disorder_strength * speckle
+      self.print_potential()
+      return
+            
+      sys.exit('Disorder '+self.disorder_type+' not yet implemented!')
     return
 
-#  def print_potential(self,filename='potential.dat'):
-#    np.savetxt(filename,self.disorder-2.0*self.tunneling)
-#    return
-
+  def print_potential(self,filename='potential.dat'):
+    print(self.tab_dim)
+    print(self.tab_delta)
+    np.savetxt(filename,np.reshape(self.disorder,np.size(self.disorder)))#-2.0*self.tunneling
+    print('potential printed')
+    return 
   """
   Converts Hamiltonian to a full matrix for Lapack diagonalization
   """
