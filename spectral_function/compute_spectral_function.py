@@ -126,19 +126,22 @@ def main():
 # Compute the spectral function and accumulate it, together with its square in order to have error bars
     partial_spectral_function = spectral_function.compute_spectral_function(i+rank*n_config, geometry, initial_state, H, my_timing)
 #    print('i=',i, 'partial spectral function = ',partial_spectral_function[105:108],'\n')
-    print('process ',rank,' config ',i,':', partial_spectral_function[220])
+#    print('process ',rank,' config ',i,':', partial_spectral_function[220])
     spectral_function.tab_spectrum += partial_spectral_function
+#    print('partial tab_spectrum = ',partial_spectral_function[220])
     spectral_function.tab_spectrum2 += partial_spectral_function**2
+#    print('intermediate tab_spectrum = ',spectral_function.tab_spectrum[220],spectral_function.tab_spectrum2[220])
 
 # normalize spectral_function.tab_spectrum and put the error bar in spectral_function.tab_spectrum2
+
+  print('quasi final tab_spectrum = ',spectral_function.tab_spectrum[220], (spectral_function.tab_spectrum2[220]/n_config-(spectral_function.tab_spectrum[220]/n_config)**2))
+  spectral_function.tab_spectrum2 = np.sqrt(spectral_function.tab_spectrum2/n_config-(spectral_function.tab_spectrum/n_config)**2)
   spectral_function.tab_spectrum /= n_config
-  spectral_function.tab_spectrum2 /= n_config
-  spectral_function.tab_spectrum2 = np.sqrt((spectral_function.tab_spectrum2-spectral_function.tab_spectrum**2)/n_config)
 #  spectral_function.tab_spectrum2 -= (spectral_function.tab_spectrum**2)/n_config
 #  print(spectral_function.tab_spectrum[0:3])
 #  print('i=',i,'cumulative spectral_function and square',spectral_function.tab_spectrum[105:108],spectral_function.tab_spectrum2[105:108]-spectral_function.tab_spectrum[105:108]**2,'\n')
   if mpi_version:
-    spectral_function.mpi_merge(comm,my_timing)
+    spectral_function.mpi_merge(comm,n_config,my_timing)
   t2 = time.perf_counter()
   my_timing.TOTAL_TIME = t2-t1
   if mpi_version:

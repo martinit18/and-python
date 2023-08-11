@@ -677,7 +677,7 @@ class Spectral_function:
     self.tab_spectrum2 /= n
     return
 
-  def mpi_merge(self, comm, timing):
+  def mpi_merge(self, comm, n_config, timing):
     start_mpi_time = timeit.default_timer()
     try:
       from mpi4py import MPI
@@ -686,18 +686,28 @@ class Spectral_function:
       return
     nprocs = comm.Get_size()
     rank = comm.Get_rank()
-#    print('Inside mpi_merge: nprocs =', nprocs)
-    toto = np.empty_like(self.tab_spectrum)
-    comm.Reduce(self.tab_spectrum,toto)
-    self.tab_spectrum = np.copy(toto)/nprocs
+#    print('Inside mpi_merge: nprocs =', nprocs),
+#    print('Inside mpi_merge process : ',rank,'tab_spectrum = ',self.tab_spectrum[220],self.tab_spectrum2[220])
 # At this stage, self.tab_spectrum2 is already the error bar over n_config configurations, computed by each process
-# One first has to go back to raw data
-    self.tab_spectrum2 = self.tab_spectrum2**2*nprocs
-    toto = np.empty_like(self.tab_spectrum2)
-    comm.Reduce(self.tab_spectrum2+nprocs**2*self.tab_spectrum**2,toto)
-    self.tab_spectrum2 = np.sqrt(np.copy(toto/nprocs))
-    print('Inside mpi_merge process : ',rank, 'nprocs = ',nprocs,'tab_spectrum = ',self.tab_spectrum[220:223])
-    timing.MPI_TIME+=(timeit.default_timer() - start_mpi_time)
+# First thing to do: starting from tab_spectrum and tab_spectrum2, reconstruct for eacy process the partial sums
+    self.tab_spectrum2 = n_config*self.tab_spectrum2**2+n_config**2*self.tab_spectrum**2
+    self.tab_spectrum *= n_config
+# Now compute the average spectrum by summing over processes
+    toto = np.empty_like(self.tab_spectrum)
+#    comm.Allreduce(self.tab_spectrum,toto)
+    self.tab_spectrum = np.copy(toto)/nprocs
+#    print('Toto inside mpi_merge process : ',rank,'toto = ',toto[220])
+#    self.tab_spectrum = np.copy(toto)/nprocs
+    toto2 = np.empty_like(self.tab_spectrum2)
+    comm.Allreduce(self.tab_spectrum2,toto2)
+    self.tab_spectrum = np.copy(toto)/(nprocs*n_config)
+    comm.Allreduce(self.tab_spectrum2,toto2)
+    self.tab_spectrum2 = np.copy(toto2)/(nprocs*n_config) - self.tab_spectrum**2/(nprocs*n_config)
+#    print('Second Inside mpi_merge process : ',rank,'tab_spectrum = ',self.tab_spectrum[220],' tab_spectrum2 =',self.tab_spectrum2[220])
+#    print('Third Inside mpi_merge process : ',rank,'tab_spectrum = ',self.tab_spectrum[220], self.tab_spectrum2[220],toto[220])
+#     self.tab_spectrum2 = np.sqrt(toto2/nprocs - self.tab_spectrum**2/nprocs)
+    self.tab_spectrum2 = np.copy((n_config*self.tab_spectrum2-(n_config*self.tab_spectrum)**2))/(n_config*nprocs)
+#    print('Inside mpi_merge process : ',rank, 'nprocs = ',nprocs,'tab_spectrum = ',self.tab_spectrum[220],self.tab_spectrum2[220])
     return
 
 
