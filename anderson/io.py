@@ -535,6 +535,9 @@ def parse_parameter_file(mpi_version,comm,nprocs,rank,parameter_file,my_list_of_
 #  print(return_list)
   return(return_list)
 
+# DD, August, 11, 2023
+# IMPORTANT
+# When the disorder type is 'palaiseau', the output file should contain the parameters of the llaser beam
 def output_string(H,n_config,nprocs=1,propagation=None,initial_state=None,measurement=None,spectral_function=None,diagonalization=None,lyapounov=None,timing=None):
 #  print(spectral_function)
   params_string = 'Dimension                               = '+str(H.dimension)+'\n'
